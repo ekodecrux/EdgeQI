@@ -9,8 +9,8 @@ module.exports = {
         PORT: 3000
       },
       watch: false,
-      instances: 1,
-      exec_mode: 'fork'
+      instances: 'max',
+      exec_mode: 'cluster'
     }
   ]
 }

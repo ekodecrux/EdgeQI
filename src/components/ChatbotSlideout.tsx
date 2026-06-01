@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle, ThumbsUp, ThumbsDown, Database, TrendingUp, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -18,6 +18,25 @@ export default function ChatbotSlideout({
   onClose,
 }: ChatbotProps) {
   const [votedMsgs, setVotedMsgs] = useState<Record<number, 'up' | 'down'>>({});
+
+  // REQ-92: KB analytics state
+  const [showKbAnalytics, setShowKbAnalytics] = useState(false);
+  const [kbAnalytics, setKbAnalytics] = useState<any>(null);
+  const [kbLoading, setKbLoading] = useState(false);
+
+  const loadKbAnalytics = async () => {
+    setKbLoading(true);
+    try {
+      const res = await fetch('/api/quality/rag/analytics');
+      if (res.ok) setKbAnalytics(await res.json());
+    } finally { setKbLoading(false); }
+  };
+
+  const toggleKbAnalytics = () => {
+    const next = !showKbAnalytics;
+    setShowKbAnalytics(next);
+    if (next && !kbAnalytics) loadKbAnalytics();
+  };
 
   const sendFeedback = async (idx: number, vote: 'up' | 'down', content: string) => {
     setVotedMsgs(prev => ({ ...prev, [idx]: vote }));
@@ -172,6 +191,93 @@ export default function ChatbotSlideout({
             <ArrowRight className="w-3 h-3 text-slate-400" />
           </button>
         </div>
+      </div>
+
+      {/* REQ-92: KB Analytics Panel */}
+      <div className="border-t border-slate-200 bg-white">
+        <button
+          onClick={toggleKbAnalytics}
+          className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-mono text-slate-500 hover:bg-slate-50 transition-all"
+          aria-label="Toggle KB analytics panel"
+        >
+          <span className="flex items-center gap-1.5">
+            <Database className="w-3 h-3 text-purple-500" />
+            Knowledge Base Analytics
+          </span>
+          <div className="flex items-center gap-2">
+            {kbAnalytics && (
+              <span className="text-emerald-600 font-bold">{kbAnalytics.docCount} docs</span>
+            )}
+            {showKbAnalytics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </div>
+        </button>
+
+        {showKbAnalytics && (
+          <div className="px-4 pb-3 space-y-3 bg-slate-50 border-t border-slate-100">
+            {kbLoading && (
+              <p className="text-[10px] text-slate-400 text-center py-2">Loading analytics...</p>
+            )}
+            {!kbLoading && kbAnalytics && (
+              <>
+                {/* Summary stats */}
+                <div className="grid grid-cols-3 gap-1.5 pt-2">
+                  <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                    <div className="text-base font-bold text-purple-700">{kbAnalytics.docCount}</div>
+                    <div className="text-[9px] text-slate-500 font-mono uppercase">Docs</div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                    <div className="text-base font-bold text-blue-700">{kbAnalytics.searchActivity?.totalSearches ?? 0}</div>
+                    <div className="text-[9px] text-slate-500 font-mono uppercase">Searches</div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                    <div className="text-base font-bold text-emerald-700">{kbAnalytics.searchActivity?.avgLatencyMs ?? 0}ms</div>
+                    <div className="text-[9px] text-slate-500 font-mono uppercase">Avg Latency</div>
+                  </div>
+                </div>
+
+                {/* Doc status breakdown */}
+                {kbAnalytics.statusBreakdown?.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono uppercase text-slate-400">Doc Status</span>
+                    {kbAnalytics.statusBreakdown.map((s: any) => (
+                      <div key={s.status} className="flex items-center justify-between text-[10px]">
+                        <span className="font-mono text-slate-600 capitalize">{s.status || 'indexed'}</span>
+                        <span className="font-bold text-slate-800">{s.cnt}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Top queries */}
+                {kbAnalytics.topQueries?.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono uppercase text-slate-400 flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3" /> Top Queries
+                    </span>
+                    {kbAnalytics.topQueries.slice(0, 5).map((q: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between text-[9px] font-mono">
+                        <span className="text-slate-600 truncate max-w-[75%]">{q.query}</span>
+                        <span className="text-purple-600 font-bold">{q.hits}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Refresh button */}
+                <button
+                  onClick={loadKbAnalytics}
+                  className="flex items-center gap-1 text-[9px] font-mono text-slate-400 hover:text-slate-600 mx-auto"
+                  aria-label="Refresh KB analytics"
+                >
+                  <RefreshCw className="w-3 h-3" /> Refresh
+                </button>
+              </>
+            )}
+            {!kbLoading && !kbAnalytics && (
+              <p className="text-[10px] text-slate-400 text-center py-2">No data yet. Upload documents to the KB.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Input textbox bar */}

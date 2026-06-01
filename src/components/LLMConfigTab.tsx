@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List } from 'lucide-react';
+import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2 } from 'lucide-react';
 
 interface Provider {
   id: string;
@@ -18,6 +18,29 @@ export default function LLMConfigTab() {
   const [customUrl, setCustomUrl] = useState('');
   const [customKey, setCustomKey] = useState('');
   const [customModel, setCustomModel] = useState('');
+
+  // REQ-98: LLM cache stats
+  const [cacheStats, setCacheStats] = useState<{ size: number; ttlMs: number } | null>(null);
+  const [cacheClearMsg, setCacheClearMsg] = useState('');
+  const [cacheLoading, setCacheLoading] = useState(false);
+
+  const loadCacheStats = async () => {
+    setCacheLoading(true);
+    try {
+      const res = await fetch('/api/quality/llm/cache/stats');
+      if (res.ok) setCacheStats(await res.json());
+    } finally { setCacheLoading(false); }
+  };
+
+  const clearCache = async () => {
+    const res = await fetch('/api/quality/llm/cache', { method: 'DELETE' });
+    const data = await res.json();
+    setCacheStats(prev => prev ? { ...prev, size: 0 } : prev);
+    setCacheClearMsg(data.message || 'Cache cleared');
+    setTimeout(() => setCacheClearMsg(''), 3000);
+  };
+
+  useEffect(() => { loadCacheStats(); }, []);
 
   // Ollama state (REQ-96)
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
@@ -329,6 +352,54 @@ export default function LLMConfigTab() {
             </a>
           </div>
         </div>
+      </div>
+
+      {/* REQ-98: LLM Response Cache */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-violet-400" />
+            <h3 className="text-white font-semibold text-sm">LLM Response Cache (REQ-98)</h3>
+          </div>
+          <button
+            onClick={loadCacheStats}
+            disabled={cacheLoading}
+            aria-label="Refresh cache stats"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 text-xs transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${cacheLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-slate-700">
+            <div className="text-2xl font-bold text-violet-400">{cacheStats?.size ?? '—'}</div>
+            <div className="text-[10px] text-slate-500 uppercase font-mono mt-0.5">Cached Entries</div>
+          </div>
+          <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-slate-700">
+            <div className="text-2xl font-bold text-blue-400">{cacheStats ? Math.round(cacheStats.ttlMs / 60000) : '—'}m</div>
+            <div className="text-[10px] text-slate-500 uppercase font-mono mt-0.5">TTL</div>
+          </div>
+          <div className="bg-slate-900/50 rounded-lg p-3 text-center border border-slate-700">
+            <div className="text-2xl font-bold text-emerald-400">{cacheStats && cacheStats.size > 0 ? 'Active' : 'Empty'}</div>
+            <div className="text-[10px] text-slate-500 uppercase font-mono mt-0.5">Status</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={clearCache}
+            disabled={!cacheStats || cacheStats.size === 0}
+            aria-label="Clear LLM response cache"
+            className="flex items-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg transition-all disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Clear Cache
+          </button>
+          {cacheClearMsg && (
+            <span className="text-xs text-emerald-400 font-mono">{cacheClearMsg}</span>
+          )}
+        </div>
+        <p className="text-slate-500 text-xs mt-3 leading-relaxed">
+          Identical LLM prompts are served from cache for {cacheStats ? Math.round((cacheStats?.ttlMs ?? 300000) / 60000) : 5} minutes — reducing API cost and latency.
+        </p>
       </div>
 
       {/* Fallback chain */}

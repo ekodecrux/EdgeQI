@@ -488,7 +488,38 @@ export default function DefectPredictTab({
           {/* Render Impact reports stack */}
           {impactReports.length > 0 ? (
             <div className="space-y-4">
-              <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400">Graphed Overlap Outcomes</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400">Graphed Overlap Outcomes</span>
+                {/* REQ-72: Impact export buttons */}
+                <div className="flex gap-1">
+                  <button
+                    onClick={async () => {
+                      const res = await fetch('/api/quality/impact/export?format=csv');
+                      const blob = await res.blob();
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                      a.download = 'impact-reports.csv'; a.click();
+                    }}
+                    aria-label="Export impact reports as CSV"
+                    title="Export impact reports as CSV"
+                    className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono rounded border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    <Download className="w-2.5 h-2.5" /> CSV
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch('/api/quality/impact/export?format=json');
+                      const blob = await res.blob();
+                      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                      a.download = 'impact-reports.json'; a.click();
+                    }}
+                    aria-label="Export impact reports as JSON"
+                    title="Export impact reports as JSON"
+                    className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono rounded border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    <FileJson className="w-2.5 h-2.5" /> JSON
+                  </button>
+                </div>
+              </div>
               <div className="space-y-2">
                 {impactReports.map((rep, idx) => {
                   const isActive = activeReportIndex === idx;
