@@ -36,7 +36,9 @@ import {
   History,
   TrendingUp,
   Percent,
-  Plus
+  Plus,
+  RotateCcw,
+  Radio
 } from 'lucide-react';
 import AgentFlowVisualizer from './AgentFlowVisualizer';
 import { AgentStep } from '../types';
@@ -218,11 +220,63 @@ export default function ExecutionEnginePage({
   const [abortingRunId, setAbortingRunId] = useState<string | null>(null);
   const [abortMsg, setAbortMsg] = useState('');
 
+  // REQ-52: Re-run failed tests only
+  const [rerunningFailed, setRerunningFailed] = useState(false);
+  const [rerunMsg, setRerunMsg] = useState('');
+
+  // REQ-57: Live run status polling map { runId → status string }
+  const [liveRunStatus, setLiveRunStatus] = useState<Record<string, string>>({});
+  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
+
   // Custom execution thresholds parameter configurations
   const [successThreshold, setSuccessThreshold] = useState<number>(85);
   const [durationThreshold, setDurationThreshold] = useState<number>(4.4); // target maximum duration in seconds
   const [healedThreshold, setHealedThreshold] = useState<number>(3); // target minimum self-healed locators count
   const [showThresholdConfig, setShowThresholdConfig] = useState<boolean>(false);
+
+  // REQ-52: Re-run failed test cases only
+  const handleRerunFailed = async () => {
+    const lastRun = history[0];
+    if (!lastRun || lastRun.failed === 0) {
+      setRerunMsg('No failed tests to re-run.');
+      setTimeout(() => setRerunMsg(''), 3000);
+      return;
+    }
+    setRerunningFailed(true);
+    setRerunMsg('');
+    try {
+      const res = await fetch('/api/quality/execution/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ failedOnly: true, baseRunId: lastRun.runId, totalTests: lastRun.failed }),
+      });
+      const data = await res.json();
+      if (data.runId) {
+        setRerunMsg(`Re-run started: ${data.runId}`);
+        setTimeout(() => setRerunMsg(''), 4000);
+      }
+    } catch (e: any) {
+      setRerunMsg(`Re-run failed: ${e.message}`);
+      setTimeout(() => setRerunMsg(''), 4000);
+    } finally {
+      setRerunningFailed(false);
+    }
+  };
+
+  // REQ-57: Poll status for a specific run (called on-demand per row)
+  const pollRunStatus = async (runId: string) => {
+    if (pollingRunId === runId) return;   // already polling
+    setPollingRunId(runId);
+    try {
+      const res = await fetch(`/api/quality/execution/runs/${runId}/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setLiveRunStatus(prev => ({ ...prev, [runId]: data.status || 'unknown' }));
+      }
+    } finally {
+      setPollingRunId(null);
+    }
+  };
 
   // Load run history from API on mount
   useEffect(() => {
@@ -816,6 +870,20 @@ export default function ExecutionEnginePage({
                   </>
                 )}
               </button>
+              {/* REQ-52: Re-run Failed button */}
+              {!isRunning && history.length > 0 && history[0].failed > 0 && (
+                <button
+                  onClick={handleRerunFailed}
+                  disabled={rerunningFailed}
+                  aria-label="Re-run failed test cases from last run"
+                  title={`Re-run ${history[0].failed} failed test(s) from ${history[0].runId}`}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-mono font-bold hover:bg-amber-100 transition-all disabled:opacity-50"
+                >
+                  {rerunningFailed ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  Re-run Failed ({history[0].failed})
+                </button>
+              )}
+              {rerunMsg && <span className="text-xs text-amber-700 font-mono">{rerunMsg}</span>}
               {/* REQ-56: Abort button — visible when running */}
               {isRunning && currentRunId && (
                 <button
@@ -1450,6 +1518,28 @@ export default function ExecutionEnginePage({
                                   {record.runId}
                                   {isPrimary && <span className="text-[8px] bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold font-mono px-1.5 rounded uppercase">Primary</span>}
                                   {isBaseline && <span className="text-[8px] bg-slate-100 border border-slate-200 text-slate-600 font-bold font-mono px-1.5 rounded uppercase">Baseline</span>}
+                                  {/* REQ-57: Live status badge */}
+                                  {liveRunStatus[record.runId] ? (
+                                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded border ${
+                                      liveRunStatus[record.runId] === 'aborted' ? 'bg-red-50 border-red-200 text-red-600' :
+                                      liveRunStatus[record.runId] === 'running'  ? 'bg-blue-50 border-blue-200 text-blue-600 animate-pulse' :
+                                      'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    }`}>
+                                      {liveRunStatus[record.runId].toUpperCase()}
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => pollRunStatus(record.runId)}
+                                      disabled={pollingRunId === record.runId}
+                                      aria-label={`Poll live status for run ${record.runId}`}
+                                      title="Poll live run status"
+                                      className="text-slate-300 hover:text-blue-500 transition-all"
+                                    >
+                                      {pollingRunId === record.runId
+                                        ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                        : <Radio className="w-3 h-3" />}
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                               <td className="p-3.5 text-slate-500">{record.timestamp}</td>

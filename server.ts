@@ -10,11 +10,38 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { sqliteDb, dbAddAudit, dbInsert, dbGetAll, dbCount, hydrateRow, parseJsonField } from "./src/db.js";
 import { chromium } from "playwright";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// ── NFR-07: HTTP Security Headers (helmet) ────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: false,   // disabled — Vite dev injects inline scripts
+  crossOriginEmbedderPolicy: false,
+}));
+
+// ── NFR-08: API Rate Limiting ─────────────────────────────────────────────────
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15-minute window
+  max: 500,                    // max 500 requests per window per IP
+  standardHeaders: true,       // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.', retryAfter: '15 minutes' },
+});
+app.use('/api/', apiLimiter);
+
+// Stricter limiter for auth endpoints (prevent brute-force)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many auth attempts, please try again later.' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -210,6 +237,16 @@ app.post("/api/quality/assistant/chat", async (req, res) => {
 // 2. FILE AND DOCUMENT INGESTION (RAG)
 app.get("/api/quality/rag/documents", (req, res) => {
   res.json(db.ragDocuments);
+});
+
+// ── REQ-93: DELETE a KB document ─────────────────────────────────────────────
+app.delete("/api/quality/rag/documents/:id", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const existing = sqliteDb.prepare("SELECT id FROM rag_documents WHERE id = ?").get(id);
+  if (!existing) return res.status(404).json({ error: "Document not found" });
+  sqliteDb.prepare("DELETE FROM rag_documents WHERE id = ?").run(id);
+  addAudit("RAG Document Deleted", id, `KB document ${id} removed`, 0);
+  res.json({ success: true, deleted: id });
 });
 
 // RAG upload — JSON body (text paste)

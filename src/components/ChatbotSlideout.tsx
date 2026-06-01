@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle, ThumbsUp, ThumbsDown, Database, TrendingUp, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle, ThumbsUp, ThumbsDown, Database, TrendingUp, RefreshCw, ChevronDown, ChevronUp, Trash2, FileText } from 'lucide-react';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -23,6 +23,11 @@ export default function ChatbotSlideout({
   const [showKbAnalytics, setShowKbAnalytics] = useState(false);
   const [kbAnalytics, setKbAnalytics] = useState<any>(null);
   const [kbLoading, setKbLoading] = useState(false);
+  // REQ-93: KB docs list with delete
+  const [kbDocs, setKbDocs] = useState<any[]>([]);
+  const [kbDocsLoading, setKbDocsLoading] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [showDocsList, setShowDocsList] = useState(false);
 
   const loadKbAnalytics = async () => {
     setKbLoading(true);
@@ -32,10 +37,40 @@ export default function ChatbotSlideout({
     } finally { setKbLoading(false); }
   };
 
+  const loadKbDocs = async () => {
+    setKbDocsLoading(true);
+    try {
+      const res = await fetch('/api/quality/rag/documents');
+      if (res.ok) {
+        const data = await res.json();
+        setKbDocs(Array.isArray(data) ? data : data.documents || []);
+      }
+    } finally { setKbDocsLoading(false); }
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    if (!window.confirm('Delete this KB document? This cannot be undone.')) return;
+    setDeletingDocId(docId);
+    try {
+      const res = await fetch(`/api/quality/rag/documents/${docId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setKbDocs(prev => prev.filter(d => d.id !== docId));
+        // Refresh analytics count
+        setKbAnalytics((prev: any) => prev ? { ...prev, docCount: Math.max(0, (prev.docCount || 1) - 1) } : prev);
+      }
+    } finally { setDeletingDocId(null); }
+  };
+
   const toggleKbAnalytics = () => {
     const next = !showKbAnalytics;
     setShowKbAnalytics(next);
     if (next && !kbAnalytics) loadKbAnalytics();
+  };
+
+  const toggleDocsList = () => {
+    const next = !showDocsList;
+    setShowDocsList(next);
+    if (next) loadKbDocs();
   };
 
   const sendFeedback = async (idx: number, vote: 'up' | 'down', content: string) => {
@@ -275,6 +310,71 @@ export default function ChatbotSlideout({
             )}
             {!kbLoading && !kbAnalytics && (
               <p className="text-[10px] text-slate-400 text-center py-2">No data yet. Upload documents to the KB.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* REQ-93: KB Document List with Delete */}
+      <div className="border-t border-slate-200 bg-white">
+        <button
+          onClick={toggleDocsList}
+          className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-mono text-slate-500 hover:bg-slate-50 transition-all"
+          aria-label="Toggle KB documents list"
+        >
+          <span className="flex items-center gap-1.5">
+            <FileText className="w-3 h-3 text-blue-500" />
+            Manage KB Documents
+          </span>
+          <div className="flex items-center gap-2">
+            {kbDocs.length > 0 && (
+              <span className="text-blue-600 font-bold">{kbDocs.length}</span>
+            )}
+            {showDocsList ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </div>
+        </button>
+
+        {showDocsList && (
+          <div className="px-4 pb-3 space-y-2 bg-slate-50 border-t border-slate-100">
+            {kbDocsLoading && (
+              <p className="text-[10px] text-slate-400 text-center py-2">Loading documents...</p>
+            )}
+            {!kbDocsLoading && kbDocs.length === 0 && (
+              <div className="text-center py-4 space-y-1">
+                <FileText className="w-6 h-6 text-slate-200 mx-auto" />
+                <p className="text-[10px] text-slate-400">No documents in the KB yet.</p>
+              </div>
+            )}
+            {kbDocs.map((doc: any) => (
+              <div key={doc.id} className="flex items-center justify-between bg-white rounded-lg border border-slate-200 px-2.5 py-2 gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-slate-700 truncate">{doc.name || doc.id}</p>
+                    <p className="text-[9px] text-slate-400 font-mono">{doc.size || '—'} · {doc.chunks_count || 0} chunks</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteDoc(doc.id)}
+                  disabled={deletingDocId === doc.id}
+                  aria-label={`Delete KB document ${doc.name || doc.id}`}
+                  title="Delete document"
+                  className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-40 shrink-0"
+                >
+                  {deletingDocId === doc.id
+                    ? <RefreshCw className="w-3 h-3 animate-spin" />
+                    : <Trash2 className="w-3 h-3" />}
+                </button>
+              </div>
+            ))}
+            {!kbDocsLoading && kbDocs.length > 0 && (
+              <button
+                onClick={loadKbDocs}
+                className="flex items-center gap-1 text-[9px] font-mono text-slate-400 hover:text-slate-600 mx-auto pt-1"
+                aria-label="Refresh KB document list"
+              >
+                <RefreshCw className="w-3 h-3" /> Refresh list
+              </button>
             )}
           </div>
         )}
