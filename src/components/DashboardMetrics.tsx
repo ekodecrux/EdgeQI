@@ -50,6 +50,19 @@ export default function DashboardMetrics({
   onNavigateToAgentic,
 }: DashboardProps) {
   const [persona, setPersona] = useState<'tactical' | 'operational' | 'strategic'>('tactical');
+
+  // NFR-09: SLA monitor state
+  const [slaData, setSlaData] = useState<{avg:number;p50:number;p95:number;p99:number;status:string;slaBreachRate:number;sampleCount:number}|null>(null);
+  const [slaLoading, setSlaLoading] = useState(false);
+  const loadSla = async () => {
+    setSlaLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/health/sla', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      setSlaData(data);
+    } catch { /* silent */ } finally { setSlaLoading(false); }
+  };
   
   // Drill-down states
   const [selectedModuleCategory, setSelectedModuleCategory] = useState<string>('Billing & Card Payments');
@@ -1097,6 +1110,47 @@ export default function DashboardMetrics({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* NFR-09: SLA / Response-Time Monitor Widget */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-violet-600" />
+              API Response-Time SLA Monitor
+            </h3>
+            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Live p50/p95/p99 latency across all /api/* routes. SLA target: &lt;2000ms.</p>
+          </div>
+          <button onClick={loadSla} disabled={slaLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+            {slaLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading...</> : <><RefreshCw className="w-3.5 h-3.5" /> Refresh SLA</>}
+          </button>
+        </div>
+        {slaData ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            {[
+              { label: 'Samples', value: slaData.sampleCount, unit: '' },
+              { label: 'Avg', value: slaData.avg, unit: 'ms' },
+              { label: 'p50', value: slaData.p50, unit: 'ms' },
+              { label: 'p95', value: slaData.p95, unit: 'ms' },
+              { label: 'p99', value: slaData.p99, unit: 'ms' },
+            ].map(m => (
+              <div key={m.label} className={`border rounded-xl p-3 text-center ${m.label === 'p95' && slaData.p95 > 2000 ? 'bg-rose-50 border-rose-200' : m.label === 'p95' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="text-base font-bold text-slate-800">{m.value}{m.unit}</div>
+                <div className="text-[9px] font-mono text-slate-500 uppercase">{m.label}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Refresh SLA" to measure API response-time latencies.</p>
+        )}
+        {slaData && (
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold border ${slaData.status === 'healthy' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : slaData.status === 'degraded' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+            <span className="uppercase">{slaData.status}</span>
+            <span className="font-normal text-slate-500">— breach rate: {slaData.slaBreachRate}% of {slaData.sampleCount} sampled requests exceeded 2s SLA</span>
+          </div>
+        )}
       </div>
     </div>
   );

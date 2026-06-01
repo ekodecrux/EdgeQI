@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap, Download } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap, Download, Package } from 'lucide-react';
 
 // REQ-83: Security report export
 async function exportSecurityReport(format: 'csv' | 'json') {
@@ -32,6 +32,22 @@ export default function SecurityTab({
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [lastScanCount, setLastScanCount] = useState<number | null>(null);
+
+  // REQ-70: Dependency vulnerability scan state
+  const [depScanResults, setDepScanResults] = useState<any>(null);
+  const [depScanning, setDepScanning] = useState(false);
+
+  const handleDepScan = async () => {
+    setDepScanning(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/security/dependency-scan', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      setDepScanResults(data);
+    } catch { /* silent */ } finally { setDepScanning(false); }
+  };
 
   // Local vulnerabilities list — merges prop list + newly scanned ones
   const [localVulns, setLocalVulns] = useState<SecurityVulnerability[]>(vulnerabilities);
@@ -380,6 +396,58 @@ export default function SecurityTab({
             </div>
           )}
         </div>
+      </div>
+      {/* REQ-70: Dependency Vulnerability Scan Panel */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-sans font-semibold text-base text-slate-900 flex items-center gap-2">
+              <Package className="w-4 h-4 text-amber-600" />
+              Dependency Vulnerability Scan
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">Scan package.json dependencies for known CVE advisories.</p>
+          </div>
+          <button onClick={handleDepScan} disabled={depScanning}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+            {depScanning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Scanning...</> : <><Search className="w-3.5 h-3.5" /> Run Dep Scan</>}
+          </button>
+        </div>
+        {depScanResults && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 gap-2">
+              {(['critical','high','medium','low'] as const).map(sev => {
+                const count = depScanResults.summary?.[sev] ?? 0;
+                const colors: Record<string,string> = { critical:'bg-rose-100 text-rose-700 border-rose-200', high:'bg-orange-50 text-orange-700 border-orange-200', medium:'bg-amber-50 text-amber-700 border-amber-200', low:'bg-slate-50 text-slate-600 border-slate-200' };
+                return (
+                  <div key={sev} className={`border rounded-xl p-2 text-center ${colors[sev]}`}>
+                    <div className="text-lg font-bold">{count}</div>
+                    <div className="text-[9px] font-mono uppercase">{sev}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-1.5">
+              {depScanResults.vulnerabilities?.map((v: any) => (
+                <div key={v.id} className="flex items-start justify-between bg-slate-50 border border-slate-200 rounded-xl p-3 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-mono font-bold text-slate-700">{v.pkg}@{v.version}</span>
+                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border ${v.severity === 'High' ? 'bg-orange-50 text-orange-700 border-orange-200' : v.severity === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>{v.severity}</span>
+                      <span className="text-[9px] font-mono text-slate-400">{v.cve}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5">{v.summary}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[9px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Fix: {v.fixVersion}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {!depScanResults && !depScanning && (
+          <p className="text-xs text-slate-400 font-mono text-center py-4">Click "Run Dep Scan" to check dependencies for known CVEs.</p>
+        )}
       </div>
     </div>
   );

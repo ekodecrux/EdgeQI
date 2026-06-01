@@ -20,7 +20,10 @@ import {
   RefreshCw,
   Copy,
   Upload,
-  X
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  Tag
 } from 'lucide-react';
 import { TestCase } from '../types';
 
@@ -60,6 +63,16 @@ export default function TestCaseGeneratorPage({
   const [isExporting, setIsExporting] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [regenFeedback, setRegenFeedback] = useState<Record<string, string>>({});
+
+  // REQ-36: TC approval state
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [approvalMap, setApprovalMap] = useState<Record<string, 'pending'|'approved'|'rejected'>>({});
+  const [approvalMsg, setApprovalMsg] = useState('');
+
+  // REQ-13: TC tagging state
+  const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
+  const [tagInput, setTagInput] = useState<Record<string, string>>({});
+  const [activeTagFilter, setActiveTagFilter] = useState<string>('');
 
   // REQ-28: Clone state
   const [cloningId, setCloningId] = useState<string | null>(null);
@@ -142,6 +155,44 @@ export default function TestCaseGeneratorPage({
     setTimeout(() => setFeedback(''), 3000);
   };
 
+  // REQ-36: TC approval/sign-off
+  const handleApprove = async (tc: TestCase, action: 'approve' | 'reject') => {
+    setApprovingId(tc.id);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch(`/api/quality/testcases/${tc.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action, approvedBy: 'qa-lead' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApprovalMap(prev => ({ ...prev, [tc.id]: data.status }));
+        setApprovalMsg(`${tc.id} ${data.status}`);
+        setTimeout(() => setApprovalMsg(''), 3000);
+      }
+    } catch (e: any) {
+      setApprovalMsg(`Approval failed: ${e.message}`);
+      setTimeout(() => setApprovalMsg(''), 3000);
+    } finally { setApprovingId(null); }
+  };
+
+  // REQ-13: Save tags for a TC
+  const handleSaveTags = async (tcId: string) => {
+    const raw = tagInput[tcId] || '';
+    const tags = raw.split(',').map(t => t.trim()).filter(Boolean);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      await fetch(`/api/quality/testcases/${tcId}/tags`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ tags })
+      });
+      setTagsMap(prev => ({ ...prev, [tcId]: tags }));
+      setTagInput(prev => ({ ...prev, [tcId]: '' }));
+    } catch { /* silent */ }
+  };
+
   // REQ-28: Clone test case
   const handleClone = async (tc: TestCase) => {
     setCloningId(tc.id);
@@ -194,9 +245,13 @@ export default function TestCaseGeneratorPage({
   const categories = ['all', 'Positive', 'Negative', 'Edge', 'Boundary'];
 
   const filteredCases = localTestCases.filter(tc => {
-    if (activeCategory === 'all') return true;
-    return tc.type.toLowerCase() === activeCategory.toLowerCase();
+    const catOk = activeCategory === 'all' || tc.type.toLowerCase() === activeCategory.toLowerCase();
+    const tagOk = !activeTagFilter || (tagsMap[tc.id] || []).includes(activeTagFilter);
+    return catOk && tagOk;
   });
+
+  // All unique tags across TCs (REQ-13)
+  const allTags = Array.from(new Set(Object.values(tagsMap).flat())).filter(Boolean);
 
   const handleCreateCase = (e: React.FormEvent) => {
     e.preventDefault();
@@ -447,10 +502,17 @@ export default function TestCaseGeneratorPage({
         {/* Right column: Test Case Inventory List Grid */}
         <div className="lg:col-span-8 flex flex-col space-y-4">
           
+          {/* REQ-36: Approval feedback banner */}
+          {approvalMsg && (
+            <div className={`px-4 py-2 rounded-xl text-xs font-mono font-bold border ${approvalMsg.includes('approved') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : approvalMsg.includes('rejected') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+              {approvalMsg}
+            </div>
+          )}
+
           {/* Controls Bar */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <span className="text-xs font-bold text-slate-700 uppercase font-mono">Filter Suite:</span>
               <div className="flex flex-wrap gap-1">
@@ -468,6 +530,19 @@ export default function TestCaseGeneratorPage({
                   </button>
                 ))}
               </div>
+              {/* REQ-13: Tag filter chips */}
+              {allTags.length > 0 && (
+                <div className="flex items-center gap-1 ml-2">
+                  <Tag className="w-3 h-3 text-indigo-400" />
+                  {allTags.map(tag => (
+                    <button key={tag} onClick={() => setActiveTagFilter(activeTagFilter === tag ? '' : tag)}
+                      className={`px-2 py-0.5 text-[9px] font-mono rounded-full border transition-all ${activeTagFilter === tag ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-bold' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-indigo-50'}`}>
+                      #{tag}
+                    </button>
+                  ))}
+                  {activeTagFilter && <button onClick={() => setActiveTagFilter('')} className="text-[9px] text-slate-400 hover:text-rose-500 ml-1"><X className="w-3 h-3" /></button>}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -643,6 +718,44 @@ export default function TestCaseGeneratorPage({
                           </span>
                         </div>
                       </div>
+                      {/* REQ-36: Approval / sign-off */}
+                      <div className="border-t border-slate-100 pt-2 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">Sign-off:</span>
+                        {approvalMap[tc.id] === 'approved' ? (
+                          <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">✔ Approved</span>
+                        ) : approvalMap[tc.id] === 'rejected' ? (
+                          <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">✘ Rejected</span>
+                        ) : (
+                          <>
+                            <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'approve'); }} disabled={approvingId === tc.id}
+                              className="flex items-center gap-1 text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-50">
+                              <ThumbsUp className="w-3 h-3" /> Approve
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'reject'); }} disabled={approvingId === tc.id}
+                              className="flex items-center gap-1 text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50">
+                              <ThumbsDown className="w-3 h-3" /> Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* REQ-13: Tag input */}
+                      <div className="border-t border-slate-100 pt-2 flex items-center gap-2 flex-wrap">
+                        <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
+                        {(tagsMap[tc.id] || []).map(tag => (
+                          <span key={tag} className="text-[9px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-full">#{tag}</span>
+                        ))}
+                        <input type="text" placeholder="Add tags (comma-sep)..." value={tagInput[tc.id] || ''}
+                          onChange={(e) => setTagInput(prev => ({ ...prev, [tc.id]: e.target.value }))}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(tc.id); } }}
+                          className="flex-1 min-w-[120px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                        <button onClick={(e) => { e.stopPropagation(); handleSaveTags(tc.id); }}
+                          className="text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all">
+                          Save
+                        </button>
+                      </div>
+
                       {/* AI Regenerate with feedback (REQ-29) */}
                       <div className="border-t border-slate-100 pt-2 flex items-center gap-2">
                         <input
