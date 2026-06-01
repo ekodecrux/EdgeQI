@@ -1,0 +1,265 @@
+/**
+ * Persistent SQLite database layer using better-sqlite3
+ * Replaces the in-memory db object — survives server restarts
+ */
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
+
+// Store DB file next to server binary in data/ directory
+const DATA_DIR = path.join(process.cwd(), "data");
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const DB_PATH = path.join(DATA_DIR, "iqstudio.db");
+export const sqliteDb = new Database(DB_PATH);
+
+// Enable WAL mode for better concurrency
+sqliteDb.pragma("journal_mode = WAL");
+sqliteDb.pragma("foreign_keys = ON");
+
+// ─── SCHEMA ───────────────────────────────────────────────────────────────────
+sqliteDb.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'qa_engineer',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME
+  );
+
+  CREATE TABLE IF NOT EXISTS requirements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    priority TEXT,
+    status TEXT DEFAULT 'Active',
+    module TEXT,
+    source TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    raw_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS test_cases (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    preconditions TEXT,
+    priority TEXT DEFAULT 'P1',
+    type TEXT DEFAULT 'Functional',
+    automation_status TEXT DEFAULT 'Automatable',
+    confidence_score INTEGER DEFAULT 0,
+    module TEXT,
+    requirement_id TEXT,
+    steps TEXT,
+    test_data TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    raw_json TEXT,
+    FOREIGN KEY(requirement_id) REFERENCES requirements(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS defect_hotspots (
+    id TEXT PRIMARY KEY,
+    module TEXT NOT NULL,
+    risk_score INTEGER DEFAULT 50,
+    defect_count INTEGER DEFAULT 0,
+    predicted_defects INTEGER DEFAULT 0,
+    root_causes TEXT,
+    last_analyzed DATETIME DEFAULT CURRENT_TIMESTAMP,
+    raw_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS impact_reports (
+    id TEXT PRIMARY KEY,
+    change_description TEXT,
+    affected_modules TEXT,
+    impacted_tc_ids TEXT,
+    risk_score INTEGER DEFAULT 50,
+    recommendations TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    raw_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS scripts (
+    id TEXT PRIMARY KEY,
+    test_case_id TEXT,
+    framework TEXT DEFAULT 'playwright',
+    language TEXT DEFAULT 'typescript',
+    code TEXT,
+    file_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    version INTEGER DEFAULT 1,
+    raw_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS performance_configs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    virtual_users INTEGER DEFAULT 100,
+    duration INTEGER DEFAULT 60,
+    ramp_up_time INTEGER DEFAULT 10,
+    target_rps INTEGER DEFAULT 500,
+    think_time INTEGER DEFAULT 1,
+    protocol TEXT DEFAULT 'HTTP',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_run DATETIME,
+    last_results TEXT,
+    raw_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS security_vulnerabilities (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    severity TEXT DEFAULT 'Medium',
+    status TEXT DEFAULT 'Open',
+    owasp_category TEXT,
+    description TEXT,
+    affected_file TEXT,
+    line_number INTEGER,
+    remediation TEXT,
+    scan_type TEXT DEFAULT 'SAST',
+    compliance_labels TEXT,
+    detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME,
+    raw_json TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS rag_documents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    size TEXT,
+    type TEXT,
+    ingested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    chunks_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'Ingested',
+    summary TEXT,
+    topics TEXT,
+    char_count INTEGER DEFAULT 0,
+    content TEXT,
+    embeddings TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS execution_runs (
+    id TEXT PRIMARY KEY,
+    total_tests INTEGER DEFAULT 0,
+    passed INTEGER DEFAULT 0,
+    failed INTEGER DEFAULT 0,
+    healed INTEGER DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    ai_summary TEXT,
+    healing_recommendations TEXT,
+    results TEXT,
+    status TEXT DEFAULT 'completed',
+    triggered_by TEXT DEFAULT 'manual',
+    branch TEXT DEFAULT 'main',
+    environment TEXT DEFAULT 'staging',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    user_email TEXT DEFAULT 'system@agenticstack.ai',
+    action TEXT NOT NULL,
+    affected_entity TEXT,
+    details TEXT,
+    latency_ms INTEGER,
+    cost_estimate REAL DEFAULT 0.002
+  );
+
+  CREATE TABLE IF NOT EXISTS prompt_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    created_by TEXT DEFAULT 'system@agenticstack.ai',
+    use_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS webhook_integrations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    url TEXT,
+    token TEXT,
+    events TEXT DEFAULT '[]',
+    active INTEGER DEFAULT 1,
+    last_triggered DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback_entries (
+    id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    comment TEXT,
+    user_email TEXT DEFAULT 'user@agenticstack.ai',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Indexes for performance
+  CREATE INDEX IF NOT EXISTS idx_tc_req_id ON test_cases(requirement_id);
+  CREATE INDEX IF NOT EXISTS idx_tc_module ON test_cases(module);
+  CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_logs(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_runs_created ON execution_runs(created_at);
+  CREATE INDEX IF NOT EXISTS idx_vulns_severity ON security_vulnerabilities(severity);
+`);
+
+// ─── SEED DEFAULT PROMPT TEMPLATES ─────────────────────────────────────────
+const templateCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM prompt_templates").get() as any).c;
+if (templateCount === 0) {
+  const insertTpl = sqliteDb.prepare(`INSERT INTO prompt_templates (id, name, prompt, category) VALUES (?, ?, ?, ?)`);
+  const templates = [
+    ["TPL-001", "Generate Tests from Requirement", "Generate comprehensive test cases for the following requirement: {{requirement}}. Include positive, negative, boundary, and edge cases.", "test-generation"],
+    ["TPL-002", "Analyze Security Vulnerabilities", "Perform OWASP Top 10 security analysis on: {{target}}. List all vulnerabilities with severity and remediation steps.", "security"],
+    ["TPL-003", "Run Regression Impact Analysis", "Analyze impact of this change: {{change}}. Identify affected test cases and modules.", "impact"],
+    ["TPL-004", "Performance Bottleneck Analysis", "Analyze performance test results and identify bottlenecks. Results: {{results}}", "performance"],
+    ["TPL-005", "Self-Healing Recommendation", "A test failed with locator error: {{error}}. Suggest 3 alternative selectors and healing strategy.", "healing"],
+  ];
+  for (const t of templates) insertTpl.run(...t);
+}
+
+// ─── HELPER FUNCTIONS ────────────────────────────────────────────────────────
+export function dbAddAudit(action: string, entity: string, details: string, latencyMs?: number, cost?: number) {
+  const id = `AUD-${Date.now().toString(36).toUpperCase()}`;
+  sqliteDb.prepare(`
+    INSERT INTO audit_logs (id, action, affected_entity, details, latency_ms, cost_estimate)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, action, entity, details, latencyMs || 0, cost || 0.002);
+}
+
+export function dbGetAll<T = any>(table: string, limit = 200, orderBy = "rowid DESC"): T[] {
+  return sqliteDb.prepare(`SELECT * FROM ${table} ORDER BY ${orderBy} LIMIT ?`).all(limit) as T[];
+}
+
+export function dbInsert(table: string, obj: Record<string, any>): void {
+  const keys = Object.keys(obj);
+  const vals = Object.values(obj);
+  const sql = `INSERT OR REPLACE INTO ${table} (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`;
+  sqliteDb.prepare(sql).run(...vals);
+}
+
+export function dbCount(table: string): number {
+  return ((sqliteDb.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as any) || { c: 0 }).c;
+}
+
+export function parseJsonField(val: any): any {
+  if (typeof val === "string") { try { return JSON.parse(val); } catch { return val; } }
+  return val;
+}
+
+// Helper to hydrate a DB row's raw_json back to full object
+export function hydrateRow(row: any): any {
+  if (!row) return null;
+  if (row.raw_json) {
+    try { return { ...JSON.parse(row.raw_json), id: row.id }; } catch {}
+  }
+  return row;
+}
+
+console.log(`[DB] SQLite connected: ${DB_PATH}`);

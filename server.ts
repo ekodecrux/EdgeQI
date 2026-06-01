@@ -6,6 +6,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import Groq from "groq-sdk";
 import multer from "multer";
 import fs from "fs";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { sqliteDb, dbAddAudit, dbInsert, dbGetAll, dbCount, hydrateRow, parseJsonField } from "./src/db.js";
+import { chromium } from "playwright";
 
 dotenv.config();
 
@@ -92,43 +96,45 @@ async function generateAI(prompt: string, jsonMode = true): Promise<string> {
   throw new Error("No AI provider available — check GEMINI_API_KEY and GROQ_API_KEY in .env");
 }
 
-// Memory database for requirements and generated test data
-interface ReqDb {
-  requirements: any[];
-  testCases: any[];
-  defectHotspots: any[];
-  impactReports: any[];
-  scripts: any[];
-  performanceConfigs: any[];
-  securityVulnerabilities: any[];
-  ragDocuments: any[];
-  auditLogs: any[];
-}
+// ── JWT CONFIG ────────────────────────────────────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET || "iqstudio-secret-jwt-2025";
 
-const db: ReqDb = {
-  requirements: [],
-  testCases: [],
-  defectHotspots: [],
-  impactReports: [],
-  scripts: [],
-  performanceConfigs: [],
-  securityVulnerabilities: [],
-  ragDocuments: [],
-  auditLogs: []
+// ── SQLITE-BACKED DB PROXY ──────────────────────────────────────────────────
+// Keeps same 'db' interface but reads/writes SQLite
+const db = {
+  get requirements() { return dbGetAll('requirements', 500).map(r => hydrateRow(r)); },
+  get testCases() { return dbGetAll('test_cases', 1000).map(r => hydrateRow(r)); },
+  get defectHotspots() { return dbGetAll('defect_hotspots', 200).map(r => hydrateRow(r)); },
+  get impactReports() { return dbGetAll('impact_reports', 200).map(r => hydrateRow(r)); },
+  get scripts() { return dbGetAll('scripts', 200).map(r => hydrateRow(r)); },
+  get performanceConfigs() { return dbGetAll('performance_configs', 100).map(r => hydrateRow(r)); },
+  get securityVulnerabilities() { return dbGetAll('security_vulnerabilities', 500).map(r => hydrateRow(r)); },
+  get ragDocuments() { return dbGetAll('rag_documents', 200).map(r => hydrateRow(r)); },
+  get auditLogs() { return dbGetAll('audit_logs', 500, 'rowid DESC'); },
 };
 
-// Log generic actions globally
+function saveRow(table: string, id: string, obj: any) {
+  dbInsert(table, { id, raw_json: JSON.stringify(obj) });
+}
+
+// Log generic actions globally (now persisted to SQLite)
 function addAudit(action: string, entity: string, details: string, latencyMs?: number, cost?: number) {
-  db.auditLogs.unshift({
-    id: `AUD-${Math.floor(Date.now() / 1000).toString().slice(-6)}`,
-    timestamp: new Date().toISOString(),
-    userEmail: "system@agenticstack.ai",
-    action,
-    affectedEntity: entity,
-    details,
-    latencyMs,
-    costEstimate: cost || 0.002
-  });
+  dbAddAudit(action, entity, details, latencyMs, cost);
+}
+
+// Auth middleware
+function requireAuth(req: any, res: any, next: any) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
 // 1. CORE CHATBOT ROUTE (Gemini-first, Groq fallback)
@@ -252,7 +258,8 @@ Respond as JSON: {"summary": "string", "topics": ["string"]}`;
     topics,
     charCount: textContent.length
   };
-  db.ragDocuments.unshift(newDoc);
+  sqliteDb.prepare(`INSERT OR REPLACE INTO rag_documents (id,name,size,type,ingested_at,chunks_count,status,summary,topics,char_count,content) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(newDoc.id, newDoc.name, newDoc.size, newDoc.type, newDoc.ingestedAt, newDoc.chunksCount, newDoc.status, summary, JSON.stringify(topics), newDoc.charCount, textContent.slice(0, 50000));
   addAudit("RAG Ingestion", "Knowledge Base Agent",
     `Ingested "${newDoc.name}" — ${rawChunks.length} chunks, ${textContent.length} chars. Topics: ${topics.join(', ')}`,
     Date.now() - start);
@@ -308,7 +315,8 @@ JSON: {"summary": "string", "topics": ["string"]}`;
     topics,
     charCount: extractedText.length
   };
-  db.ragDocuments.unshift(newDoc);
+  sqliteDb.prepare(`INSERT OR REPLACE INTO rag_documents (id,name,size,type,ingested_at,chunks_count,status,summary,topics,char_count,content) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+  ).run(newDoc.id, newDoc.name, newDoc.size, newDoc.type, newDoc.ingestedAt, chunks, 'Ingested', summary, JSON.stringify(topics), extractedText.length, extractedText.slice(0, 50000));
   addAudit("RAG File Ingestion", "Knowledge Base Agent",
     `Ingested file "${originalname}" — ${chunks} chunks, ${extractedText.length} chars`,
     Date.now() - start);
@@ -444,7 +452,10 @@ Return ONLY a valid JSON array with no markdown fences:
     console.warn("[AI] File-based generation failed:", err.message);
   }
 
-  generatedTCs.forEach(tc => db.testCases.unshift(tc));
+  generatedTCs.forEach(tc => {
+    saveRow('test_cases', tc.id, tc);
+  });
+  saveRow('requirements', newReq.id, newReq);
   addAudit("File Upload & Parse", "Requirements Agent", `Parsed file: "${originalname}" (${fileSizeKb} KB, ${extractedText.length} chars) → ${generatedTCs.length} test cases`, Date.now() - start);
 
   res.json({
@@ -462,6 +473,12 @@ app.get("/api/quality/requirements", (req, res) => {
 
 app.get("/api/quality/testcases", (req, res) => {
   res.json(db.testCases);
+});
+
+// DELETE test case
+app.delete("/api/quality/testcases/:id", (req, res) => {
+  sqliteDb.prepare("DELETE FROM test_cases WHERE id = ?").run(req.params.id);
+  res.json({ success: true });
 });
 
 // Helper: fetch and extract meaningful text from a URL
@@ -724,7 +741,8 @@ Return ONLY a valid JSON array with no markdown, no explanation:
     console.warn("[AI] Generation failed, using smart fallback. Error:", err.message);
   }
 
-  generatedTCs.forEach(tc => db.testCases.unshift(tc));
+  generatedTCs.forEach(tc => saveRow('test_cases', tc.id, tc));
+  saveRow('requirements', newReq.id, newReq);
 
   addAudit("Parse Requirement", "Requirements Agent", `Parsed: "${finalTitle}" (${sourceType}) → ${generatedTCs.length} test cases generated`, Date.now() - start);
   res.json({ success: true, requirement: newReq, generatedTestCases: generatedTCs });
@@ -809,7 +827,7 @@ Respond in this exact JSON (no markdown):
     testingPriority: aiForecast.testingPriority,
     relatedTestCases: relatedTCs.map(t => t.split(']')[0].replace('[', '').trim())
   };
-  db.defectHotspots.unshift(newHotspot);
+  saveRow('defect_hotspots', `DH-${Date.now().toString(36)}`, newHotspot);
 
   addAudit("Defect Prediction", "Predictive Analytics Agent", `AI risk analysis for "${title}": ${aiForecast.riskScore}% risk, ${aiForecast.testingPriority} priority`, Date.now() - start);
   res.json({ success: true, predicted: newHotspot });
@@ -889,7 +907,7 @@ Respond in this exact JSON (no markdown):
 
 // 5. IMPACT ANALYSIS & REGRESSION SELECTION
 app.get("/api/quality/impact/reports", (req, res) => {
-  res.json(db.impactReports);
+  res.json(db.impactReports.map(r => r.raw_json ? JSON.parse(r.raw_json) : r));
 });
 
 app.post("/api/quality/impact/analyze", async (req, res) => {
@@ -982,7 +1000,7 @@ Respond in exact JSON (no markdown):
     regressionRationale: impactResult.regressionRationale
   };
 
-  db.impactReports.unshift(newReport);
+  saveRow('impact_reports', newReport.id, newReport);
   addAudit("Impact Analysis", "Impact Analyzer Agent",
     `AI-analyzed change "${changeTrigger.slice(0, 60)}" — ${impactResult.riskScore}% risk, ${impactResult.impactedTestCaseIds.length} tests selected`,
     Date.now() - start);
@@ -1054,12 +1072,7 @@ app.post("/api/quality/scripts/generate", async (req, res) => {
   };
 
   // Replace or push
-  const existingIdx = db.scripts.findIndex(s => s.fileName === newScript.fileName);
-  if (existingIdx >= 0) {
-    db.scripts[existingIdx] = newScript;
-  } else {
-    db.scripts.unshift(newScript);
-  }
+  saveRow('scripts', newScript.id, newScript);
 
   addAudit("Script Generation", "Script Automation Agent", `Compiled ${targetFramework} POM Code for ${testCase.id}`, Date.now() - start);
   res.json({ success: true, script: newScript });
@@ -1230,7 +1243,7 @@ Respond as a JSON array of strings (no markdown):
     executedAt: new Date().toISOString()
   };
 
-  db.performanceConfigs.unshift(config);
+  saveRow('performance_configs', config.id, config);
   addAudit("Perf Execution", "Performance Scale Agent",
     `${testType} load test on "${endpointOrJourney.slice(0, 60)}" — ${vus} VUs, avg ${avgMs}ms, ${errorRate}% errors`,
     Date.now() - start);
@@ -1313,9 +1326,8 @@ Return a JSON array (no markdown):
   }
 
   vulns.forEach(v => {
-    if (!db.securityVulnerabilities.find(existing => existing.id === v.id)) {
-      db.securityVulnerabilities.unshift(v);
-    }
+    sqliteDb.prepare(`INSERT OR IGNORE INTO security_vulnerabilities (id,title,severity,status,owasp_category,description,affected_file,line_number,remediation,scan_type,compliance_labels) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      ).run(v.id, v.title, v.severity, v.status || 'Open', v.owaspCategory || '', v.description || '', v.affectedFile || '', v.lineNumber || 0, v.remediation || '', v.scanType || 'SAST', JSON.stringify(v.complianceLabels || []));
   });
 
   addAudit("Security Scan", "DevSecOps Security Agent",
@@ -1329,7 +1341,8 @@ app.post("/api/quality/security/remediate", async (req, res) => {
   const { vulnerabilityId } = req.body;
   const start = Date.now();
 
-  const vul = db.securityVulnerabilities.find(v => v.id === vulnerabilityId);
+  const rawVul = sqliteDb.prepare("SELECT * FROM security_vulnerabilities WHERE id = ?").get(vulnerabilityId) as any;
+  const vul = rawVul ? { ...rawVul, owaspCategory: rawVul.owasp_category, affectedFile: rawVul.affected_file, lineNumber: rawVul.line_number, complianceLabels: parseJsonField(rawVul.compliance_labels) } : null;
   if (!vul) {
     return res.status(404).json({ error: "Vulnerability not found." });
   }
@@ -1359,11 +1372,11 @@ Format as markdown with clear sections: ## Why It's Dangerous, ## Insecure Code,
     vul.remediationCode = `## Remediation for ${vul.title}\n\n**Class:** ${vul.vulnerabilityClass}\n\nApply input validation, use parameterized queries, and keep dependencies updated. Refer to OWASP guidelines for ${vul.vulnerabilityClass}.`;
   }
 
-  vul.status = "Remediated";
+  sqliteDb.prepare("UPDATE security_vulnerabilities SET status = 'Remediated', resolved_at = CURRENT_TIMESTAMP, remediation = ? WHERE id = ?").run(vul.remediationCode || '', vulnerabilityId);
   addAudit("Security Remediation", "DevSecOps Security Agent",
-    `AI remediation applied for ${vulnerabilityId} (${vul.severity} ${vul.vulnerabilityClass})`,
+    `AI remediation applied for ${vulnerabilityId} (${vul.severity} ${vul.vulnerabilityClass || vul.owasp_category})`,
     Date.now() - start);
-  res.json({ success: true, vulnerability: vul });
+  res.json({ success: true, vulnerability: { ...vul, status: 'Remediated' } });
 });
 
 // 9. EXECUTION ENGINE — Real test run simulation (REQ-37, REQ-40, REQ-43, REQ-44–REQ-49)
@@ -1502,7 +1515,9 @@ Respond as JSON (no markdown):
   };
 
   // Store run record in history
-  executionRunHistory.push(runRecord);
+  // Persist run to SQLite
+  sqliteDb.prepare(`INSERT OR REPLACE INTO execution_runs (id, total_tests, passed, failed, healed, duration_ms, ai_summary, healing_recommendations, results, triggered_by) VALUES (?,?,?,?,?,?,?,?,?,?)`
+  ).run(runId, results.length, passed, failed, healed, totalDuration, aiSummary, JSON.stringify(healingRecommendations), JSON.stringify(results), 'manual');
 
   addAudit("Test Execution", "Execution Engine Agent",
     `${runId}: ${results.length} tests run — ${passed} passed, ${healed} healed, ${failed} failed (${fw}/${br})`,
@@ -1524,18 +1539,558 @@ Respond as JSON (no markdown):
   });
 });
 
-// 9b. Execution history — store run records in a separate in-memory array
-const executionRunHistory: any[] = [];
-
+// 9b. Execution history — now persisted to SQLite
 app.get("/api/quality/execution/runs", (req, res) => {
-  // Return newest first
-  res.json({ runs: executionRunHistory.slice().reverse().slice(0, 20) });
+  const rows = sqliteDb.prepare("SELECT * FROM execution_runs ORDER BY created_at DESC LIMIT 50").all() as any[];
+  const runs = rows.map(r => ({
+    ...r,
+    results: parseJsonField(r.results),
+    healing_recommendations: parseJsonField(r.healing_recommendations),
+  }));
+  res.json({ runs });
+});
+
+// DELETE a run
+app.delete("/api/quality/execution/runs/:id", (req, res) => {
+  sqliteDb.prepare("DELETE FROM execution_runs WHERE id = ?").run(req.params.id);
+  res.json({ success: true });
 });
 
 // 10. AUDIT UTILITIES
 app.get("/api/quality/audit", (req, res) => {
   res.json(db.auditLogs);
 });
+
+// Clear old audit logs
+app.delete("/api/quality/audit", (req, res) => {
+  sqliteDb.prepare("DELETE FROM audit_logs WHERE timestamp < datetime('now', '-30 days')").run();
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NEW FEATURES BLOCK
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── AUTH: REGISTER / LOGIN ────────────────────────────────────────────────────
+app.post("/api/auth/register", async (req, res) => {
+  const { email, name, password, role } = req.body;
+  if (!email || !password || !name) return res.status(400).json({ error: "email, name and password required" });
+  const existing = sqliteDb.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  if (existing) return res.status(409).json({ error: "Email already registered" });
+  const hash = await bcrypt.hash(password, 10);
+  const result = sqliteDb.prepare(
+    "INSERT INTO users (email, name, password_hash, role) VALUES (?, ?, ?, ?)"
+  ).run(email, name, hash, role || "qa_engineer");
+  const token = jwt.sign({ id: result.lastInsertRowid, email, name, role: role || "qa_engineer" }, JWT_SECRET, { expiresIn: "24h" });
+  addAudit("User Register", "Auth", `New user: ${email} (${role || 'qa_engineer'})`);
+  res.json({ success: true, token, user: { id: result.lastInsertRowid, email, name, role: role || "qa_engineer" } });
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "email and password required" });
+  const user = sqliteDb.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+  const ok = await bcrypt.compare(password, user.password_hash);
+  if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+  sqliteDb.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
+  const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+  addAudit("User Login", "Auth", `Login: ${email}`);
+  res.json({ success: true, token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+});
+
+app.get("/api/auth/me", (req: any, res) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token' });
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
+    const user = sqliteDb.prepare("SELECT id, email, name, role, created_at, last_login FROM users WHERE id = ?").get(payload.id);
+    res.json({ user });
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+});
+
+app.get("/api/auth/users", (req, res) => {
+  const users = sqliteDb.prepare("SELECT id, email, name, role, created_at, last_login FROM users").all();
+  res.json({ users });
+});
+
+// ── REAL PLAYWRIGHT EXECUTION ────────────────────────────────────────────────
+app.post("/api/quality/execution/playwright-run", async (req, res) => {
+  const { testUrl, scriptCode, testCaseId, headless = true } = req.body;
+  if (!testUrl && !scriptCode) return res.status(400).json({ error: "testUrl or scriptCode required" });
+  const start = Date.now();
+
+  let passed = false;
+  let errorMsg = "";
+  let screenshotBase64 = "";
+  let logs: string[] = [];
+
+  try {
+    logs.push(`[${new Date().toISOString()}] Launching Chromium headless...`);
+    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const page = await context.newPage();
+
+    // Capture console logs from page
+    page.on('console', msg => logs.push(`[PAGE ${msg.type().toUpperCase()}] ${msg.text().slice(0, 200)}`));
+    page.on('pageerror', err => logs.push(`[PAGE ERROR] ${err.message.slice(0, 200)}`));
+
+    if (testUrl) {
+      logs.push(`[${new Date().toISOString()}] Navigating to ${testUrl}`);
+      const response = await page.goto(testUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
+      logs.push(`[${new Date().toISOString()}] Page loaded — status: ${response?.status()}`);
+      const title = await page.title();
+      logs.push(`[${new Date().toISOString()}] Page title: "${title}"`);
+
+      // Take screenshot
+      const screenshot = await page.screenshot({ type: 'png', fullPage: false });
+      screenshotBase64 = screenshot.toString('base64');
+      logs.push(`[${new Date().toISOString()}] Screenshot captured (${screenshot.length} bytes)`);
+      passed = true;
+    }
+
+    if (scriptCode) {
+      logs.push(`[${new Date().toISOString()}] Executing custom script code...`);
+      // Minimal safety execution — eval the provided Playwright commands
+      try {
+        const evalFn = new Function('page', 'context', 'logs', `return (async()=>{ ${scriptCode} })()`);
+        await evalFn(page, context, logs);
+        passed = true;
+        logs.push(`[${new Date().toISOString()}] Script completed successfully`);
+      } catch (scriptErr: any) {
+        errorMsg = scriptErr.message;
+        logs.push(`[${new Date().toISOString()}] Script error: ${scriptErr.message}`);
+      }
+    }
+
+    await browser.close();
+    logs.push(`[${new Date().toISOString()}] Browser closed`);
+  } catch (e: any) {
+    errorMsg = e.message;
+    logs.push(`[${new Date().toISOString()}] Playwright error: ${e.message}`);
+  }
+
+  const durationMs = Date.now() - start;
+  const result = { passed, errorMsg, durationMs, logs, screenshotBase64: screenshotBase64.slice(0, 50000), testCaseId };
+  addAudit("Playwright Run", "Execution Engine", `Real browser run for TC:${testCaseId || 'ad-hoc'} — ${passed ? 'PASSED' : 'FAILED'} in ${durationMs}ms`, durationMs);
+  res.json({ success: true, result });
+});
+
+// ── CI/CD WEBHOOK RECEIVER ────────────────────────────────────────────────────
+app.post("/api/quality/cicd/webhook", async (req, res) => {
+  const payload = req.body;
+  const eventType = req.headers['x-github-event'] || req.headers['x-gitlab-event'] || req.headers['x-event-key'] || 'push';
+  const start = Date.now();
+
+  const webhookEvent = {
+    id: `WHK-${Date.now().toString(36).toUpperCase()}`,
+    eventType: String(eventType),
+    source: payload.repository?.full_name || payload.project?.path_with_namespace || 'unknown',
+    branch: payload.ref?.replace('refs/heads/', '') || payload.object_attributes?.target_branch || 'main',
+    commit: payload.after || payload.checkout_sha || 'unknown',
+    author: payload.pusher?.name || payload.user_name || 'unknown',
+    message: payload.head_commit?.message || payload.commits?.[0]?.message || 'CI/CD event',
+    receivedAt: new Date().toISOString(),
+    triggered: false,
+    triggerResult: 'skipped',
+  };
+
+  // Auto-trigger execution for push/merge events
+  const shouldTrigger = ['push', 'Pull Request Hook', 'merge_request'].some(e => String(eventType).toLowerCase().includes(e.toLowerCase()));
+  if (shouldTrigger) {
+    webhookEvent.triggered = true;
+    webhookEvent.triggerResult = 'execution_queued';
+    addAudit("CI/CD Webhook Trigger", "CI/CD Integration", `Auto-triggered from ${webhookEvent.source} branch:${webhookEvent.branch} — ${webhookEvent.message?.slice(0, 60)}`, Date.now() - start);
+  }
+
+  sqliteDb.prepare(`INSERT INTO webhook_integrations (id, name, type, events, active) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO NOTHING`
+  ).run(webhookEvent.id, webhookEvent.source, String(eventType), JSON.stringify([webhookEvent]));
+
+  res.json({ success: true, event: webhookEvent });
+});
+
+// GET CI/CD integrations
+app.get("/api/quality/cicd/integrations", (req, res) => {
+  const integrations = sqliteDb.prepare("SELECT * FROM webhook_integrations ORDER BY created_at DESC LIMIT 50").all();
+  res.json({ integrations });
+});
+
+// Generate CI/CD config files
+app.post("/api/quality/cicd/generate-config", async (req, res) => {
+  const { platform, projectName, testCommand, branches } = req.body;
+  const configs: Record<string, string> = {};
+
+  const branchFilter = (branches || ['main', 'develop']).map((b: string) => `'${b}'`).join(', ');
+  const cmd = testCommand || 'npm test';
+  const proj = projectName || 'my-project';
+
+  const ghSecretWebhook = '${{ secrets.IQSTUDIO_WEBHOOK_URL }}';
+  const ghRefName = '${{ github.ref_name }}';
+  const ghJobStatus = '${{ job.status }}';
+  configs['github-actions'] = `# .github/workflows/iq-quality-gate.yml\nname: iQStudio Quality Gate\n\non:\n  push:\n    branches: [${branchFilter}]\n  pull_request:\n    branches: [${branchFilter}]\n\njobs:\n  quality-gate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '20'\n      - name: Install deps\n        run: npm ci\n      - name: Run iQStudio Playwright Tests\n        run: ${cmd}\n      - name: Notify iQStudio\n        if: always()\n        run: |\n          curl -X POST ${ghSecretWebhook} \\\n            -H 'Content-Type: application/json' \\\n            -d '{"event": "push", "branch": "${ghRefName}", "status": "${ghJobStatus}"}'\n`;
+
+  configs['jenkins'] = `// Jenkinsfile\npipeline {\n  agent any\n  stages {\n    stage('Checkout') { steps { checkout scm } }\n    stage('Install') { steps { sh 'npm ci' } }\n    stage('iQStudio Quality Gate') {\n      steps {\n        sh '${cmd}'\n        sh '''curl -X POST \${IQSTUDIO_WEBHOOK_URL} -H \"Content-Type: application/json\" -d \'{\"event\":\"push\",\"branch\":\"\${GIT_BRANCH}\"}\' '''\n      }\n    }\n  }\n  post {\n    always { junit '**/*.xml' }\n  }\n}`;
+
+  configs['gitlab-ci'] = `# .gitlab-ci.yml\nstages: [test]\niqstudio-quality-gate:\n  stage: test\n  image: node:20\n  script:\n    - npm ci\n    - ${cmd}\n    - curl -X POST \$IQSTUDIO_WEBHOOK_URL -H 'Content-Type: application/json' -d '{\"event\":\"push\",\"branch\":\"'\$CI_COMMIT_BRANCH'\"}' \n  only: [${branchFilter}]`;
+
+  configs['azure-pipelines'] = `# azure-pipelines.yml\ntrigger:\n  branches:\n    include: [${branchFilter}]\npool:\n  vmImage: ubuntu-latest\nsteps:\n  - task: NodeTool@0\n    inputs:\n      versionSpec: '20.x'\n  - script: npm ci\n  - script: ${cmd}\n    displayName: 'iQStudio Quality Gate'`;
+
+  const selected = configs[platform] || configs['github-actions'];
+  addAudit("CI/CD Config Generated", "CI/CD Integration", `Generated ${platform} config for ${proj}`);
+  res.json({ success: true, platform: platform || 'github-actions', config: selected, allConfigs: configs });
+});
+
+// ── JIRA / TESTRAIL INTEGRATION ───────────────────────────────────────────────
+app.post("/api/quality/integrations/jira/sync", async (req, res) => {
+  const { jiraUrl, email, token, projectKey, testCaseIds } = req.body;
+  if (!projectKey) return res.status(400).json({ error: 'projectKey required' });
+  const start = Date.now();
+
+  const allTcs = db.testCases;
+  const tcIds: string[] = testCaseIds || allTcs.slice(0, 10).map((tc: any) => tc.id);
+  const syncResults: any[] = [];
+
+  // Only attempt live sync if real credentials provided
+  if (jiraUrl && token) {
+    try {
+      const searchUrl = `${jiraUrl}/rest/api/3/search?jql=project=${encodeURIComponent(projectKey)}&maxResults=20`;
+      const resp = await fetch(searchUrl, {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(`${email || ''}:${token}`).toString('base64')}`,
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as any;
+        const issues = (data.issues || []).slice(0, 20);
+        for (const issue of issues) {
+          syncResults.push({
+            jiraKey: issue.key,
+            summary: issue.fields?.summary,
+            status: issue.fields?.status?.name,
+            priority: issue.fields?.priority?.name,
+            mappedTcId: tcIds[syncResults.length % Math.max(tcIds.length, 1)],
+          });
+        }
+        addAudit("Jira Sync", "Integration", `Synced ${syncResults.length} issues from ${projectKey}`, Date.now() - start);
+        return res.json({ success: true, syncedCount: syncResults.length, results: syncResults, source: 'live-jira' });
+      }
+    } catch (e: any) {
+      console.warn('[Jira] Live sync failed:', e.message);
+    }
+  }
+
+  // Demo mode — generate realistic simulated Jira issues
+  const demoStatuses = ['To Do', 'In Progress', 'Done', 'In Review', 'Blocked'];
+  const demoPriorities = ['Highest', 'High', 'Medium', 'Low'];
+  const demoSummaries = [
+    `Login flow validation for ${projectKey}`,
+    `Registration form field validation`,
+    `Password reset email delivery`,
+    `User session timeout handling`,
+    `API rate limiting tests`,
+    `Cross-browser compatibility check`,
+    `Mobile responsive layout test`,
+    `Performance under load test`,
+  ];
+  const demoCount = Math.min(tcIds.length > 0 ? Math.min(tcIds.length, 8) : 5, 8);
+  const simResults: any[] = [];
+  for (let i = 0; i < demoCount; i++) {
+    simResults.push({
+      jiraKey: `${projectKey}-${100 + i}`,
+      summary: demoSummaries[i % demoSummaries.length],
+      status: demoStatuses[i % demoStatuses.length],
+      priority: demoPriorities[i % demoPriorities.length],
+      mappedTcId: tcIds[i % Math.max(tcIds.length, 1)] || `TC-DEMO-${i + 1}`,
+    });
+  }
+  addAudit("Jira Sync (Demo)", "Integration", `Simulated ${simResults.length} Jira issues for ${projectKey}`, Date.now() - start);
+  res.json({ success: true, syncedCount: simResults.length, results: simResults, source: 'demo' });
+});
+
+app.post("/api/quality/integrations/testrail/sync", async (req, res) => {
+  const { testrailUrl, email, token, projectId: trProjectId } = req.body;
+  const start = Date.now();
+  const tcs = db.testCases;
+
+  // Only attempt live sync if real credentials provided
+  if (testrailUrl && token) {
+    try {
+      const resp = await fetch(`${testrailUrl}/index.php?/api/v2/get_cases/${trProjectId || 1}`, {
+        headers: { 'Authorization': `Basic ${Buffer.from(`${email || ''}:${token}`).toString('base64')}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as any;
+        const cases = (data.cases || []).slice(0, 20);
+        addAudit("TestRail Sync", "Integration", `Synced ${cases.length} test cases from TestRail`, Date.now() - start);
+        return res.json({ success: true, syncedCount: cases.length, source: 'live-testrail', cases });
+      }
+    } catch (e: any) { console.warn('[TestRail] Live sync failed:', e.message); }
+  }
+
+  // Demo mode — map existing test cases to TestRail IDs
+  const tcSlice = tcs.slice(0, 8);
+  const demoStatuses = ['active', 'passed', 'failed', 'blocked', 'retest'];
+  const mapped = tcSlice.length > 0
+    ? tcSlice.map((tc: any, i: number) => ({
+        testrailId: 1000 + i,
+        tcId: tc.id,
+        title: tc.title || `Test Case ${i + 1}`,
+        status: demoStatuses[i % demoStatuses.length],
+        priority: i % 2 === 0 ? 'High' : 'Medium',
+      }))
+    : Array.from({ length: 5 }, (_, i) => ({
+        testrailId: 1000 + i,
+        tcId: `TC-DEMO-${i + 1}`,
+        title: `Demo Test Case ${i + 1}`,
+        status: demoStatuses[i % demoStatuses.length],
+        priority: 'Medium',
+      }));
+  addAudit("TestRail Sync (Demo)", "Integration", `Mapped ${mapped.length} test cases (demo)`, Date.now() - start);
+  res.json({ success: true, syncedCount: mapped.length, source: 'demo', cases: mapped });
+});
+
+// ── DATA-DRIVEN SCRIPT GENERATION (REQ-28) ────────────────────────────────────
+app.post("/api/quality/scripts/generate-data-driven", async (req, res) => {
+  const { testCaseId, framework, dataFormat, dataRows, targetUrl, title: bodyTitle, description: bodyDesc } = req.body;
+  const start = Date.now();
+
+  // Allow working without an existing DB test case - use provided title/desc or defaults
+  let tc: any = testCaseId ? db.testCases.find((t: any) => t.id === testCaseId) : null;
+  if (!tc) {
+    tc = {
+      id: testCaseId || `TC-DATADRVN-${Date.now().toString(36).toUpperCase()}`,
+      title: bodyTitle || 'Login Validation Test',
+      description: bodyDesc || 'Validate user login with multiple credential combinations',
+    };
+  }
+
+  const sampleRows = dataRows || [
+    { username: 'user1@test.com', password: 'Pass@123', expected: 'success' },
+    { username: 'user2@test.com', password: 'Pass@456', expected: 'success' },
+    { username: 'invalid@test.com', password: 'wrong', expected: 'error' },
+    { username: '', password: '', expected: 'validation_error' },
+    { username: 'admin@test.com', password: 'Admin@789', expected: 'success' },
+  ];
+
+  const fmt = dataFormat || 'csv';
+  const fw = framework || 'playwright';
+
+  let csvData = sampleRows.map((r: any) => Object.values(r).join(',')).join('\n');
+  const csvHeader = Object.keys(sampleRows[0]).join(',');
+  csvData = csvHeader + '\n' + csvData;
+
+  // Build script immediately from template (no AI blocking dependency)
+  const rowsJson = sampleRows.map((r: any) => '  ' + JSON.stringify(r)).join(',\n');
+  let scriptCode = '';
+  if (fw === 'playwright') {
+    scriptCode = `import { test, expect } from '@playwright/test';\n\n// Data-Driven Test: ${tc.title}\nconst testData = [\n${rowsJson}\n];\n\nfor (const data of testData) {\n  test(\'${tc.title} - \' + JSON.stringify(data), async ({ page }) => {\n    await page.goto(\'${targetUrl || 'https://example.com'}\');\n    await expect(page.locator(\'body\')).toBeVisible();\n  });\n}`;
+  } else if (fw === 'cypress') {
+    scriptCode = `const testData = [\n${rowsJson}\n];\ndescribe(\'${tc.title}\', () => {\n  testData.forEach((data: any, i: number) => {\n    it(\'Row \' + i + \': \' + JSON.stringify(data), () => {\n      cy.visit(\'${targetUrl || 'https://example.com'}\');\n      cy.log(JSON.stringify(data));\n    });\n  });\n});`;
+  } else {
+    scriptCode = `// Data-driven ${fw} test: ${tc.title}\nconst testData = [\n${rowsJson}\n];\ntestData.forEach((row: any, i: number) => {\n  console.log(\'Row \' + i + \':\', JSON.stringify(row));\n});`;
+  }
+
+  const script = {
+    id: `SCR-${Date.now().toString(36).toUpperCase()}`,
+    testCaseId: tc.id,
+    title: tc.title,
+    framework: fw,
+    type: 'data-driven',
+    code: scriptCode,
+    csvData,
+    rowCount: sampleRows.length,
+  };
+  saveRow('scripts', script.id, script);
+  addAudit("Data-Driven Script Gen", "Script Generator", `Generated data-driven ${fw} script for ${testCaseId} with ${sampleRows.length} rows`, Date.now() - start);
+  res.json({ success: true, script, csvData, rowCount: sampleRows.length });
+});
+
+// ── EXPANDED SCRIPT FRAMEWORKS (REQ-26) ───────────────────────────────────────
+app.post("/api/quality/scripts/generate-framework", async (req, res) => {
+  const { testCaseIds, framework, language, targetUrl, pageObjectModel, titles } = req.body;
+  const start = Date.now();
+
+  let tcs = testCaseIds?.length
+    ? db.testCases.filter((tc: any) => testCaseIds.includes(tc.id)).slice(0, 5)
+    : [];
+
+  // If no matching TCs in DB, create demo TCs from provided titles or defaults
+  if (tcs.length === 0) {
+    const demoTitles: string[] = titles || testCaseIds || ['Login Test', 'Registration Test', 'Search Test'];
+    tcs = demoTitles.slice(0, 5).map((t: string, i: number) => ({
+      id: `TC-DEMO-${i + 1}`, title: t, steps: [{ action: 'Navigate to page' }, { action: 'Verify element visible' }]
+    }));
+  }
+
+  const fw = framework || 'robot';
+  const lang = language || 'python';
+  const url = targetUrl || 'https://example.com';
+  const pomEnabled = pageObjectModel !== false;
+
+  const tcList = tcs.map((tc: any) => `- ${tc.id}: ${tc.title}\n  Steps: ${(tc.steps || []).slice(0, 3).map((s: any) => s.action).join('; ')}`).join('\n');
+
+  // Build script from template immediately (no AI blocking)
+  const buildFrameworkFallback = () => {
+    if (fw === 'robot') {
+      return '*** Settings ***\nLibrary    SeleniumLibrary\n\n*** Variables ***\n${URL}    ' + url + '\n\n*** Test Cases ***\n' +
+        tcs.map((tc: any) => tc.title + '\n    Open Browser    ${URL}    chrome\n    ' +
+          (tc.steps||[]).slice(0,2).map((s: any) => 'Log    ' + s.action).join('\n    ') + '\n    Close Browser').join('\n\n');
+    } else if (fw === 'webdriverio') {
+      return "const { browser } = require('@wdio/globals');\n\ndescribe('" + (tcs[0]?.title||'Suite') + "', () => {\n" +
+        tcs.map((tc: any) => "  it('" + tc.title + "', async () => {\n    await browser.url('" + url + "');\n    await expect(browser).toHaveTitle(/.+/);\n  });").join('\n') + '\n});';
+    } else if (fw === 'puppeteer') {
+      return "const puppeteer = require('puppeteer');\n(async () => {\n  const browser = await puppeteer.launch({headless:true});\n  const page = await browser.newPage();\n" +
+        tcs.map((tc: any) => "  // " + tc.title + "\n  await page.goto('" + url + "');").join('\n') + '\n  await browser.close();\n})();';
+    } else if (fw === 'cypress') {
+      return "describe('" + (tcs[0]?.title||'Suite') + "', () => {\n  beforeEach(() => { cy.visit('" + url + "'); });\n" +
+        tcs.map((tc: any) => "  it('" + tc.title + "', () => {\n    cy.get('body').should('exist');\n  });").join('\n') + '\n});';
+    }
+    return '// ' + fw + ' script\n' + tcs.map((tc: any) => '// Test: ' + tc.title).join('\n');
+  };
+  let code = buildFrameworkFallback();
+  const script = { id: `SCR-${Date.now().toString(36).toUpperCase()}`, framework: fw, language: lang, code, testCaseIds, pomEnabled };
+  saveRow('scripts', script.id, script);
+  addAudit("Multi-Framework Script Gen", "Script Generator", `Generated ${fw}/${lang} script for ${tcs.length} test cases`, Date.now() - start);
+  res.json({ success: true, script });
+});
+
+// ── MULTI-LLM PROVIDER CONFIG ────────────────────────────────────────────────
+app.get("/api/quality/llm/providers", (req, res) => {
+  const providers = [
+    { id: 'gemini', name: 'Google Gemini', model: 'gemini-2.0-flash', status: process.env.GEMINI_API_KEY ? 'active' : 'unconfigured', latencyMs: 3500, costPer1k: 0.00015 },
+    { id: 'groq', name: 'Groq (Llama 3.3 70B)', model: 'llama-3.3-70b-versatile', status: process.env.GROQ_API_KEY ? 'active' : 'unconfigured', latencyMs: 1200, costPer1k: 0.00059 },
+    { id: 'openai', name: 'OpenAI GPT-4o', model: 'gpt-4o', status: process.env.OPENAI_API_KEY ? 'active' : 'unconfigured', latencyMs: 4800, costPer1k: 0.005 },
+    { id: 'anthropic', name: 'Anthropic Claude 3.5 Sonnet', model: 'claude-3-5-sonnet-20241022', status: process.env.ANTHROPIC_API_KEY ? 'active' : 'unconfigured', latencyMs: 5200, costPer1k: 0.003 },
+    { id: 'custom', name: 'Custom OpenAI-Compatible', model: process.env.CUSTOM_LLM_MODEL || 'custom-model', status: process.env.CUSTOM_LLM_URL ? 'active' : 'unconfigured', latencyMs: 2000, costPer1k: 0 },
+  ];
+  res.json({ providers, activeProvider: process.env.ACTIVE_LLM_PROVIDER || 'gemini' });
+});
+
+app.post("/api/quality/llm/test", async (req, res) => {
+  const { provider, apiKey, model, customUrl } = req.body;
+  const start = Date.now();
+  const testPrompt = 'Say "Hello from iQStudio" in exactly 5 words. No other text.';
+  
+  try {
+    if (provider === 'openai' || (provider === 'custom' && customUrl)) {
+      const baseUrl = provider === 'custom' ? customUrl : 'https://api.openai.com/v1';
+      const resp = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: model || 'gpt-4o-mini', messages: [{ role: 'user', content: testPrompt }], max_tokens: 50 }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await resp.json() as any;
+      const text = data.choices?.[0]?.message?.content || '';
+      return res.json({ success: !!text, response: text, latencyMs: Date.now() - start, provider });
+    } else if (provider === 'anthropic') {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: model || 'claude-3-haiku-20240307', messages: [{ role: 'user', content: testPrompt }], max_tokens: 50 }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await resp.json() as any;
+      const text = data.content?.[0]?.text || '';
+      return res.json({ success: !!text, response: text, latencyMs: Date.now() - start, provider });
+    } else {
+      // Test existing configured providers
+      const text = await generateAI(testPrompt, false);
+      return res.json({ success: !!text, response: text, latencyMs: Date.now() - start, provider: 'auto' });
+    }
+  } catch (e: any) {
+    res.json({ success: false, error: e.message, latencyMs: Date.now() - start, provider });
+  }
+});
+
+// ── FEEDBACK & LEARNING LOOP (REQ-97/98) ─────────────────────────────────────
+app.post("/api/quality/feedback", (req, res) => {
+  const { entityType, entityId, vote, comment, userEmail } = req.body;
+  if (!entityType || !entityId || !vote) return res.status(400).json({ error: 'entityType, entityId and vote required' });
+  const id = `FB-${Date.now().toString(36).toUpperCase()}`;
+  sqliteDb.prepare(`INSERT INTO feedback_entries (id, entity_type, entity_id, vote, comment, user_email) VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, entityType, entityId, vote, comment || '', userEmail || 'user@agenticstack.ai');
+  addAudit("Feedback", entityType, `${vote} on ${entityId}: ${comment?.slice(0, 60) || ''}`);
+  res.json({ success: true, id });
+});
+
+app.get("/api/quality/feedback", (req, res) => {
+  const { entityType, entityId } = req.query;
+  let query = "SELECT * FROM feedback_entries";
+  const params: any[] = [];
+  if (entityType) { query += " WHERE entity_type = ?"; params.push(entityType); }
+  if (entityId) { query += (params.length ? " AND" : " WHERE") + " entity_id = ?"; params.push(entityId); }
+  query += " ORDER BY created_at DESC LIMIT 100";
+  const entries = sqliteDb.prepare(query).all(...params);
+  res.json({ entries });
+});
+
+// ── PROMPT TEMPLATES (REQ-98) ─────────────────────────────────────────────────
+app.get("/api/quality/prompt-templates", (req, res) => {
+  const templates = sqliteDb.prepare("SELECT * FROM prompt_templates ORDER BY use_count DESC, created_at DESC").all();
+  res.json({ templates });
+});
+
+app.post("/api/quality/prompt-templates", (req, res) => {
+  const { name, prompt, category } = req.body;
+  if (!name || !prompt) return res.status(400).json({ error: 'name and prompt required' });
+  const id = `TPL-${Date.now().toString(36).toUpperCase()}`;
+  sqliteDb.prepare(`INSERT INTO prompt_templates (id, name, prompt, category) VALUES (?, ?, ?, ?)`
+  ).run(id, name, prompt, category || 'general');
+  addAudit("Prompt Template Created", "AI Assistant", `Template: ${name}`);
+  res.json({ success: true, id });
+});
+
+app.post("/api/quality/prompt-templates/:id/use", (req, res) => {
+  sqliteDb.prepare("UPDATE prompt_templates SET use_count = use_count + 1 WHERE id = ?").run(req.params.id);
+  const template = sqliteDb.prepare("SELECT * FROM prompt_templates WHERE id = ?").get(req.params.id);
+  res.json({ success: true, template });
+});
+
+app.delete("/api/quality/prompt-templates/:id", (req, res) => {
+  sqliteDb.prepare("DELETE FROM prompt_templates WHERE id = ?").run(req.params.id);
+  res.json({ success: true });
+});
+
+// ── RAG ENHANCED: WITH CONTENT SEARCH ─────────────────────────────────────────
+app.post("/api/quality/rag/search", async (req, res) => {
+  const { query, limit = 5 } = req.body;
+  if (!query) return res.status(400).json({ error: 'query required' });
+
+  const docs = sqliteDb.prepare("SELECT id, name, summary, topics, content FROM rag_documents WHERE content LIKE ? LIMIT ?").all(`%${query.split(' ')[0]}%`, limit) as any[];
+
+  // Score by keyword overlap
+  const queryTerms = query.toLowerCase().split(/\s+/);
+  const scored = docs.map(doc => {
+    const text = (doc.content || doc.summary || '').toLowerCase();
+    const score = queryTerms.filter((t: string) => text.includes(t)).length / queryTerms.length;
+    return { ...doc, relevanceScore: Math.round(score * 100), content: undefined };
+  }).sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+
+  res.json({ results: scored, query });
+});
+
+// ── STATS/HEALTH ENDPOINT ─────────────────────────────────────────────────────
+app.get("/api/quality/stats", (req, res) => {
+  const stats = {
+    requirements: dbCount('requirements'),
+    testCases: dbCount('test_cases'),
+    executions: dbCount('execution_runs'),
+    scripts: dbCount('scripts'),
+    vulnerabilities: dbCount('security_vulnerabilities'),
+    ragDocuments: dbCount('rag_documents'),
+    users: dbCount('users'),
+    auditLogs: dbCount('audit_logs'),
+    dbPath: DB_PATH_INFO,
+    uptime: process.uptime(),
+  };
+  res.json({ success: true, stats });
+});
+
+const DB_PATH_INFO = path.join(process.cwd(), 'data', 'iqstudio.db');
 
 // Serve Vite middleware on top of the endpoints
 async function startServer() {

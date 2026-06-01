@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle } from 'lucide-react';
+import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -17,6 +17,17 @@ export default function ChatbotSlideout({
   isOpen,
   onClose,
 }: ChatbotProps) {
+  const [votedMsgs, setVotedMsgs] = useState<Record<number, 'up' | 'down'>>({});
+
+  const sendFeedback = async (idx: number, vote: 'up' | 'down', content: string) => {
+    setVotedMsgs(prev => ({ ...prev, [idx]: vote }));
+    fetch('/api/quality/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entityType: 'chat_response', entityId: `msg-${idx}`, vote, comment: content.slice(0, 100) }),
+    }).catch(() => {});
+  };
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
@@ -95,6 +106,24 @@ export default function ChatbotSlideout({
                   : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none font-sans font-normal'
               }`}>
                 <div className="whitespace-pre-wrap select-text">{m.content}</div>
+                {!isUser && idx > 0 && (
+                  <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => sendFeedback(idx, 'up', m.content)}
+                      className={`p-1 rounded transition-all ${votedMsgs[idx] === 'up' ? 'text-emerald-500 bg-emerald-50' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
+                      title="Good response"
+                    >
+                      <ThumbsUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => sendFeedback(idx, 'down', m.content)}
+                      className={`p-1 rounded transition-all ${votedMsgs[idx] === 'down' ? 'text-red-500 bg-red-50' : 'text-slate-400 hover:text-red-400 hover:bg-red-50'}`}
+                      title="Poor response"
+                    >
+                      <ThumbsDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
