@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2 } from 'lucide-react';
+import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface Provider {
   id: string;
@@ -18,6 +18,49 @@ export default function LLMConfigTab() {
   const [customUrl, setCustomUrl] = useState('');
   const [customKey, setCustomKey] = useState('');
   const [customModel, setCustomModel] = useState('');
+
+  // REQ-80/81: LLM fallback chain config
+  const [fallbackChain, setFallbackChain] = useState<Array<{ provider: string; model: string; enabled: boolean; priority: number }>>([]);
+  const [chainSaving, setChainSaving] = useState(false);
+  const [chainMsg, setChainMsg] = useState('');
+
+  const loadFallbackChain = async () => {
+    const token = localStorage.getItem('iq_token');
+    const res = await fetch('/api/quality/llm/fallback-chain', { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) { const d = await res.json(); setFallbackChain(d.chain || []); }
+  };
+
+  const saveFallbackChain = async (updates: Array<{ provider: string; enabled?: boolean; priority?: number }>) => {
+    setChainSaving(true);
+    const token = localStorage.getItem('iq_token');
+    const res = await fetch('/api/quality/llm/fallback-chain', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ updates })
+    });
+    if (res.ok) { const d = await res.json(); setFallbackChain(d.chain || []); setChainMsg('Saved ✓'); setTimeout(() => setChainMsg(''), 2000); }
+    setChainSaving(false);
+  };
+
+  const toggleProvider = (provider: string) => {
+    const entry = fallbackChain.find(e => e.provider === provider);
+    if (!entry) return;
+    saveFallbackChain([{ provider, enabled: !entry.enabled }]);
+  };
+
+  const moveProvider = (provider: string, direction: 'up' | 'down') => {
+    const sorted = [...fallbackChain].sort((a, b) => a.priority - b.priority);
+    const idx = sorted.findIndex(e => e.provider === provider);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const updates = [
+      { provider: sorted[idx].provider, priority: sorted[swapIdx].priority },
+      { provider: sorted[swapIdx].provider, priority: sorted[idx].priority },
+    ];
+    saveFallbackChain(updates);
+  };
+
+  useEffect(() => { loadFallbackChain(); }, []);
 
   // REQ-98: LLM cache stats
   const [cacheStats, setCacheStats] = useState<{ size: number; ttlMs: number } | null>(null);
@@ -402,19 +445,53 @@ export default function LLMConfigTab() {
         </p>
       </div>
 
-      {/* Fallback chain */}
-      <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
-        <h4 className="text-indigo-300 font-semibold text-sm mb-2 flex items-center gap-2">
-          <Zap className="w-4 h-4" /> Auto-Fallback Chain (REQ-80)
-        </h4>
-        <div className="flex items-center gap-2 flex-wrap">
-          {['Gemini 2.0 Flash', '→', 'Groq Llama 3.3-70B', '→', 'OpenAI GPT-4o', '→', 'Custom Endpoint', '→', 'Static Fallback'].map((item, i) => (
-            item === '→'
-              ? <span key={i} className="text-slate-500 text-xs">→</span>
-              : <span key={i} className="bg-slate-800 border border-slate-600 text-slate-300 text-xs px-2 py-1 rounded-lg font-mono">{item}</span>
-          ))}
+      {/* REQ-80/81: Live Fallback Chain Config */}
+      <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-indigo-300 font-semibold text-sm flex items-center gap-2">
+            <Zap className="w-4 h-4" /> Auto-Fallback Chain (REQ-80/81)
+          </h4>
+          <div className="flex items-center gap-2">
+            {chainMsg && <span className="text-xs text-emerald-400 font-mono">{chainMsg}</span>}
+            <button onClick={loadFallbackChain} disabled={chainSaving} className="p-1.5 rounded-lg hover:bg-white/10 transition-all">
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${chainSaving ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
-        <p className="text-slate-500 text-xs mt-2">When the primary provider fails, iQStudio automatically tries the next configured provider. Gemini → Groq is active now.</p>
+        {fallbackChain.length === 0 ? (
+          <p className="text-slate-500 text-xs">Loading fallback chain…</p>
+        ) : (
+          <div className="space-y-2">
+            {[...fallbackChain].sort((a, b) => a.priority - b.priority).map((entry, idx, arr) => (
+              <div key={entry.provider} className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all ${entry.enabled ? 'bg-white/5 border-indigo-500/30' : 'bg-slate-800/30 border-slate-700/30 opacity-60'}`}>
+                <span className="text-slate-500 font-mono text-[10px] w-4 text-center font-bold">{entry.priority}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-slate-200 text-xs font-mono font-bold capitalize">{entry.provider}</span>
+                  <span className="text-slate-500 text-[10px] font-mono ml-2">{entry.model}</span>
+                </div>
+                <span className={`text-[9px] px-2 py-0.5 rounded border font-mono font-bold ${entry.enabled ? 'bg-emerald-900/30 border-emerald-500/40 text-emerald-400' : 'bg-slate-800 border-slate-600 text-slate-500'}`}>
+                  {entry.enabled ? 'ON' : 'OFF'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => moveProvider(entry.provider, 'up')} disabled={idx === 0 || chainSaving} title="Move up in priority" className="p-1 rounded hover:bg-white/10 disabled:opacity-30 transition-all">
+                    <ArrowUp className="w-3 h-3 text-slate-400" />
+                  </button>
+                  <button onClick={() => moveProvider(entry.provider, 'down')} disabled={idx === arr.length - 1 || chainSaving} title="Move down in priority" className="p-1 rounded hover:bg-white/10 disabled:opacity-30 transition-all">
+                    <ArrowDown className="w-3 h-3 text-slate-400" />
+                  </button>
+                  <button onClick={() => toggleProvider(entry.provider)} disabled={chainSaving} title={entry.enabled ? 'Disable provider' : 'Enable provider'} className="p-1 rounded hover:bg-white/10 transition-all">
+                    {entry.enabled
+                      ? <ToggleRight className="w-4 h-4 text-emerald-400" />
+                      : <ToggleLeft className="w-4 h-4 text-slate-500" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-slate-500 text-xs leading-relaxed">
+          When the primary provider fails, iQStudio automatically tries the next <span className="text-emerald-400 font-mono">ON</span> provider in priority order. Drag rows or use arrows to reorder.
+        </p>
       </div>
     </div>
   );

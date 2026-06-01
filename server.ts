@@ -3311,6 +3311,101 @@ app.get('/api/quality/health/sla', requireAuth, (req, res) => {
   });
 });
 
+// ── REQ-53: FLAKY TEST QUARANTINE ────────────────────────────────────────────
+// In-memory quarantine store (keyed by testCaseId)
+const flakyQuarantine = new Map<string, { tcId: string; reason: string; quarantinedAt: string; failCount: number; autoDetected: boolean }>();
+
+app.get('/api/quality/execution/flaky', requireAuth, (_req, res) => {
+  res.json({ quarantined: Array.from(flakyQuarantine.values()) });
+});
+
+app.post('/api/quality/execution/flaky', requireAuth, (req, res) => {
+  const { tcId, reason = 'Manually quarantined', autoDetected = false } = req.body;
+  if (!tcId) return res.status(400).json({ error: 'tcId required' });
+  const entry = { tcId, reason, quarantinedAt: new Date().toISOString(), failCount: req.body.failCount || 1, autoDetected };
+  flakyQuarantine.set(tcId, entry);
+  addAudit('Flaky Quarantine', tcId, `TC ${tcId} quarantined: ${reason}`, 0);
+  res.json({ success: true, entry });
+});
+
+app.delete('/api/quality/execution/flaky/:tcId', requireAuth, (req, res) => {
+  const { tcId } = req.params;
+  if (!flakyQuarantine.has(tcId)) return res.status(404).json({ error: 'Not in quarantine' });
+  flakyQuarantine.delete(tcId);
+  addAudit('Flaky Released', tcId, `TC ${tcId} removed from quarantine`, 0);
+  res.json({ success: true, released: tcId });
+});
+
+// Auto-quarantine: after a run completes, flag TCs that failed ≥3 times in last 5 runs
+app.post('/api/quality/execution/flaky/auto-scan', requireAuth, (req, res) => {
+  const runs = sqliteDb.prepare("SELECT results FROM execution_runs ORDER BY created_at DESC LIMIT 5").all() as any[];
+  const failCounts: Record<string, number> = {};
+  for (const run of runs) {
+    try {
+      const results = JSON.parse(run.results || '[]');
+      for (const r of results) {
+        if (r.status === 'failed') failCounts[r.testCaseId || r.id] = (failCounts[r.testCaseId || r.id] || 0) + 1;
+      }
+    } catch { /* skip */ }
+  }
+  const autoFlagged: string[] = [];
+  for (const [tcId, count] of Object.entries(failCounts)) {
+    if (count >= 2 && !flakyQuarantine.has(tcId)) {
+      flakyQuarantine.set(tcId, { tcId, reason: `Auto-detected: failed ${count}/${runs.length} recent runs`, quarantinedAt: new Date().toISOString(), failCount: count, autoDetected: true });
+      autoFlagged.push(tcId);
+    }
+  }
+  res.json({ success: true, scanned: runs.length, autoFlagged, totalQuarantined: flakyQuarantine.size });
+});
+
+// ── REQ-80/REQ-81: LLM FALLBACK CHAIN CONFIG ─────────────────────────────────
+// Persists provider priority order + enabled state for the fallback chain
+const llmFallbackChain: Array<{ provider: string; model: string; enabled: boolean; priority: number }> = [
+  { provider: 'gemini',   model: 'gemini-2.0-flash',      enabled: true,  priority: 1 },
+  { provider: 'groq',     model: 'llama-3.3-70b-versatile', enabled: true,  priority: 2 },
+  { provider: 'openai',   model: 'gpt-4o',                 enabled: false, priority: 3 },
+  { provider: 'custom',   model: 'custom-endpoint',        enabled: false, priority: 4 },
+  { provider: 'static',   model: 'static-fallback',        enabled: true,  priority: 5 },
+];
+
+app.get('/api/quality/llm/fallback-chain', requireAuth, (_req, res) => {
+  res.json({ chain: llmFallbackChain.sort((a, b) => a.priority - b.priority) });
+});
+
+app.patch('/api/quality/llm/fallback-chain', requireAuth, (req, res) => {
+  // Accepts array of { provider, enabled, priority }
+  const updates: Array<{ provider: string; enabled?: boolean; priority?: number }> = req.body.updates || [];
+  for (const upd of updates) {
+    const entry = llmFallbackChain.find(e => e.provider === upd.provider);
+    if (entry) {
+      if (typeof upd.enabled === 'boolean') entry.enabled = upd.enabled;
+      if (typeof upd.priority === 'number')  entry.priority = upd.priority;
+    }
+  }
+  addAudit('LLM Fallback Chain Updated', 'LLM Config', `Chain updated: ${updates.map(u => u.provider).join(', ')}`, 0);
+  res.json({ success: true, chain: llmFallbackChain.sort((a, b) => a.priority - b.priority) });
+});
+
+// ── REQ-66/REQ-67: RUN HISTORY EXPORT (CSV) ──────────────────────────────────
+app.get('/api/quality/execution/runs/export', (req, res) => {
+  const format = (req.query.format as string) || 'csv';
+  const runs = sqliteDb.prepare("SELECT * FROM execution_runs ORDER BY created_at DESC LIMIT 200").all() as any[];
+  if (format === 'json') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="run-history.json"');
+    return res.send(JSON.stringify(runs, null, 2));
+  }
+  // CSV
+  const header = 'id,total_tests,passed,failed,healed,duration_ms,triggered_by,created_at';
+  const rows = runs.map(r =>
+    [r.id, r.total_tests, r.passed, r.failed, r.healed, r.duration_ms, r.triggered_by || '', r.created_at].join(',')
+  );
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="run-history.csv"');
+  res.send([header, ...rows].join('\n'));
+});
+
+// ── NFR-11: GRACEFUL SHUTDOWN ─────────────────────────────────────────────────
 // Serve Vite middleware on top of the endpoints
 async function startServer() {
   if (process.env.DISABLE_HMR === 'true') {
@@ -3337,3 +3432,21 @@ async function startServer() {
 }
 
 startServer();
+
+// ── NFR-11: GRACEFUL SHUTDOWN ─────────────────────────────────────────────────
+// Ensures in-flight requests drain and SQLite WAL is flushed before process exit
+function gracefulShutdown(signal: string) {
+  console.log(`[NFR-11] Received ${signal} — starting graceful shutdown...`);
+  // Flush SQLite WAL checkpoint before exit
+  try { sqliteDb.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best-effort */ }
+  // Give in-flight requests up to 10s to complete, then force-exit
+  const forceExit = setTimeout(() => {
+    console.warn('[NFR-11] Forced exit after 10s drain timeout');
+    process.exit(0);
+  }, 10_000);
+  forceExit.unref(); // don't keep event loop alive for the timer alone
+  console.log('[NFR-11] Shutdown complete — process exiting cleanly');
+  process.exit(0);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));

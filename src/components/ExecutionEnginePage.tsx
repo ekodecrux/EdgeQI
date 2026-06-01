@@ -38,7 +38,10 @@ import {
   Percent,
   Plus,
   RotateCcw,
-  Radio
+  Radio,
+  ShieldAlert,
+  ShieldOff,
+  Filter
 } from 'lucide-react';
 import AgentFlowVisualizer from './AgentFlowVisualizer';
 import { AgentStep } from '../types';
@@ -228,6 +231,16 @@ export default function ExecutionEnginePage({
   const [liveRunStatus, setLiveRunStatus] = useState<Record<string, string>>({});
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
 
+  // REQ-53: Flaky test quarantine
+  const [quarantined, setQuarantined] = useState<Array<{tcId:string;reason:string;failCount:number;quarantinedAt:string;autoDetected:boolean}>>([]);
+  const [showQuarantine, setShowQuarantine] = useState(false);
+  const [quarantineLoading, setQuarantineLoading] = useState(false);
+  const [autoScanMsg, setAutoScanMsg] = useState('');
+
+  // REQ-66/67: Run history search + CSV export
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyExporting, setHistoryExporting] = useState(false);
+
   // Custom execution thresholds parameter configurations
   const [successThreshold, setSuccessThreshold] = useState<number>(85);
   const [durationThreshold, setDurationThreshold] = useState<number>(4.4); // target maximum duration in seconds
@@ -277,6 +290,54 @@ export default function ExecutionEnginePage({
       setPollingRunId(null);
     }
   };
+
+  // REQ-53: Load + manage flaky quarantine
+  const loadQuarantine = async () => {
+    setQuarantineLoading(true);
+    try {
+      const token = localStorage.getItem('iq_token');
+      const res = await fetch('/api/quality/execution/flaky', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { const d = await res.json(); setQuarantined(d.quarantined || []); }
+    } finally { setQuarantineLoading(false); }
+  };
+
+  const handleAutoScan = async () => {
+    setAutoScanMsg('Scanning...');
+    const token = localStorage.getItem('iq_token');
+    const res = await fetch('/api/quality/execution/flaky/auto-scan', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const d = await res.json();
+    setAutoScanMsg(`Auto-scan: ${d.autoFlagged?.length || 0} new flaky test(s) quarantined`);
+    loadQuarantine();
+    setTimeout(() => setAutoScanMsg(''), 4000);
+  };
+
+  const handleReleaseQuarantine = async (tcId: string) => {
+    const token = localStorage.getItem('iq_token');
+    await fetch(`/api/quality/execution/flaky/${tcId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    setQuarantined(prev => prev.filter(q => q.tcId !== tcId));
+  };
+
+  // REQ-66/67: Export run history as CSV
+  const handleExportRunHistory = async (format: 'csv' | 'json') => {
+    setHistoryExporting(true);
+    try {
+      const res = await fetch(`/api/quality/execution/runs/export?format=${format}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `run-history.${format}`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setHistoryExporting(false); }
+  };
+
+  // REQ-66/67: Filtered history by search query
+  const filteredHistory = historySearch.trim()
+    ? history.filter(r =>
+        r.runId.toLowerCase().includes(historySearch.toLowerCase()) ||
+        r.timestamp.toLowerCase().includes(historySearch.toLowerCase()) ||
+        String(r.passed).includes(historySearch) ||
+        String(r.failed).includes(historySearch)
+      )
+    : history;
 
   // Load run history from API on mount
   useEffect(() => {
@@ -830,6 +891,61 @@ export default function ExecutionEnginePage({
         </div>
       </div>
 
+      {/* REQ-53: Flaky Test Quarantine Panel */}
+      {showQuarantine && (
+        <div className="bg-white border border-orange-200 rounded-2xl p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-orange-500" />
+              <h3 className="font-sans font-extrabold text-slate-900 text-sm">Flaky Test Quarantine <span className="text-xs font-normal text-slate-400">(REQ-53)</span></h3>
+            </div>
+            <div className="flex items-center gap-2">
+              {autoScanMsg && <span className="text-xs text-orange-600 font-mono">{autoScanMsg}</span>}
+              <button onClick={handleAutoScan} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 text-xs font-bold hover:bg-orange-100 transition-all">
+                <Search className="w-3 h-3" /> Auto-Scan Flaky
+              </button>
+              <button onClick={loadQuarantine} disabled={quarantineLoading} className="p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${quarantineLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+          {quarantined.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs font-mono">No quarantined tests. Run Auto-Scan to detect flaky tests from recent run history.</div>
+          ) : (
+            <div className="border border-slate-100 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-orange-50 border-b border-orange-100">
+                  <tr className="text-[10px] font-mono uppercase text-orange-700 font-bold">
+                    <th className="p-3 text-left">Test Case ID</th>
+                    <th className="p-3 text-left">Reason</th>
+                    <th className="p-3 text-center">Fail Count</th>
+                    <th className="p-3 text-center">Source</th>
+                    <th className="p-3 text-left">Quarantined At</th>
+                    <th className="p-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {quarantined.map(q => (
+                    <tr key={q.tcId} className="hover:bg-orange-50/30 transition-colors">
+                      <td className="p-3 font-mono font-bold text-slate-800">{q.tcId}</td>
+                      <td className="p-3 text-slate-500 max-w-[200px] truncate" title={q.reason}>{q.reason}</td>
+                      <td className="p-3 text-center"><span className="bg-rose-50 border border-rose-200 text-rose-700 px-2 py-0.5 rounded font-mono font-bold text-[10px]">{q.failCount}x</span></td>
+                      <td className="p-3 text-center"><span className={`text-[9px] px-2 py-0.5 rounded border font-mono font-bold ${q.autoDetected ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>{q.autoDetected ? 'AUTO' : 'MANUAL'}</span></td>
+                      <td className="p-3 text-slate-400 font-mono text-[10px]">{new Date(q.quarantinedAt).toLocaleString()}</td>
+                      <td className="p-3 text-center">
+                        <button onClick={() => handleReleaseQuarantine(q.tcId)} title="Release from quarantine" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-all mx-auto">
+                          <ShieldOff className="w-3 h-3" /> Release
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Agent Sequence Flow */}
       <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100">
@@ -897,6 +1013,15 @@ export default function ExecutionEnginePage({
                 </button>
               )}
               {abortMsg && <span className="text-xs text-red-600 font-mono">{abortMsg}</span>}
+              {/* REQ-53: Flaky Quarantine toggle */}
+              <button
+                onClick={() => { setShowQuarantine(!showQuarantine); if (!showQuarantine) loadQuarantine(); }}
+                aria-label="Toggle flaky test quarantine panel"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-mono font-bold transition-all ${showQuarantine ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Quarantine {quarantined.length > 0 && <span className="bg-orange-200 text-orange-800 text-[9px] px-1.5 rounded-full font-bold">{quarantined.length}</span>}
+              </button>
             </div>
           </div>
         </div>
@@ -1463,11 +1588,33 @@ export default function ExecutionEnginePage({
 
               {/* Comprehensive Historical Run Comparison Ledger table */}
               <div className="space-y-2.5">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-wrap justify-between items-center gap-2">
                   <span className="text-[11px] font-mono font-extrabold uppercase text-slate-500 tracking-wider">
                     Historical Executable Regression Ledger
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Showing {history.length} runs</span>
+                  {/* REQ-66/67: Search + CSV/JSON export */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                      <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search runs…"
+                        value={historySearch}
+                        onChange={e => setHistorySearch(e.target.value)}
+                        className="pl-7 pr-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36"
+                        aria-label="Search run history"
+                      />
+                    </div>
+                    <button onClick={() => handleExportRunHistory('csv')} disabled={historyExporting} title="Export run history as CSV" className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-all">
+                      <Download className="w-3 h-3" /> CSV
+                    </button>
+                    <button onClick={() => handleExportRunHistory('json')} disabled={historyExporting} title="Export run history as JSON" className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold hover:bg-blue-100 transition-all">
+                      <FileJson className="w-3 h-3" /> JSON
+                    </button>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {filteredHistory.length}/{history.length} runs
+                    </span>
+                  </div>
                 </div>
 
                 <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
@@ -1484,7 +1631,10 @@ export default function ExecutionEnginePage({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-sans text-slate-650">
-                        {history.map((record) => {
+                        {filteredHistory.length === 0 && historySearch && (
+                          <tr><td colSpan={6} className="p-6 text-center text-slate-400 text-xs font-mono">No runs matching "{historySearch}"</td></tr>
+                        )}
+                        {filteredHistory.map((record) => {
                           const recSuccess = (record.passed / record.totalTests) * 100;
                           const isPrimary = record.runId === selectedRunId;
                           const isBaseline = record.runId === compareRunId;
