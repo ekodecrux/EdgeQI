@@ -23,7 +23,9 @@ import {
   Link,
   BookOpen,
   LogOut,
-  UserCircle
+  UserCircle,
+  Clock,
+  BarChart3
 } from 'lucide-react';
 
 import { 
@@ -57,6 +59,8 @@ import LLMConfigTab from './components/LLMConfigTab';
 import CICDTab from './components/CICDTab';
 import FeedbackTemplatesTab from './components/FeedbackTemplatesTab';
 import IntegrationsTab from './components/IntegrationsTab';
+import SchedulerTab from './components/SchedulerTab';
+import AnalyticsTab from './components/AnalyticsTab';
 
 export default function App() {
   // Navigation layout Page active
@@ -77,7 +81,9 @@ export default function App() {
     'llm-config' |
     'cicd' |
     'integrations' |
-    'feedback'
+    'feedback' |
+    'scheduler' |
+    'analytics'
   >('agentic');
 
   // Auth state
@@ -690,6 +696,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               <div className="pt-2 mt-1 border-t border-slate-100">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block mb-1 px-1">Config &amp; Integrations</span>
                 {[
+                  { id: 'scheduler', label: 'Test Scheduler', icon: Clock, color: 'text-indigo-600' },
+                  { id: 'analytics', label: 'AI Analytics', icon: BarChart3, color: 'text-violet-600' },
                   { id: 'cicd', label: 'CI/CD Integration', icon: GitBranch, color: 'text-cyan-600' },
                   { id: 'integrations', label: 'TMS Integrations', icon: Link, color: 'text-sky-600' },
                   { id: 'llm-config', label: 'LLM Providers', icon: Cpu, color: 'text-violet-600' },
@@ -871,6 +879,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {activeTab === 'cicd' && <CICDTab />}
           {activeTab === 'integrations' && <IntegrationsTab />}
           {activeTab === 'feedback' && <FeedbackTemplatesTab />}
+          {activeTab === 'scheduler' && <SchedulerTab />}
+          {activeTab === 'analytics' && <AnalyticsTab />}
 
           {activeTab === 'audit' && (
             <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-4">

@@ -202,6 +202,18 @@ export default function ExecutionEnginePage({
   const [aiSummaryText, setAiSummaryText] = useState<string>('');
   const [healingRecs, setHealingRecs] = useState<string[]>([]);
 
+  // Parallel run state (REQ-47)
+  const [showParallelPanel, setShowParallelPanel] = useState(false);
+  const [parallelWorkers, setParallelWorkers] = useState(3);
+  const [parallelRunning, setParallelRunning] = useState(false);
+  const [parallelResult, setParallelResult] = useState<any>(null);
+
+  // SSE streaming state (REQ-55)
+  const [sseRunId, setSseRunId] = useState('');
+  const [sseLines, setSseLines] = useState<string[]>([]);
+  const [sseConnected, setSseConnected] = useState(false);
+  const [sseEventSource, setSseEventSource] = useState<EventSource | null>(null);
+
   // Custom execution thresholds parameter configurations
   const [successThreshold, setSuccessThreshold] = useState<number>(85);
   const [durationThreshold, setDurationThreshold] = useState<number>(4.4); // target maximum duration in seconds
@@ -327,6 +339,66 @@ export default function ExecutionEnginePage({
       return () => clearTimeout(timer);
     }
   }, [isRunning, hasRunExecuted, prevIsRunning, currentRunId]);
+
+  // Parallel execution (REQ-47)
+  const handleParallelRun = async () => {
+    if (parallelRunning) return;
+    setParallelRunning(true);
+    setParallelResult(null);
+    try {
+      const res = await fetch('/api/quality/execution/parallel-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          testCaseIds: [], // empty = server generates demo IDs
+          framework: 'Playwright',
+          browser: 'Chromium',
+          workers: parallelWorkers
+        })
+      });
+      const data = await res.json();
+      setParallelResult(data);
+      if (data.runId) setSseRunId(data.runId);
+      setShowToast(`Parallel run completed! ${data.passed || 0} passed / ${data.failed || 0} failed across ${parallelWorkers} workers.`);
+      setTimeout(() => setShowToast(null), 5000);
+    } catch (e: any) {
+      setParallelResult({ error: e.message });
+    } finally {
+      setParallelRunning(false);
+    }
+  };
+
+  // SSE connect (REQ-55)
+  const connectSSE = (runId: string) => {
+    if (sseEventSource) { sseEventSource.close(); }
+    setSseLines([]);
+    setSseConnected(true);
+    const es = new EventSource(`/api/quality/execution/stream/${runId}`);
+    setSseEventSource(es);
+    es.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        const line = `[${data.timestamp || new Date().toISOString()}] ${data.message || evt.data}`;
+        setSseLines(prev => [...prev.slice(-200), line]);
+        if (data.type === 'complete' || data.type === 'error') {
+          setSseConnected(false);
+          es.close();
+        }
+      } catch {
+        setSseLines(prev => [...prev.slice(-200), evt.data]);
+      }
+    };
+    es.onerror = () => {
+      setSseConnected(false);
+      es.close();
+    };
+  };
+
+  const disconnectSSE = () => {
+    sseEventSource?.close();
+    setSseEventSource(null);
+    setSseConnected(false);
+  };
 
   // Handle Locator Self Healing Trigger
   const handleTriggerHeal = (snapId: string) => {
@@ -693,12 +765,20 @@ export default function ExecutionEnginePage({
             <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-bold block">Autonomous Agent Orchestration Map</span>
             <p className="text-xs text-slate-500">Visual state transitions across the dynamic pipelines of the testing container.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {currentRunId && (
               <span className="text-[10px] font-mono bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold">
                 Run ID: {currentRunId}
               </span>
             )}
+            {/* Parallel Run button (REQ-47) */}
+            <button
+              onClick={() => setShowParallelPanel(!showParallelPanel)}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-sans font-bold py-2 px-3 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Parallel Run
+            </button>
             <button
               onClick={onTriggerRun}
               disabled={isRunning}
@@ -726,6 +806,119 @@ export default function ExecutionEnginePage({
           isRunning={isRunning}
           onTriggerRun={onTriggerRun}
         />
+
+        {/* Parallel Run Configuration Panel (REQ-47) */}
+        {showParallelPanel && (
+          <div className="mt-4 p-5 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-sans font-bold text-purple-900">Parallel Execution Engine (REQ-47)</span>
+              </div>
+              <button onClick={() => setShowParallelPanel(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-mono text-slate-600 mb-1">Worker Threads (max 5)</label>
+                <input
+                  type="range" min="1" max="5" value={parallelWorkers}
+                  onChange={e => setParallelWorkers(Number(e.target.value))}
+                  className="w-full accent-purple-600"
+                />
+                <span className="text-xs font-mono text-purple-700 font-bold">{parallelWorkers} workers</span>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={handleParallelRun}
+                  disabled={parallelRunning}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
+                >
+                  {parallelRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running...</> : <><Play className="w-3.5 h-3.5" /> Launch Parallel Run</>}
+                </button>
+              </div>
+              <div className="flex items-end">
+                <p className="text-[10px] text-slate-500 font-mono leading-relaxed">
+                  Distributes test cases across {parallelWorkers} concurrent workers using Promise.all() bucketing for maximum throughput.
+                </p>
+              </div>
+            </div>
+            {parallelResult && !parallelResult.error && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-purple-200">
+                {[
+                  { label: 'Total', val: parallelResult.total || 0, color: 'text-slate-800' },
+                  { label: 'Passed', val: parallelResult.passed || 0, color: 'text-emerald-700' },
+                  { label: 'Failed', val: parallelResult.failed || 0, color: 'text-rose-700' },
+                  { label: 'Duration', val: `${((parallelResult.durationMs || 0)/1000).toFixed(2)}s`, color: 'text-indigo-700' },
+                ].map(m => (
+                  <div key={m.label} className="bg-white border border-purple-100 rounded-xl p-3 text-center">
+                    <p className="text-[10px] font-mono text-slate-400">{m.label}</p>
+                    <p className={`text-lg font-extrabold font-mono ${m.color}`}>{m.val}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {parallelResult?.error && (
+              <p className="text-xs text-red-600 font-mono bg-red-50 border border-red-200 rounded-lg p-2">
+                Error: {parallelResult.error}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* SSE Live Log Streaming Panel (REQ-55) */}
+        <div className="mt-4 p-4 bg-slate-800 border border-slate-700 rounded-2xl space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span className="text-xs font-mono text-slate-300 font-bold">SSE Live Log Stream (REQ-55)</span>
+              {sseConnected && <span className="text-[10px] text-emerald-400 font-mono">● CONNECTED</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Run ID (e.g. RUN-12345)"
+                value={sseRunId}
+                onChange={e => setSseRunId(e.target.value)}
+                className="bg-slate-900 border border-slate-600 text-white text-xs px-2 py-1.5 rounded-lg w-36 focus:outline-none focus:border-indigo-500 font-mono"
+              />
+              {!sseConnected ? (
+                <button
+                  onClick={() => connectSSE(sseRunId || currentRunId || 'demo')}
+                  disabled={!sseRunId && !currentRunId}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded-lg transition-all disabled:opacity-50"
+                >
+                  <Play className="w-3 h-3" /> Connect
+                </button>
+              ) : (
+                <button
+                  onClick={disconnectSSE}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 text-xs font-mono rounded-lg transition-all"
+                >
+                  <X className="w-3 h-3" /> Disconnect
+                </button>
+              )}
+              {sseLines.length > 0 && (
+                <button
+                  onClick={() => setSseLines([])}
+                  className="text-slate-500 hover:text-slate-300 text-xs font-mono px-2 py-1.5 border border-slate-600 rounded-lg"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="bg-slate-950 rounded-xl p-3 min-h-[80px] max-h-[160px] overflow-y-auto font-mono text-[11px] text-slate-300 leading-relaxed">
+            {sseLines.length === 0 ? (
+              <span className="text-slate-600">Enter a Run ID and click Connect to stream live execution events...</span>
+            ) : (
+              sseLines.map((line, i) => (
+                <div key={i} className="border-b border-slate-900 py-0.5">{line}</div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Pipeline Execution Analytics & Drift Comparison */}

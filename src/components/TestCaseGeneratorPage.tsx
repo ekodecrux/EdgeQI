@@ -13,7 +13,11 @@ import {
   Clipboard, 
   Settings2,
   TableProperties,
-  Edit2
+  Edit2,
+  Download,
+  FileJson,
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 import { TestCase } from '../types';
 
@@ -49,6 +53,11 @@ export default function TestCaseGeneratorPage({
   const [feedback, setFeedback] = useState('');
   const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null);
 
+  // Export & Regenerate states
+  const [isExporting, setIsExporting] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [regenFeedback, setRegenFeedback] = useState<Record<string, string>>({});
+
   // Sync state whenever parent props update (CRITICAL for project-level separation)
   useEffect(() => {
     setLocalTestCases(testCases);
@@ -60,6 +69,56 @@ export default function TestCaseGeneratorPage({
     setLocalTestCases(prev => prev.map(tc => tc.id === id ? { ...tc, confidenceScore: 100 } : tc));
     setFeedback(`TestCase ${id} simulation rerun passed successfully!`);
     setTimeout(() => setFeedback(''), 3000);
+  };
+
+  // Export test cases
+  const handleExport = async (format: 'csv' | 'json') => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams({ format });
+      if (currentProjectId && currentProjectId !== 'ALL') params.set('projectId', currentProjectId);
+      const res = await fetch(`/api/quality/testcases/export?${params}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `testcases-export.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setFeedback(`Exported ${filteredCases.length} test cases as ${format.toUpperCase()}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } catch (e: any) {
+      setFeedback(`Export failed: ${e.message}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // AI Regenerate a test case with optional feedback
+  const handleRegenerate = async (tc: TestCase, userFeedback?: string) => {
+    setRegeneratingId(tc.id);
+    try {
+      const res = await fetch(`/api/quality/testcases/${tc.id}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: userFeedback || '' })
+      });
+      const data = await res.json();
+      if (data.success && data.testCase) {
+        setLocalTestCases(prev => prev.map(t => t.id === tc.id ? { ...t, ...data.testCase } : t));
+        setFeedback(`AI regenerated ${tc.id} successfully!`);
+        setTimeout(() => setFeedback(''), 3000);
+      }
+    } catch (e: any) {
+      setFeedback(`Regeneration failed: ${e.message}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } finally {
+      setRegeneratingId(null);
+      setRegenFeedback(prev => ({ ...prev, [tc.id]: '' }));
+    }
   };
 
   const handleHeal = (id: string) => {
@@ -281,9 +340,32 @@ export default function TestCaseGeneratorPage({
               </div>
             </div>
 
-            <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-              Suite Coverage: <strong className="text-emerald-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                Suite Coverage: <strong className="text-emerald-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
+              </span>
+              {/* Export buttons (REQ-25) */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleExport('csv')}
+                  disabled={isExporting || filteredCases.length === 0}
+                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
+                  title="Export as CSV"
+                >
+                  {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                  CSV
+                </button>
+                <button
+                  onClick={() => handleExport('json')}
+                  disabled={isExporting || filteredCases.length === 0}
+                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
+                  title="Export as JSON"
+                >
+                  {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileJson className="w-3 h-3" />}
+                  JSON
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* List Card Grid */}
@@ -332,6 +414,21 @@ export default function TestCaseGeneratorPage({
                         title="Simulate validation test"
                       >
                         <Play className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* AI Regenerate button (REQ-29) */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRegenerate(tc);
+                        }}
+                        disabled={regeneratingId === tc.id}
+                        className="bg-purple-50 text-purple-700 p-1.5 rounded-lg border border-purple-200 hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
+                        title="AI Regenerate this test case"
+                      >
+                        {regeneratingId === tc.id
+                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          : <Sparkles className="w-3.5 h-3.5" />}
                       </button>
 
                       {tc.confidenceScore < 90 && (
@@ -397,6 +494,27 @@ export default function TestCaseGeneratorPage({
                             Parsed by NLP Core
                           </span>
                         </div>
+                      </div>
+                      {/* AI Regenerate with feedback (REQ-29) */}
+                      <div className="border-t border-slate-100 pt-2 flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Optional: feedback for AI regeneration..."
+                          value={regenFeedback[tc.id] || ''}
+                          onChange={(e) => setRegenFeedback(prev => ({ ...prev, [tc.id]: e.target.value }))}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleRegenerate(tc, regenFeedback[tc.id]); }}
+                          disabled={regeneratingId === tc.id}
+                          className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold disabled:opacity-50 transition-all"
+                        >
+                          {regeneratingId === tc.id
+                            ? <><RefreshCw className="w-3 h-3 animate-spin" /> Regenerating...</>
+                            : <><Sparkles className="w-3 h-3" /> AI Regen</>}
+                        </button>
                       </div>
                     </div>
                   )}

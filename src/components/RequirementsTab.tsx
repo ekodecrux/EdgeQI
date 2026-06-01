@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 
 interface RequirementsProps {
@@ -40,6 +40,43 @@ export default function RequirementsTab({
   const [salesforceShadow, setSalesforceShadow] = useState(false);
 
   const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
+
+  // Voice input state (REQ-04)
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const recognitionRef = useRef<any>(null);
+
+  const startVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceTranscript('Speech recognition not supported in this browser. Try Chrome.');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (e: any) => { setIsListening(false); setVoiceTranscript('Error: ' + e.error); };
+    recognition.onresult = (e: any) => {
+      let transcript = '';
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      setVoiceTranscript(transcript);
+      setContent(transcript);
+      if (!title) setTitle('Voice requirement ' + new Date().toLocaleTimeString());
+    };
+    recognition.start();
+  };
+
+  const stopVoiceInput = () => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,18 +285,35 @@ export default function RequirementsTab({
 
           {sourceType === 'voice' && (
             <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-center space-y-3">
-              <Volume2 className="w-8 h-8 text-purple-600 mx-auto animate-pulse" />
-              <p className="text-xs text-slate-700 font-semibold">Simulated Speech-To-Text</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setTitle('Voice Transcript requirement check');
-                  setContent('The payment checkout gateway must auto reject visual submit clicks if user is anonymous or holds negative wallet balance limits.');
-                }}
-                className="px-3 py-1.5 rounded bg-white border border-slate-200 text-slate-700 text-[10px] font-mono hover:bg-slate-50"
-              >
-                Insert Sample Speech Transcript
-              </button>
+              <div className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center transition-all ${isListening ? 'bg-red-500 animate-pulse' : 'bg-purple-100'}`}>
+                <Volume2 className={`w-6 h-6 ${isListening ? 'text-white' : 'text-purple-600'}`} />
+              </div>
+              <p className="text-xs text-slate-700 font-semibold">
+                {isListening ? '🔴 Listening… speak your requirement' : 'Click to start voice input (REQ-04)'}
+              </p>
+              <div className="flex gap-2 justify-center">
+                {!isListening ? (
+                  <button type="button" onClick={startVoiceInput}
+                    className="px-4 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 flex items-center gap-2">
+                    <Volume2 className="w-3.5 h-3.5" /> Start Recording
+                  </button>
+                ) : (
+                  <button type="button" onClick={stopVoiceInput}
+                    className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 flex items-center gap-2">
+                    <Square className="w-3.5 h-3.5" /> Stop Recording
+                  </button>
+                )}
+                <button type="button" onClick={() => { setContent('The payment checkout gateway must auto reject visual submit clicks if user is anonymous or holds negative wallet balance limits.'); setTitle('Payment Gateway Voice Requirement'); }}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-mono hover:bg-slate-50">
+                  Demo Transcript
+                </button>
+              </div>
+              {voiceTranscript && (
+                <div className="mt-2 p-2 bg-white border border-slate-200 rounded text-xs text-slate-700 text-left font-mono leading-relaxed max-h-24 overflow-y-auto">
+                  {voiceTranscript}
+                </div>
+              )}
+              <p className="text-[10px] text-slate-400">Uses browser Web Speech API — works best in Chrome/Edge</p>
             </div>
           )}
 
