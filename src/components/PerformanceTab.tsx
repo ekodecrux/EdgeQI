@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle, RefreshCw, History } from 'lucide-react';
 import { PerformanceConfig } from '../types';
 
 interface PerformanceProps {
@@ -48,6 +48,20 @@ export default function PerformanceTab({
       "Add Redis cache index on Stripe country lookup metadata to shave 30ms from transit time."
     ]
   };
+
+  // REQ-69: Performance history trend
+  const [perfHistory, setPerfHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const loadPerfHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/performance/history', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      if (data.history) setPerfHistory(data.history);
+    } catch { /* silent */ } finally { setHistoryLoading(false); }
+  };
+  useEffect(() => { loadPerfHistory(); }, []);
 
   const handleRun = async () => {
     await onExecutePerformanceTest(testType, endpointOrJourney, virtualUsers, durationSeconds, rampUpTimeSeconds, rpsLimit);
@@ -305,6 +319,49 @@ export default function PerformanceTab({
                 </svg>
                 <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-slate-400">Run a test to see real data</span>
               </div>
+            )}
+          </div>
+
+          {/* REQ-69: Performance History Trend Panel */}
+          <div className="border-t border-slate-200 pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-mono font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-purple-500" /> Performance Trend History
+              </h4>
+              <button onClick={loadPerfHistory} disabled={historyLoading}
+                className="flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-purple-700 border border-slate-200 hover:border-purple-300 px-2 py-0.5 rounded-lg transition-all disabled:opacity-50">
+                <RefreshCw className={`w-3 h-3 ${historyLoading ? 'animate-spin' : ''}`} /> Refresh
+              </button>
+            </div>
+            {perfHistory.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px] font-mono border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border border-slate-200">
+                      {['Target', 'Avg (ms)', 'p95 (ms)', 'TPS', 'Err%', 'VUs', 'Date'].map(h => (
+                        <th key={h} className="px-2 py-1.5 text-left text-slate-500 uppercase border-b border-slate-200 font-bold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perfHistory.slice(0, 8).map((row: any, i: number) => (
+                      <tr key={i} className={`border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        <td className="px-2 py-1.5 text-slate-700 max-w-[120px] truncate">{row.endpointOrJourney || '—'}</td>
+                        <td className="px-2 py-1.5 text-purple-700 font-bold">{row.metrics?.avgResponseTimeMs ?? '—'}</td>
+                        <td className={`px-2 py-1.5 font-bold ${(row.metrics?.p95Ms ?? 0) > 2000 ? 'text-rose-600' : 'text-emerald-600'}`}>{row.metrics?.p95Ms ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-cyan-700">{row.metrics?.throughputTps ?? '—'}</td>
+                        <td className={`px-2 py-1.5 font-bold ${(row.metrics?.errorRate ?? 0) > 1 ? 'text-rose-600' : 'text-slate-600'}`}>{row.metrics?.errorRate ?? '—'}%</td>
+                        <td className="px-2 py-1.5 text-slate-500">{row.virtualUsers ?? '—'}</td>
+                        <td className="px-2 py-1.5 text-slate-400">{row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 font-mono text-center py-3 bg-slate-50 rounded-lg border border-slate-200">
+                No performance history yet. Run a load test to build the trend dataset.
+              </p>
             )}
           </div>
 

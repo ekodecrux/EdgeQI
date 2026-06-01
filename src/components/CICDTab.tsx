@@ -1,7 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { GitBranch, Webhook, Play, CheckCircle, Copy, Download, Settings, Zap, RefreshCw, Terminal, AlertCircle } from 'lucide-react';
+import { GitBranch, Webhook, Play, CheckCircle, Copy, Download, Settings, Zap, RefreshCw, Terminal, AlertCircle, Bell, BellOff, Layers, Plus, X } from 'lucide-react';
 
 export default function CICDTab() {
+  // REQ-87: Pipeline status state
+  const [pipelineStatus, setPipelineStatus] = useState<any[]>([]);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [newPipeline, setNewPipeline] = useState({ name: '', stage: 'build', status: 'running' });
+
+  const loadPipelines = async () => {
+    setPipelineLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/cicd/pipeline-status', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      if (data.pipelines) setPipelineStatus(data.pipelines);
+    } catch { /* silent */ } finally { setPipelineLoading(false); }
+  };
+
+  const addPipeline = async () => {
+    if (!newPipeline.name.trim()) return;
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/cicd/pipeline-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(newPipeline)
+      });
+      const data = await res.json();
+      if (data.pipeline) { setPipelineStatus(prev => [data.pipeline, ...prev]); setNewPipeline({ name: '', stage: 'build', status: 'running' }); }
+    } catch { /* silent */ }
+  };
+
+  // REQ-88: Notification config state
+  const [notifConfigs, setNotifConfigs] = useState<any[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [newNotif, setNewNotif] = useState({ label: '', url: '', events: 'run_complete' });
+
+  const loadNotifConfigs = async () => {
+    setNotifLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/notifications/config', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      if (data.configs) setNotifConfigs(data.configs);
+    } catch { /* silent */ } finally { setNotifLoading(false); }
+  };
+
+  const addNotifConfig = async () => {
+    if (!newNotif.url.trim()) return;
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/notifications/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ...newNotif, events: [newNotif.events] })
+      });
+      const data = await res.json();
+      if (data.config) { setNotifConfigs(prev => [data.config, ...prev]); setNewNotif({ label: '', url: '', events: 'run_complete' }); }
+    } catch { /* silent */ }
+  };
+
+  const toggleNotif = async (id: string, enabled: boolean) => {
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      await fetch(`/api/quality/notifications/config/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ enabled })
+      });
+      setNotifConfigs(prev => prev.map(c => c.id === id ? { ...c, enabled } : c));
+    } catch { /* silent */ }
+  };
+
   const [platform, setPlatform] = useState('github-actions');
   const [projectName, setProjectName] = useState('my-project');
   const [testCommand, setTestCommand] = useState('npx playwright test');
@@ -15,8 +85,9 @@ export default function CICDTab() {
 
   useEffect(() => {
     fetch('/api/quality/cicd/integrations').then(r => r.json()).then(d => setIntegrations(d.integrations || []));
-    // Set webhook URL to current origin
     setWebhookUrl(`${window.location.origin}/api/quality/cicd/webhook`);
+    loadPipelines();
+    loadNotifConfigs();
   }, []);
 
   const generateConfig = async () => {
@@ -230,6 +301,99 @@ export default function CICDTab() {
           <p className="text-slate-500 text-xs mt-1">Configure your CI/CD platform to send webhooks to the URL above</p>
         </div>
       )}
+
+      {/* REQ-87: Pipeline Status Panel */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+            <Layers className="w-4 h-4 text-cyan-400" /> Pipeline Status Tracker <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-87)</span>
+          </h3>
+          <button onClick={loadPipelines} disabled={pipelineLoading}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
+            <RefreshCw className={`w-3 h-3 ${pipelineLoading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+        {/* Add pipeline form */}
+        <div className="flex gap-2 flex-wrap">
+          <input value={newPipeline.name} onChange={e => setNewPipeline(p => ({...p, name: e.target.value}))}
+            placeholder="Pipeline name" className="flex-1 min-w-[140px] bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500" />
+          <select value={newPipeline.stage} onChange={e => setNewPipeline(p => ({...p, stage: e.target.value}))}
+            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500">
+            {['build','test','deploy','scan'].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={newPipeline.status} onChange={e => setNewPipeline(p => ({...p, status: e.target.value}))}
+            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500">
+            {['running','passed','failed','pending'].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button onClick={addPipeline} className="flex items-center gap-1 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded-lg transition-all">
+            <Plus className="w-3.5 h-3.5" /> Add
+          </button>
+        </div>
+        {pipelineStatus.length > 0 ? (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {pipelineStatus.map((p: any) => {
+              const statusColors: Record<string,string> = { running:'text-cyan-400', passed:'text-emerald-400', failed:'text-rose-400', pending:'text-amber-400' };
+              const dotColors: Record<string,string> = { running:'bg-cyan-400 animate-pulse', passed:'bg-emerald-400', failed:'bg-rose-400', pending:'bg-amber-400' };
+              return (
+                <div key={p.id} className="flex items-center gap-3 bg-slate-900/50 rounded-lg px-3 py-2">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${dotColors[p.status] || 'bg-slate-500'}`} />
+                  <span className="text-xs text-slate-300 font-medium flex-1 truncate">{p.name}</span>
+                  <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{p.stage}</span>
+                  <span className={`text-[10px] font-mono font-bold ${statusColors[p.status] || 'text-slate-400'}`}>{p.status}</span>
+                  <span className="text-[9px] text-slate-600 ml-1">{new Date(p.updatedAt).toLocaleTimeString()}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 font-mono text-center py-2">No pipelines tracked yet. Add one above.</p>
+        )}
+      </div>
+
+      {/* REQ-88: Notification Config Panel */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+            <Bell className="w-4 h-4 text-violet-400" /> Slack / Webhook Notifications <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-88)</span>
+          </h3>
+          <button onClick={loadNotifConfigs} disabled={notifLoading}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
+            <RefreshCw className={`w-3 h-3 ${notifLoading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <input value={newNotif.label} onChange={e => setNewNotif(n => ({...n, label: e.target.value}))}
+            placeholder="Label (e.g. Slack #qa)" className="flex-1 min-w-[120px] bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-violet-500" />
+          <input value={newNotif.url} onChange={e => setNewNotif(n => ({...n, url: e.target.value}))}
+            placeholder="Webhook URL https://..." className="flex-1 min-w-[180px] bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500" />
+          <select value={newNotif.events} onChange={e => setNewNotif(n => ({...n, events: e.target.value}))}
+            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-violet-500">
+            <option value="run_complete">run_complete</option>
+            <option value="run_failed">run_failed</option>
+            <option value="all">all</option>
+          </select>
+          <button onClick={addNotifConfig} className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded-lg transition-all">
+            <Plus className="w-3.5 h-3.5" /> Add
+          </button>
+        </div>
+        {notifConfigs.length > 0 ? (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {notifConfigs.map((cfg: any) => (
+              <div key={cfg.id} className="flex items-center gap-3 bg-slate-900/50 rounded-lg px-3 py-2">
+                <button onClick={() => toggleNotif(cfg.id, !cfg.enabled)} title={cfg.enabled ? 'Disable' : 'Enable'}
+                  className={`shrink-0 ${cfg.enabled ? 'text-emerald-400' : 'text-slate-600'} hover:opacity-80 transition-opacity`}>
+                  {cfg.enabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                </button>
+                <span className="text-xs text-slate-300 font-medium shrink-0">{cfg.label || 'Unnamed'}</span>
+                <span className="text-[10px] font-mono text-slate-500 flex-1 truncate">{cfg.url}</span>
+                <span className="text-[9px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{Array.isArray(cfg.events) ? cfg.events.join(', ') : cfg.events}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 font-mono text-center py-2">No notification endpoints configured yet.</p>
+        )}
+      </div>
     </div>
   );
 }

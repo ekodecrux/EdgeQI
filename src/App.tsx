@@ -25,7 +25,12 @@ import {
   LogOut,
   UserCircle,
   Clock,
-  BarChart3
+  BarChart3,
+  CheckSquare,
+  Plus,
+  X,
+  Edit2,
+  Play
 } from 'lucide-react';
 
 import { 
@@ -62,6 +67,295 @@ import IntegrationsTab from './components/IntegrationsTab';
 import SchedulerTab from './components/SchedulerTab';
 import AnalyticsTab from './components/AnalyticsTab';
 
+// ── REQ-30: TEST PLAN CRUD ────────────────────────────────────────────────────
+function TestPlansTab() {
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', milestone: '' });
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState('');
+
+  const token = () => localStorage.getItem('iqstudio_token');
+  const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/quality/test-plans', { headers: authH() });
+      const data = await res.json();
+      if (data.plans) setPlans(data.plans);
+    } catch { /* silent */ } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const createPlan = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/quality/test-plans', {
+        method: 'POST', headers: authH(),
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      if (data.plan) { setPlans(prev => [data.plan, ...prev]); setShowForm(false); setForm({ name: '', description: '', milestone: '' }); setFeedback('Test plan created!'); setTimeout(() => setFeedback(''), 3000); }
+    } catch { /* silent */ } finally { setSaving(false); }
+  };
+
+  const deletePlan = async (id: string) => {
+    try {
+      await fetch(`/api/quality/test-plans/${id}`, { method: 'DELETE', headers: authH() });
+      setPlans(prev => prev.filter(p => p.id !== id));
+    } catch { /* silent */ }
+  };
+
+  const statusColors: Record<string,string> = { draft:'bg-slate-100 text-slate-600', active:'bg-emerald-50 text-emerald-700', completed:'bg-blue-50 text-blue-700', archived:'bg-slate-50 text-slate-400' };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-sans font-semibold text-slate-900 flex items-center gap-2">
+              <TableProperties className="w-4 h-4 text-teal-600" /> Test Plans <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-30)</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">Create and manage test execution plans with milestones and test case associations.</p>
+          </div>
+          <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            <Plus className="w-3.5 h-3.5" /> New Plan
+          </button>
+        </div>
+        {feedback && <div className="mb-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
+        {showForm && (
+          <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Plan Name *</label>
+                <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Sprint 23 Regression"
+                  className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Milestone</label>
+                <input value={form.milestone} onChange={e => setForm(f => ({...f, milestone: e.target.value}))} placeholder="v2.4.0 Release"
+                  className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Description</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} rows={2} placeholder="Scope and objectives..."
+                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400" />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100">Cancel</button>
+              <button onClick={createPlan} disabled={saving || !form.name.trim()} className="px-4 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                {saving ? 'Creating…' : 'Create Plan'}
+              </button>
+            </div>
+          </div>
+        )}
+        {loading ? (
+          <div className="text-center py-8 text-slate-400 text-xs font-mono">Loading test plans…</div>
+        ) : plans.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-xs font-mono">No test plans yet. Click "New Plan" to create one.</div>
+        ) : (
+          <div className="space-y-2">
+            {plans.map(plan => (
+              <div key={plan.id} className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-teal-300 transition-all">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-slate-900 text-sm">{plan.name}</span>
+                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full ${statusColors[plan.status] || 'bg-slate-100 text-slate-600'}`}>{plan.status}</span>
+                    {plan.milestone && <span className="text-[10px] font-mono text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">🏁 {plan.milestone}</span>}
+                  </div>
+                  {plan.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{plan.description}</p>}
+                  <p className="text-[10px] font-mono text-slate-400 mt-0.5">{plan.tcIds?.length || 0} test cases · Created {new Date(plan.createdAt).toLocaleDateString()}</p>
+                </div>
+                <button onClick={() => deletePlan(plan.id)} className="text-slate-400 hover:text-rose-500 shrink-0 mt-0.5 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── REQ-33: MANUAL TEST EXECUTION TRACKER ─────────────────────────────────────
+function ManualExecutionTab() {
+  const [runs, setRuns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ tcTitle: '', tester: '', notes: '' });
+  const [selectedRun, setSelectedRun] = useState<any>(null);
+  const [feedback, setFeedback] = useState('');
+
+  const token = () => localStorage.getItem('iqstudio_token');
+  const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/quality/execution/manual', { headers: authH() });
+      const data = await res.json();
+      if (data.runs) setRuns(data.runs);
+    } catch { /* silent */ } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const startRun = async () => {
+    if (!form.tcTitle.trim()) return;
+    try {
+      const res = await fetch('/api/quality/execution/manual', {
+        method: 'POST', headers: authH(),
+        body: JSON.stringify({ tcTitle: form.tcTitle, tester: form.tester || 'QA Engineer', notes: form.notes,
+          steps: [{ action: 'Navigate to feature', expected: 'Page loads correctly' }, { action: 'Perform test action', expected: 'Feature responds as expected' }] })
+      });
+      const data = await res.json();
+      if (data.run) { setRuns(prev => [data.run, ...prev]); setShowForm(false); setForm({ tcTitle: '', tester: '', notes: '' }); setFeedback('Manual run started!'); setTimeout(() => setFeedback(''), 3000); }
+    } catch { /* silent */ }
+  };
+
+  const updateStatus = async (runId: string, status: string) => {
+    try {
+      const res = await fetch(`/api/quality/execution/manual/${runId}/status`, {
+        method: 'PATCH', headers: authH(),
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (data.run) { setRuns(prev => prev.map(r => r.id === runId ? data.run : r)); if (selectedRun?.id === runId) setSelectedRun(data.run); }
+    } catch { /* silent */ }
+  };
+
+  const updateStep = async (runId: string, stepIdx: number, result: string, actual: string) => {
+    try {
+      const res = await fetch(`/api/quality/execution/manual/${runId}/step`, {
+        method: 'PATCH', headers: authH(),
+        body: JSON.stringify({ stepIdx, result, actual })
+      });
+      const data = await res.json();
+      if (data.run) { setRuns(prev => prev.map(r => r.id === runId ? data.run : r)); setSelectedRun(data.run); }
+    } catch { /* silent */ }
+  };
+
+  const statusColors: Record<string,string> = { in_progress:'bg-amber-50 text-amber-700 border-amber-200', passed:'bg-emerald-50 text-emerald-700 border-emerald-200', failed:'bg-rose-50 text-rose-700 border-rose-200', blocked:'bg-orange-50 text-orange-700 border-orange-200' };
+  const stepColors: Record<string,string> = { pass:'bg-emerald-100 text-emerald-700', fail:'bg-rose-100 text-rose-700', skip:'bg-slate-100 text-slate-600', pending:'bg-slate-50 text-slate-400' };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="lg:col-span-5 space-y-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-sans font-semibold text-slate-900 flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-orange-500" /> Manual Execution <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-33)</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">Track manual test execution with step-by-step results.</p>
+            </div>
+            <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors">
+              <Plus className="w-3.5 h-3.5" /> New Run
+            </button>
+          </div>
+          {feedback && <div className="mb-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
+          {showForm && (
+            <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <input value={form.tcTitle} onChange={e => setForm(f => ({...f, tcTitle: e.target.value}))} placeholder="Test case title *"
+                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" />
+              <input value={form.tester} onChange={e => setForm(f => ({...f, tester: e.target.value}))} placeholder="Tester name"
+                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" />
+              <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Notes / context…"
+                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100">Cancel</button>
+                <button onClick={startRun} disabled={!form.tcTitle.trim()} className="px-4 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 disabled:opacity-50">Start Run</button>
+              </div>
+            </div>
+          )}
+          {loading ? <div className="text-center py-8 text-slate-400 text-xs font-mono">Loading…</div> : runs.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs font-mono">No manual runs yet.</div>
+          ) : (
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              {runs.map(run => (
+                <div key={run.id} onClick={() => setSelectedRun(run)}
+                  className={`p-3 border rounded-xl cursor-pointer transition-all ${selectedRun?.id === run.id ? 'border-orange-400 bg-orange-50/50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 text-sm truncate">{run.tcTitle}</p>
+                      <p className="text-[10px] font-mono text-slate-500">Tester: {run.tester} · {run.steps?.length || 0} steps</p>
+                    </div>
+                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${statusColors[run.status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{run.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="lg:col-span-7">
+        {selectedRun ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h4 className="font-semibold text-slate-900">{selectedRun.tcTitle}</h4>
+                <p className="text-xs text-slate-500">Tester: {selectedRun.tester} · Started: {selectedRun.startedAt ? new Date(selectedRun.startedAt).toLocaleString() : '—'}</p>
+              </div>
+              <div className="flex gap-1.5">
+                {(['in_progress','passed','failed','blocked'] as const).map(s => (
+                  <button key={s} onClick={() => updateStatus(selectedRun.id, s)}
+                    className={`text-[9px] font-mono font-bold px-2 py-1 rounded-lg border transition-all ${selectedRun.status === s ? statusColors[s] : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'}`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {selectedRun.notes && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2">{selectedRun.notes}</p>}
+            <div className="space-y-2">
+              <h5 className="text-xs font-mono font-bold text-slate-600 uppercase tracking-wider">Test Steps</h5>
+              {(selectedRun.steps || []).map((step: any, i: number) => (
+                <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] font-mono text-slate-400 mt-0.5 shrink-0">#{i+1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800">{step.action}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">Expected: {step.expected}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {(['pass','fail','skip'] as const).map(r => (
+                        <button key={r} onClick={() => updateStep(selectedRun.id, i, r, step.actual || '')}
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-all ${step.result === r ? stepColors[r] + ' font-bold border-transparent' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}>
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {step.actual !== undefined && (
+                    <input type="text" value={step.actual || ''} placeholder="Actual result observed…"
+                      onChange={e => { const s = [...selectedRun.steps]; s[i] = {...s[i], actual: e.target.value}; setSelectedRun({...selectedRun, steps: s}); }}
+                      onBlur={e => updateStep(selectedRun.id, i, step.result || 'pending', e.target.value)}
+                      className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-300 font-mono" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="h-full min-h-[300px] flex items-center justify-center bg-white border border-slate-200 rounded-2xl">
+            <div className="text-center text-slate-400">
+              <CheckSquare className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm font-medium">Select a run to view steps</p>
+              <p className="text-xs mt-1">Click any run on the left to open step tracker</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   // Navigation layout Page active
   const [activeTab, setActiveTab] = useState<
@@ -83,7 +377,9 @@ export default function App() {
     'integrations' |
     'feedback' |
     'scheduler' |
-    'analytics'
+    'analytics' |
+    'test-plans' |
+    'manual-execution'
   >('agentic');
 
   // Auth state
@@ -669,6 +965,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
                 { id: 'dashboard', label: 'QE Dashboard', icon: TrendingUp, color: 'text-purple-600' },
                 { id: 'modules', label: 'Module Quality', icon: Layers, color: 'text-purple-650' },
                 { id: 'execution', label: 'Execution Engine', icon: Cpu, color: 'text-indigo-600' },
+                { id: 'test-plans', label: 'Test Plans', icon: TableProperties, color: 'text-teal-600' },
+                { id: 'manual-execution', label: 'Manual Execution', icon: CheckSquare, color: 'text-orange-600' },
                 { id: 'audit', label: 'Pipeline Audit Log', icon: History, color: 'text-slate-650' },
                 { id: 'converter', label: 'Enterprise Converter', icon: RefreshCw, color: 'text-pink-600' },
               ].map((page) => {
@@ -875,6 +1173,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             />
           )}
 
+          {activeTab === 'test-plans' && <TestPlansTab />}
+          {activeTab === 'manual-execution' && <ManualExecutionTab />}
           {activeTab === 'llm-config' && <LLMConfigTab />}
           {activeTab === 'cicd' && <CICDTab />}
           {activeTab === 'integrations' && <IntegrationsTab />}

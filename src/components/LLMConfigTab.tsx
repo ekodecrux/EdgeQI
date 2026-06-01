@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, User, BookOpen } from 'lucide-react';
 
 interface Provider {
   id: string;
@@ -493,6 +493,148 @@ export default function LLMConfigTab() {
           When the primary provider fails, iQStudio automatically tries the next <span className="text-emerald-400 font-mono">ON</span> provider in priority order. Drag rows or use arrows to reorder.
         </p>
       </div>
+
+      {/* REQ-101: User Preferences Panel */}
+      <UserPreferencesPanel />
+
+      {/* NFR-03: API Documentation Viewer */}
+      <ApiDocsPanel />
+    </div>
+  );
+}
+
+// ── REQ-101: USER PREFERENCE PERSISTENCE ─────────────────────────────────────
+function UserPreferencesPanel() {
+  const [prefs, setPrefs] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const token = () => localStorage.getItem('iqstudio_token');
+  const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
+
+  useEffect(() => {
+    setLoading(true);
+    fetch('/api/auth/me/preferences', { headers: authH() })
+      .then(r => r.json()).then(d => { if (d.preferences) setPrefs(d.preferences); })
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await fetch('/api/auth/me/preferences', { method: 'PUT', headers: authH(), body: JSON.stringify({ preferences: prefs }) });
+      setMsg('Preferences saved!'); setTimeout(() => setMsg(''), 3000);
+    } catch { /* silent */ } finally { setSaving(false); }
+  };
+
+  const prefFields = [
+    { key: 'theme', label: 'UI Theme', type: 'select', options: ['system', 'light', 'dark'] },
+    { key: 'defaultProjectId', label: 'Default Project', type: 'text', placeholder: 'ALL' },
+    { key: 'notificationsEnabled', label: 'Email Notifications', type: 'checkbox' },
+    { key: 'aiModel', label: 'Preferred AI Model', type: 'select', options: ['gemini', 'groq', 'auto'] },
+    { key: 'resultsPerPage', label: 'Results per page', type: 'number' },
+  ];
+
+  return (
+    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <User className="w-4 h-4 text-sky-400" /> User Preferences <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-101)</span>
+        </h3>
+        {msg && <span className="text-xs font-mono text-emerald-400">{msg}</span>}
+      </div>
+      {loading ? <p className="text-slate-500 text-xs font-mono">Loading preferences…</p> : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {prefFields.map(f => (
+            <div key={f.key}>
+              <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">{f.label}</label>
+              {f.type === 'select' ? (
+                <select value={prefs[f.key] ?? f.options![0]}
+                  onChange={e => setPrefs(p => ({...p, [f.key]: e.target.value}))}
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-sky-500">
+                  {f.options!.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : f.type === 'checkbox' ? (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={!!prefs[f.key]}
+                    onChange={e => setPrefs(p => ({...p, [f.key]: e.target.checked}))}
+                    className="accent-sky-500 w-4 h-4" />
+                  <span className="text-slate-300 text-xs">{prefs[f.key] ? 'Enabled' : 'Disabled'}</span>
+                </label>
+              ) : (
+                <input type={f.type} value={prefs[f.key] ?? ''}
+                  onChange={e => setPrefs(p => ({...p, [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value}))}
+                  placeholder={f.placeholder || ''}
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-sky-500" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <button onClick={save} disabled={saving}
+        className="flex items-center gap-1.5 px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+        {saving ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving…</> : 'Save Preferences'}
+      </button>
+    </div>
+  );
+}
+
+// ── NFR-03: API DOCUMENTATION VIEWER ─────────────────────────────────────────
+function ApiDocsPanel() {
+  const [routes, setRoutes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  const loadDocs = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/docs', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      if (data.routes) setRoutes(data.routes);
+    } catch { /* silent */ } finally { setLoading(false); }
+  };
+
+  const filtered = routes.filter(r =>
+    !filter || r.path?.toLowerCase().includes(filter.toLowerCase()) || r.method?.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  const methodColors: Record<string,string> = { GET:'bg-emerald-900/40 text-emerald-400 border-emerald-700/50', POST:'bg-blue-900/40 text-blue-400 border-blue-700/50', PATCH:'bg-amber-900/40 text-amber-400 border-amber-700/50', DELETE:'bg-rose-900/40 text-rose-400 border-rose-700/50', PUT:'bg-violet-900/40 text-violet-400 border-violet-700/50' };
+
+  return (
+    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-violet-400" /> API Documentation <span className="text-[10px] font-mono text-slate-400 ml-1">(NFR-03)</span>
+        </h3>
+        <button onClick={() => { if (!expanded) { loadDocs(); } setExpanded(v => !v); }}
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
+          {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : null}
+          {expanded ? 'Hide' : 'Show Routes'}
+        </button>
+      </div>
+      {expanded && (
+        <div className="space-y-3">
+          <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter by path or method…"
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500" />
+          <div className="space-y-1 max-h-72 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-slate-500 text-xs font-mono text-center py-3">{loading ? 'Loading routes…' : 'No routes match filter.'}</p>
+            ) : filtered.map((r: any, i: number) => (
+              <div key={i} className="flex items-center gap-2.5 bg-slate-900/60 rounded-lg px-3 py-1.5">
+                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${methodColors[r.method] || 'bg-slate-800 text-slate-400 border-slate-700'}`}>{r.method}</span>
+                <span className="text-xs font-mono text-slate-300 flex-1 truncate">{r.path}</span>
+                {r.auth && <span className="text-[9px] font-mono text-amber-400 shrink-0">🔒 auth</span>}
+              </div>
+            ))}
+          </div>
+          {filtered.length > 0 && (
+            <p className="text-[10px] font-mono text-slate-500 text-right">{filtered.length} route{filtered.length !== 1 ? 's' : ''} registered</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

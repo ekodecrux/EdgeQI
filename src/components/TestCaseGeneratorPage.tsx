@@ -77,6 +77,16 @@ export default function TestCaseGeneratorPage({
   // REQ-28: Clone state
   const [cloningId, setCloningId] = useState<string | null>(null);
 
+  // REQ-16: Inline step editor state
+  const [editingStepsId, setEditingStepsId] = useState<string | null>(null);
+  const [editingSteps, setEditingSteps] = useState<{ action: string; expectedResult: string }[]>([]);
+  const [savingSteps, setSavingSteps] = useState(false);
+
+  // REQ-18: Bulk priority state
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkPriority, setBulkPriority] = useState<'P0' | 'P1' | 'P2' | 'P3'>('P1');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
   // REQ-26: Bulk import state
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -191,6 +201,53 @@ export default function TestCaseGeneratorPage({
       setTagsMap(prev => ({ ...prev, [tcId]: tags }));
       setTagInput(prev => ({ ...prev, [tcId]: '' }));
     } catch { /* silent */ }
+  };
+
+  // REQ-16: Save inline steps to backend
+  const handleSaveSteps = async (tcId: string) => {
+    setSavingSteps(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch(`/api/quality/testcases/${tcId}/steps`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ steps: editingSteps })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLocalTestCases(prev => prev.map(tc => tc.id === tcId ? { ...tc, steps: editingSteps } : tc));
+        setFeedback(`Steps for ${tcId} saved successfully!`);
+        setEditingStepsId(null);
+        setTimeout(() => setFeedback(''), 3000);
+      }
+    } catch (e: any) {
+      setFeedback(`Steps save failed: ${e.message}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } finally { setSavingSteps(false); }
+  };
+
+  // REQ-18: Bulk priority update
+  const handleBulkPriorityUpdate = async () => {
+    if (bulkSelected.size === 0) return;
+    setBulkUpdating(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/testcases/bulk-priority', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ids: Array.from(bulkSelected), priority: bulkPriority })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLocalTestCases(prev => prev.map(tc => bulkSelected.has(tc.id) ? { ...tc, priority: bulkPriority } : tc));
+        setFeedback(`Updated priority to ${bulkPriority} for ${data.updated} test case(s)`);
+        setBulkSelected(new Set());
+        setTimeout(() => setFeedback(''), 3000);
+      }
+    } catch (e: any) {
+      setFeedback(`Bulk update failed: ${e.message}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } finally { setBulkUpdating(false); }
   };
 
   // REQ-28: Clone test case
@@ -545,10 +602,29 @@ export default function TestCaseGeneratorPage({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
                 Suite Coverage: <strong className="text-emerald-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
               </span>
+              {/* REQ-18: Bulk priority controls */}
+              {bulkSelected.size > 0 && (
+                <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1">
+                  <span className="text-[10px] font-mono text-indigo-700 font-bold">{bulkSelected.size} selected</span>
+                  <select value={bulkPriority} onChange={e => setBulkPriority(e.target.value as any)}
+                    className="text-[10px] font-mono border border-indigo-200 rounded px-1 py-0.5 bg-white text-indigo-800 focus:outline-none">
+                    <option value="P0">P0</option>
+                    <option value="P1">P1</option>
+                    <option value="P2">P2</option>
+                    <option value="P3">P3</option>
+                  </select>
+                  <button onClick={handleBulkPriorityUpdate} disabled={bulkUpdating}
+                    className="flex items-center gap-1 text-[10px] font-mono bg-indigo-600 text-white px-2 py-0.5 rounded hover:bg-indigo-700 disabled:opacity-50">
+                    {bulkUpdating ? <RefreshCw className="w-3 h-3 animate-spin" /> : null} Apply
+                  </button>
+                  <button onClick={() => setBulkSelected(new Set())}
+                    className="text-[10px] text-indigo-500 hover:text-indigo-700"><X className="w-3 h-3" /></button>
+                </div>
+              )}
               {/* Export + Import buttons */}
               <div className="flex items-center gap-1">
                 <button
@@ -589,12 +665,17 @@ export default function TestCaseGeneratorPage({
                 <div
                   key={tc.id}
                   onClick={() => setSelectedTestCase(isSelected ? null : tc)}
-                  className={`bg-white border hover:border-slate-300 rounded-2xl p-4 transition-all cursor-pointer shadow-xs ${
+                  className={`bg-white border hover:border-slate-300 rounded-2xl p-4 transition-all cursor-pointer shadow-xs ${bulkSelected.has(tc.id) ? 'ring-1 ring-indigo-400 border-indigo-300 ' : ''}${
                     isSelected ? 'ring-1 ring-emerald-500 border-emerald-500' : 'border-slate-200'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1 text-left">
+                    {/* REQ-18: Bulk select checkbox */}
+                    <input type="checkbox" checked={bulkSelected.has(tc.id)}
+                      onChange={e => { e.stopPropagation(); setBulkSelected(prev => { const s = new Set(prev); s.has(tc.id) ? s.delete(tc.id) : s.add(tc.id); return s; }); }}
+                      onClick={e => e.stopPropagation()}
+                      className="mt-1 accent-indigo-600 w-3.5 h-3.5 shrink-0" />
+                    <div className="space-y-1 text-left flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-mono text-emerald-700 font-bold">{tc.id}</span>
                         <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
@@ -637,6 +718,15 @@ export default function TestCaseGeneratorPage({
                         title="Clone this test case" aria-label={`Clone test case ${tc.id}`}
                       >
                         {cloningId === tc.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {/* REQ-16: Inline step editor button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingStepsId(tc.id); setEditingSteps(tc.steps ? tc.steps.map(s => ({...s})) : []); }}
+                        className="bg-teal-50 text-teal-700 p-1.5 rounded-lg border border-teal-200 hover:bg-teal-600 hover:text-white transition-all"
+                        title="Edit steps inline" aria-label={`Edit steps for ${tc.id}`}
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
 
                       {/* AI Regenerate button (REQ-29) */}
@@ -783,6 +873,51 @@ export default function TestCaseGeneratorPage({
                 </div>
               );
             })}
+
+            {/* REQ-16: Inline step editor modal */}
+            {editingStepsId && (() => {
+              return (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+                    <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                      <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                        <Edit2 className="w-4 h-4 text-teal-600" /> Edit Steps &mdash; {editingStepsId}
+                      </h3>
+                      <button onClick={() => setEditingStepsId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        {editingSteps.map((step, idx) => (
+                          <div key={idx} className="flex gap-2 items-start">
+                            <span className="text-[10px] font-mono text-slate-400 mt-2.5 shrink-0">#{idx+1}</span>
+                            <input type="text" placeholder="Action" value={step.action}
+                              onChange={e => { const s = [...editingSteps]; s[idx] = {...s[idx], action: e.target.value}; setEditingSteps(s); }}
+                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                            <input type="text" placeholder="Expected result" value={step.expectedResult}
+                              onChange={e => { const s = [...editingSteps]; s[idx] = {...s[idx], expectedResult: e.target.value}; setEditingSteps(s); }}
+                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] text-teal-800 focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                            <button onClick={() => setEditingSteps(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-rose-400 hover:text-rose-600 mt-1.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                        ))}
+                        {editingSteps.length === 0 && <p className="text-center text-slate-400 text-[11px] py-4 font-mono">No steps. Add one below.</p>}
+                      </div>
+                      <button onClick={() => setEditingSteps(prev => [...prev, { action: '', expectedResult: '' }])}
+                        className="text-[11px] font-mono text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg hover:bg-teal-600 hover:text-white transition-all">
+                        + Add Step
+                      </button>
+                      <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
+                        <button onClick={() => setEditingStepsId(null)} className="px-4 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+                        <button onClick={() => handleSaveSteps(editingStepsId!)} disabled={savingSteps}
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-50">
+                          {savingSteps ? <><RefreshCw className="w-3 h-3 animate-spin" /> Saving...</> : 'Save Steps'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {filteredCases.length === 0 && (
               <div className="bg-white border border-slate-200 border-dashed rounded-2xl p-8 text-center text-slate-500">

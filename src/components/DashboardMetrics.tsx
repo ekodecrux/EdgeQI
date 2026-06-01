@@ -21,7 +21,10 @@ import {
   ArrowRight,
   Server,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  X,
+  Bell,
+  HardDrive
 } from 'lucide-react';
 import { TestCase, DefectHotspot, SecurityVulnerability } from '../types';
 
@@ -89,7 +92,66 @@ export default function DashboardMetrics({
     } catch { /* silent */ } finally { setUptimeLoading(false); }
   };
   useEffect(() => { loadUptime(); }, []);
-  
+
+  // REQ-89: Run alert log state
+  const [alertLog, setAlertLog] = useState<any[]>([]);
+  const [alertLoading, setAlertLoading] = useState(false);
+  const loadAlertLog = async () => {
+    setAlertLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/alerts', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      if (data.alerts) setAlertLog(data.alerts);
+    } catch { /* silent */ } finally { setAlertLoading(false); }
+  };
+  const acknowledgeAlert = async (id: string) => {
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      await fetch(`/api/quality/alerts/${id}/acknowledge`, {
+        method: 'PATCH',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      setAlertLog(prev => prev.map(a => a.id === id ? { ...a, acknowledged: true } : a));
+    } catch { /* silent */ }
+  };
+  useEffect(() => { loadAlertLog(); }, []);
+
+  // REQ-91: Widget config state
+  const [widgetConfig, setWidgetConfig] = useState<{ id: string; label: string; visible: boolean }[]>([
+    { id: 'coverage', label: 'Coverage Metrics', visible: true },
+    { id: 'defects', label: 'Defect Hotspots', visible: true },
+    { id: 'security', label: 'Security Findings', visible: true },
+    { id: 'performance', label: 'Performance SLA', visible: true },
+    { id: 'uptime', label: 'Uptime Monitor', visible: true },
+    { id: 'alerts', label: 'Run Alert Log', visible: true },
+  ]);
+  const [showWidgetConfig, setShowWidgetConfig] = useState(false);
+  const saveWidgetConfig = async () => {
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      await fetch('/api/quality/dashboard/widgets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ widgets: widgetConfig })
+      });
+    } catch { /* silent */ }
+    setShowWidgetConfig(false);
+  };
+
+  // NFR-01: Bundle size state
+  const [bundleData, setBundleData] = useState<any[]>([]);
+  const [bundleLoading, setBundleLoading] = useState(false);
+  const loadBundleSize = async () => {
+    setBundleLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/health/bundle-size', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const data = await res.json();
+      if (data.results) setBundleData(data.results);
+    } catch { /* silent */ } finally { setBundleLoading(false); }
+  };
+
   // Drill-down states
   const [selectedModuleCategory, setSelectedModuleCategory] = useState<string>('Billing & Card Payments');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
@@ -1179,6 +1241,44 @@ export default function DashboardMetrics({
         )}
       </div>
 
+      {/* REQ-91: Widget Config Panel toggle button */}
+      <div className="flex justify-end">
+        <button onClick={() => setShowWidgetConfig(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors">
+          <Settings className="w-3.5 h-3.5" /> Customize Widgets
+        </button>
+      </div>
+
+      {/* REQ-91: Widget Config Modal */}
+      {showWidgetConfig && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                <Settings className="w-4 h-4 text-slate-500" /> Dashboard Widget Config
+              </h3>
+              <button onClick={() => setShowWidgetConfig(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              {widgetConfig.map(w => (
+                <label key={w.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" checked={w.visible}
+                    onChange={e => setWidgetConfig(prev => prev.map(c => c.id === w.id ? { ...c, visible: e.target.checked } : c))}
+                    className="accent-blue-600 w-4 h-4" />
+                  <span className="text-sm text-slate-700">{w.label}</span>
+                </label>
+              ))}
+              <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
+                <button onClick={() => setShowWidgetConfig(false)} className="px-4 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button onClick={saveWidgetConfig} className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">Save Layout</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* NFR-05: Uptime / Service Availability Monitor */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
@@ -1236,6 +1336,81 @@ export default function DashboardMetrics({
           </>
         ) : (
           <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Refresh" to load uptime and availability metrics.</p>
+        )}
+      </div>
+
+      {/* REQ-89: Run Failure Alert Log */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-rose-500" />
+              Run Failure Alert Log <span className="text-[10px] text-slate-400 font-mono ml-1">(REQ-89)</span>
+            </h3>
+            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Failure events from automated test runs with severity classification.</p>
+          </div>
+          <button onClick={loadAlertLog} disabled={alertLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+            {alertLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…</> : <><RefreshCw className="w-3.5 h-3.5" /> Refresh</>}
+          </button>
+        </div>
+        {alertLog.length > 0 ? (
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {alertLog.map((alert: any) => (
+              <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-xl border text-xs ${alert.acknowledged ? 'bg-slate-50 border-slate-200 opacity-60' : alert.severity === 'critical' ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'}`}>
+                <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${alert.acknowledged ? 'bg-slate-400' : alert.severity === 'critical' ? 'bg-rose-500 animate-pulse' : 'bg-amber-500'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-bold text-[10px] text-slate-600">{alert.runId}</span>
+                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase ${alert.severity === 'critical' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{alert.severity}</span>
+                    {alert.acknowledged && <span className="text-[9px] font-mono text-slate-400">✓ acknowledged</span>}
+                  </div>
+                  <p className="text-slate-700 mt-0.5">{alert.message}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">{new Date(alert.at).toLocaleString()}</p>
+                </div>
+                {!alert.acknowledged && (
+                  <button onClick={() => acknowledgeAlert(alert.id)}
+                    className="text-[10px] font-mono text-slate-500 hover:text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded shrink-0">
+                    Ack
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 font-mono text-center py-3">No run failure alerts logged yet. Alerts appear when runs exceed failure thresholds.</p>
+        )}
+      </div>
+
+      {/* NFR-01: Bundle Size Budget Monitor */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-indigo-500" />
+              Bundle Size Budget Monitor <span className="text-[10px] text-slate-400 font-mono ml-1">(NFR-01)</span>
+            </h3>
+            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Checks dist output against size budgets: Server ≤300KB, Client JS ≤1500KB, CSS ≤200KB.</p>
+          </div>
+          <button onClick={loadBundleSize} disabled={bundleLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+            {bundleLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Checking…</> : <><RefreshCw className="w-3.5 h-3.5" /> Check Budgets</>}
+          </button>
+        </div>
+        {bundleData.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {bundleData.map((item: any) => (
+              <div key={item.name} className={`border rounded-xl p-3 text-center ${item.within ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                <div className={`text-base font-bold font-mono ${item.within ? 'text-emerald-700' : 'text-rose-700'}`}>{item.sizeKb} KB</div>
+                <div className="text-[9px] font-mono text-slate-500 uppercase mt-0.5">{item.name}</div>
+                <div className={`text-[9px] font-mono font-bold mt-0.5 ${item.within ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {item.within ? `✓ within ${item.limitKb}KB` : `⚠ over ${item.limitKb}KB limit`}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Check Budgets" to measure current dist bundle sizes against performance budgets.</p>
         )}
       </div>
     </div>

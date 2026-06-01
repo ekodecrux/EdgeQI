@@ -33,6 +33,27 @@ export default function SecurityTab({
   const [scanError, setScanError] = useState<string | null>(null);
   const [lastScanCount, setLastScanCount] = useState<number | null>(null);
 
+  // REQ-84: A11y scan state
+  const [a11yResults, setA11yResults] = useState<any[]>([]);
+  const [a11yScanning, setA11yScanning] = useState(false);
+  const [a11yTarget, setA11yTarget] = useState('https://staging.qa-env.io');
+  const [a11yError, setA11yError] = useState<string | null>(null);
+
+  const handleA11yScan = async () => {
+    setA11yScanning(true); setA11yError(null); setA11yResults([]);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const res = await fetch('/api/quality/security/scan/a11y', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ url: a11yTarget })
+      });
+      const data = await res.json();
+      if (data.success) setA11yResults(data.issues || []);
+      else setA11yError(data.error || 'A11y scan failed');
+    } catch (e: any) { setA11yError(e.message); } finally { setA11yScanning(false); }
+  };
+
   // REQ-70: Dependency vulnerability scan state
   const [depScanResults, setDepScanResults] = useState<any>(null);
   const [depScanning, setDepScanning] = useState(false);
@@ -397,6 +418,50 @@ export default function SecurityTab({
           )}
         </div>
       </div>
+      {/* REQ-84: Accessibility (A11y) Scan Panel */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="font-sans font-semibold text-base text-slate-900 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-violet-600" />
+              Accessibility (A11y) Scan <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-84 / WCAG 2.1)</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">Detect WCAG 2.1 violations: missing alt text, contrast, keyboard traps, ARIA labels.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input value={a11yTarget} onChange={e => setA11yTarget(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono w-56 focus:outline-none focus:ring-1 focus:ring-violet-400" placeholder="https://..." />
+            <button onClick={handleA11yScan} disabled={a11yScanning}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+              {a11yScanning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Scanning…</> : <><ShieldCheck className="w-3.5 h-3.5" /> Run A11y Scan</>}
+            </button>
+          </div>
+        </div>
+        {a11yError && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-mono">{a11yError}</div>}
+        {a11yResults.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-mono text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              {a11yResults.length} WCAG violation{a11yResults.length !== 1 ? 's' : ''} found
+            </div>
+            {a11yResults.map((issue: any, i: number) => (
+              <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border ${issue.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-200' : issue.severity === 'Serious' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{issue.severity}</span>
+                  <span className="text-[10px] font-mono text-slate-500">{issue.wcag}</span>
+                  <span className="text-xs font-semibold text-slate-800">{issue.rule}</span>
+                </div>
+                <p className="text-[11px] text-slate-600">{issue.description}</p>
+                <code className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded block truncate">{issue.element}</code>
+              </div>
+            ))}
+          </div>
+        )}
+        {!a11yResults.length && !a11yScanning && !a11yError && (
+          <p className="text-xs text-slate-400 font-mono text-center py-3">Enter a URL above and run the A11y scan to detect WCAG 2.1 violations.</p>
+        )}
+      </div>
+
       {/* REQ-70: Dependency Vulnerability Scan Panel */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
