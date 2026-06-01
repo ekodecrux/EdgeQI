@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, User, BookOpen } from 'lucide-react';
+import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, User, BookOpen, ShieldCheck, Clock, Activity } from 'lucide-react';
 
 interface Provider {
   id: string;
@@ -499,6 +499,9 @@ export default function LLMConfigTab() {
 
       {/* NFR-03: API Documentation Viewer */}
       <ApiDocsPanel />
+
+      {/* REQ-103/104 + NFR-02: Compliance & Retention Panel */}
+      <CompliancePanel />
     </div>
   );
 }
@@ -632,6 +635,160 @@ function ApiDocsPanel() {
           </div>
           {filtered.length > 0 && (
             <p className="text-[10px] font-mono text-slate-500 text-right">{filtered.length} route{filtered.length !== 1 ? 's' : ''} registered</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── REQ-103/104 + NFR-02: COMPLIANCE, AUDIT TRAIL & DATA RETENTION ────────────
+function CompliancePanel() {
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [retention, setRetention] = useState<any[]>([]);
+  const [perfMetrics, setPerfMetrics] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState<'audit'|'retention'|'perf'>('audit');
+  const [actorFilter, setActorFilter] = useState('');
+
+  const token = () => localStorage.getItem('iqstudio_token') || localStorage.getItem('iq_token');
+  const authH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
+
+  const loadAudit = async () => {
+    setLoading(true);
+    try {
+      const url = actorFilter ? `/api/quality/compliance/audit-trail?actor=${encodeURIComponent(actorFilter)}&limit=50` : '/api/quality/compliance/audit-trail?limit=50';
+      const r = await fetch(url, { headers: authH() });
+      const d = await r.json();
+      setAuditLogs(d.logs || []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  const loadRetention = async () => {
+    try {
+      const r = await fetch('/api/quality/compliance/retention', { headers: authH() });
+      const d = await r.json();
+      setRetention(d.policy || []);
+    } catch { /* ignore */ }
+  };
+
+  const loadPerf = async () => {
+    try {
+      const r = await fetch('/api/quality/health/performance', { headers: authH() });
+      const d = await r.json();
+      setPerfMetrics(d.metrics);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    loadAudit();
+    loadRetention();
+    loadPerf();
+  }, []);
+
+  const sectionTab = (id: 'audit'|'retention'|'perf', label: string, badge?: string) => (
+    <button onClick={() => setActiveSection(id)}
+      className={`px-3 py-1.5 text-[10px] font-mono font-bold rounded-lg border transition-all ${activeSection === id ? 'bg-slate-900 text-white border-slate-700' : 'bg-slate-800/40 text-slate-400 border-slate-700 hover:bg-slate-800'}`}>
+      {label}{badge && <span className="ml-1 bg-slate-600 text-white text-[8px] px-1 rounded-full">{badge}</span>}
+    </button>
+  );
+
+  return (
+    <div className="bg-slate-950 border border-slate-700 rounded-2xl p-5 shadow-lg mt-4">
+      <div className="flex items-center gap-2 mb-4">
+        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <span className="text-sm font-bold text-white">Compliance &amp; Governance</span>
+        <div className="flex gap-1.5 ml-2 flex-wrap">
+          <span className="text-[9px] bg-emerald-900/60 text-emerald-400 px-1.5 py-0.5 rounded font-mono border border-emerald-800">REQ-103</span>
+          <span className="text-[9px] bg-blue-900/60 text-blue-400 px-1.5 py-0.5 rounded font-mono border border-blue-800">REQ-104</span>
+          <span className="text-[9px] bg-violet-900/60 text-violet-400 px-1.5 py-0.5 rounded font-mono border border-violet-800">NFR-02</span>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {sectionTab('audit', 'Audit Trail', String(auditLogs.length))}
+        {sectionTab('retention', 'Data Retention')}
+        {sectionTab('perf', 'Load Perf (NFR-02)')}
+      </div>
+
+      {activeSection === 'audit' && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input value={actorFilter} onChange={e => setActorFilter(e.target.value)}
+              placeholder="Filter by actor…"
+              className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-emerald-500" />
+            <button onClick={loadAudit} disabled={loading}
+              className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+              {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Search'}
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {auditLogs.length === 0 ? (
+              <p className="text-slate-500 text-xs font-mono text-center py-4">No audit logs found.</p>
+            ) : auditLogs.map((log: any, i: number) => (
+              <div key={i} className="flex items-start gap-2 bg-slate-900/60 rounded-lg px-3 py-1.5">
+                <Clock className="w-3 h-3 text-slate-500 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold truncate">{log.action}</span>
+                    <span className="text-[9px] text-slate-500 shrink-0">{log.actor}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 truncate">{log.details}</p>
+                </div>
+                <span className="text-[9px] font-mono text-slate-600 shrink-0">{new Date(log.created_at).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeSection === 'retention' && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-400 font-mono">Data retention policies per entity type (REQ-104)</p>
+          {retention.length === 0 ? (
+            <p className="text-slate-500 text-xs font-mono text-center py-4">Loading policy…</p>
+          ) : retention.map((p: any, i: number) => (
+            <div key={i} className="flex items-center justify-between bg-slate-900/60 rounded-lg px-3 py-2">
+              <div>
+                <span className="text-xs font-mono text-white font-bold">{p.entity}</span>
+                <p className="text-[10px] text-slate-400">{p.description}</p>
+              </div>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${p.retentionDays === -1 ? 'bg-blue-900/40 text-blue-400 border-blue-700' : 'bg-amber-900/40 text-amber-400 border-amber-700'}`}>
+                {p.retentionDays === -1 ? 'Forever' : `${p.retentionDays}d`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeSection === 'perf' && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-3.5 h-3.5 text-violet-400" />
+            <span className="text-xs text-white font-bold">Frontend Load Metrics (NFR-02: TTI &lt; 2s)</span>
+            <button onClick={loadPerf} className="ml-auto p-1 rounded hover:bg-slate-800">
+              <RefreshCw className="w-3 h-3 text-slate-400" />
+            </button>
+          </div>
+          {!perfMetrics ? (
+            <p className="text-slate-500 text-xs font-mono text-center py-4">Loading metrics…</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'FCP', value: `${perfMetrics.firstContentfulPaint}ms`, ok: perfMetrics.firstContentfulPaint < 1500 },
+                { label: 'TTI', value: `${perfMetrics.timeToInteractive}ms`, ok: perfMetrics.timeToInteractive < 2000 },
+                { label: 'TBT', value: `${perfMetrics.totalBlockingTime}ms`, ok: perfMetrics.totalBlockingTime < 200 },
+                { label: 'LCP', value: `${perfMetrics.largestContentfulPaint}ms`, ok: perfMetrics.largestContentfulPaint < 2500 },
+                { label: 'CLS', value: String(perfMetrics.cumulativeLayoutShift), ok: perfMetrics.cumulativeLayoutShift < 0.1 },
+              ].map(m => (
+                <div key={m.label} className={`rounded-lg px-3 py-2 border ${m.ok ? 'bg-emerald-900/30 border-emerald-700' : 'bg-rose-900/30 border-rose-700'}`}>
+                  <div className="text-[10px] font-mono text-slate-400">{m.label}</div>
+                  <div className={`text-sm font-bold font-mono ${m.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{m.value}</div>
+                  <div className={`text-[9px] font-mono ${m.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{m.ok ? '✓ within budget' : '✗ over budget'}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

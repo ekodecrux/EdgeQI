@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Eye, 
   AlertTriangle, 
@@ -17,7 +17,13 @@ import {
   Code,
   RefreshCw,
   Loader2,
-  FileJson
+  FileJson,
+  Layers,
+  Wand2,
+  Tag,
+  Clock,
+  User,
+  Plus
 } from 'lucide-react';
 import { DefectHotspot, ImpactReport } from '../types';
 
@@ -68,6 +74,61 @@ export default function DefectPredictTab({
 
   const [activeReportIndex, setActiveReportIndex] = useState<number | null>(0);
   const [showConfigSnippet, setShowConfigSnippet] = useState(false);
+
+  // REQ-74: Root cause clusters
+  const [clusters, setClusters] = useState<any[]>([]);
+  const [clustersLoading, setClustersLoading] = useState(false);
+  const [newClusterLabel, setNewClusterLabel] = useState('');
+  const [newClusterPattern, setNewClusterPattern] = useState('');
+  const [showAddCluster, setShowAddCluster] = useState(false);
+
+  // REQ-77: AI defect triage
+  const [triageTitle, setTriageTitle] = useState('');
+  const [triageDesc, setTriageDesc] = useState('');
+  const [triageStack, setTriageStack] = useState('');
+  const [triageResult, setTriageResult] = useState<any>(null);
+  const [triaging, setTriaging] = useState(false);
+
+  useEffect(() => { loadClusters(); }, []);
+
+  const loadClusters = async () => {
+    setClustersLoading(true);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const r = await fetch('/api/quality/defects/clusters', { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setClusters(d.clusters || []);
+    } catch { /* ignore */ }
+    setClustersLoading(false);
+  };
+
+  const handleAddCluster = async () => {
+    if (!newClusterLabel || !newClusterPattern) return;
+    const token = localStorage.getItem('iqstudio_token');
+    const r = await fetch('/api/quality/defects/clusters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ label: newClusterLabel, pattern: newClusterPattern, severity: 'Medium' }),
+    });
+    const d = await r.json();
+    if (d.success) { setClusters(prev => [...prev, d.cluster]); setNewClusterLabel(''); setNewClusterPattern(''); setShowAddCluster(false); }
+  };
+
+  const handleTriage = async () => {
+    if (!triageTitle && !triageDesc) return;
+    setTriaging(true); setTriageResult(null);
+    try {
+      const token = localStorage.getItem('iqstudio_token');
+      const r = await fetch('/api/quality/defects/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: triageTitle, description: triageDesc, stackTrace: triageStack }),
+      });
+      const d = await r.json();
+      if (d.success) setTriageResult(d.triage);
+    } catch { /* ignore */ }
+    setTriaging(false);
+  };
 
   const handlePredictSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -584,6 +645,115 @@ export default function DefectPredictTab({
             </div>
           )}
         </div>
+      </div>
+
+      {/* REQ-74: Root Cause Cluster Grouping */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-violet-500" />
+            <span className="text-xs font-bold text-slate-700">Root Cause Cluster Grouping</span>
+            <span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-mono border border-violet-200">REQ-74</span>
+          </div>
+          <div className="flex gap-1">
+            <button onClick={loadClusters} className="p-1 rounded hover:bg-slate-100" title="Refresh">
+              <RefreshCw className={`w-3 h-3 text-slate-400 ${clustersLoading ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={() => setShowAddCluster(s => !s)} className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-violet-600 text-white rounded hover:bg-violet-700">
+              <Plus className="w-3 h-3" /> Add Cluster
+            </button>
+          </div>
+        </div>
+
+        {showAddCluster && (
+          <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-lg space-y-2">
+            <input value={newClusterLabel} onChange={e => setNewClusterLabel(e.target.value)}
+              placeholder="Cluster label (e.g. UI Rendering Failures)" className="w-full text-xs border border-violet-200 rounded px-2 py-1 focus:outline-none focus:border-violet-400" />
+            <input value={newClusterPattern} onChange={e => setNewClusterPattern(e.target.value)}
+              placeholder="Pattern keywords (e.g. timeout|element not found)" className="w-full text-xs border border-violet-200 rounded px-2 py-1 focus:outline-none focus:border-violet-400" />
+            <button onClick={handleAddCluster} className="px-3 py-1 text-[10px] bg-violet-600 text-white rounded hover:bg-violet-700">Save Cluster</button>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {clustersLoading ? (
+            <div className="text-center py-4 text-slate-400 text-xs">Loading clusters…</div>
+          ) : clusters.length === 0 ? (
+            <div className="text-center py-4 text-slate-400 text-xs">No clusters yet — click Add Cluster</div>
+          ) : clusters.map(cl => (
+            <div key={cl.id} className="border border-violet-100 rounded-lg p-3 bg-violet-50/40">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-3 h-3 text-violet-500" />
+                  <span className="text-xs font-bold text-slate-700">{cl.label}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono font-bold ${
+                    cl.severity === 'High' || cl.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                    cl.severity === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>{cl.severity}</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500">{cl.count} defects</span>
+              </div>
+              <div className="mt-1.5 text-[10px] font-mono text-slate-500">Pattern: <span className="text-violet-600">{cl.pattern}</span></div>
+              {cl.suggestedFix && <div className="mt-1 text-[10px] text-slate-600 italic">💡 {cl.suggestedFix}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* REQ-77: AI Defect Triage Assistant */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Wand2 className="w-4 h-4 text-rose-500" />
+          <span className="text-xs font-bold text-slate-700">AI Defect Triage Assistant</span>
+          <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-mono border border-rose-200">REQ-77</span>
+        </div>
+
+        <div className="space-y-2 mb-3">
+          <input value={triageTitle} onChange={e => setTriageTitle(e.target.value)}
+            placeholder="Defect title (e.g. Login button unresponsive on Safari)"
+            className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-rose-400" />
+          <textarea value={triageDesc} onChange={e => setTriageDesc(e.target.value)}
+            placeholder="Description / steps to reproduce…"
+            rows={2} className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-rose-400 resize-none" />
+          <textarea value={triageStack} onChange={e => setTriageStack(e.target.value)}
+            placeholder="Stack trace (optional)…"
+            rows={2} className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-rose-400 resize-none font-mono" />
+          <button onClick={handleTriage} disabled={triaging || (!triageTitle && !triageDesc)}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-rose-600 text-white rounded hover:bg-rose-700 disabled:opacity-50">
+            {triaging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+            {triaging ? 'Triaging…' : 'Triage with AI'}
+          </button>
+        </div>
+
+        {triageResult && (
+          <div className="border border-rose-200 rounded-lg p-3 bg-rose-50/40 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-rose-600 text-white">{triageResult.priority}</span>
+              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-slate-700 text-white">{triageResult.category}</span>
+              <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
+                triageResult.actualSeverity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                triageResult.actualSeverity === 'High' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>{triageResult.actualSeverity}</span>
+              <span className="text-[9px] text-slate-500 ml-auto">Confidence: {Math.round((triageResult.confidence || 0) * 100)}%</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div><span className="text-slate-500">Owner:</span> <span className="font-bold text-slate-700">{triageResult.suggestedOwner}</span></div>
+              <div><span className="text-slate-500">Est. fix:</span> <span className="font-bold text-slate-700">{triageResult.estimatedFixTime}</span></div>
+            </div>
+            <div className="text-[10px] text-slate-700">
+              <span className="font-bold text-slate-500">Root cause: </span>{triageResult.rootCauseSuggestion}
+            </div>
+            {triageResult.relatedPatterns?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {triageResult.relatedPatterns.map((p: string, i: number) => (
+                  <span key={i} className="text-[9px] bg-slate-100 border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-mono">{p}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

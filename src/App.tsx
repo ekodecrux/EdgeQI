@@ -170,6 +170,8 @@ function TestPlansTab() {
                   </div>
                   {plan.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{plan.description}</p>}
                   <p className="text-[10px] font-mono text-slate-400 mt-0.5">{plan.tcIds?.length || 0} test cases · Created {new Date(plan.createdAt).toLocaleDateString()}</p>
+                  {/* REQ-31/32: Milestone progress inline */}
+                  <PlanProgressPanel planId={plan.id} planName={plan.name} />
                 </div>
                 <button onClick={() => deletePlan(plan.id)} className="text-slate-400 hover:text-rose-500 shrink-0 mt-0.5 transition-colors">
                   <X className="w-3.5 h-3.5" />
@@ -178,6 +180,52 @@ function TestPlansTab() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── REQ-31/32: TEST PLAN EXECUTION LINK + MILESTONE TRACKING ─────────────────
+function PlanProgressPanel({ planId, planName }: { planId: string; planName: string }) {
+  const [progress, setProgress] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const token = () => localStorage.getItem('iqstudio_token');
+  const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/quality/test-plans/${planId}/progress`, { headers: authH() });
+      const d = await r.json();
+      setProgress(d);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [planId]);
+
+  const statusColor: Record<string,string> = {
+    completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    in_progress: 'text-amber-700 bg-amber-50 border-amber-200',
+    not_started: 'text-slate-600 bg-slate-50 border-slate-200',
+  };
+
+  if (loading) return <div className="text-xs text-slate-400 py-2">Loading progress…</div>;
+  if (!progress) return null;
+
+  return (
+    <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-bold text-indigo-700">{planName} — Milestone Progress</span>
+        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold ${statusColor[progress.milestoneStatus] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{progress.milestoneStatus?.replace('_',' ')}</span>
+      </div>
+      {progress.milestone && <div className="text-[10px] text-indigo-600 font-mono">🏁 {progress.milestone}</div>}
+      <div className="w-full bg-indigo-100 rounded-full h-1.5">
+        <div className="bg-indigo-500 h-1.5 rounded-full transition-all" style={{ width: `${progress.progress || 0}%` }} />
+      </div>
+      <div className="flex justify-between text-[10px] text-indigo-600 font-mono">
+        <span>{progress.progress || 0}% complete</span>
+        <span>{progress.passed}/{progress.tcCount} TCs passed</span>
       </div>
     </div>
   );

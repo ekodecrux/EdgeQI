@@ -237,6 +237,14 @@ export default function ExecutionEnginePage({
   const [quarantineLoading, setQuarantineLoading] = useState(false);
   const [autoScanMsg, setAutoScanMsg] = useState('');
 
+  // REQ-34: Auto-defect from failed run
+  const [autoDefects, setAutoDefects] = useState<any[]>([]);
+  const [defectsLoading, setDefectsLoading] = useState(false);
+  const [showAutoDefects, setShowAutoDefects] = useState(false);
+  const [logDefectRunId, setLogDefectRunId] = useState('');
+  const [loggingDefect, setLoggingDefect] = useState(false);
+  const [defectMsg, setDefectMsg] = useState('');
+
   // REQ-66/67: Run history search + CSV export
   const [historySearch, setHistorySearch] = useState('');
   const [historyExporting, setHistoryExporting] = useState(false);
@@ -289,6 +297,36 @@ export default function ExecutionEnginePage({
     } finally {
       setPollingRunId(null);
     }
+  };
+
+  // REQ-34: Load auto-defects from failed runs
+  const loadAutoDefects = async () => {
+    setDefectsLoading(true);
+    try {
+      const token = localStorage.getItem('iq_token') || localStorage.getItem('iqstudio_token');
+      const r = await fetch('/api/quality/defects/from-run', { headers: { Authorization: `Bearer ${token}` } });
+      if (r.ok) { const d = await r.json(); setAutoDefects(d.defects || []); }
+    } finally { setDefectsLoading(false); }
+  };
+
+  const handleLogDefect = async () => {
+    if (!logDefectRunId) return;
+    setLoggingDefect(true);
+    try {
+      const token = localStorage.getItem('iq_token') || localStorage.getItem('iqstudio_token');
+      const r = await fetch('/api/quality/defects/from-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ runId: logDefectRunId, severity: 'High', failureMsg: 'Test case failed during automated execution' }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        setDefectMsg(`Defect ${d.defect.id} logged from run ${logDefectRunId}`);
+        setLogDefectRunId('');
+        loadAutoDefects();
+        setTimeout(() => setDefectMsg(''), 4000);
+      }
+    } finally { setLoggingDefect(false); }
   };
 
   // REQ-53: Load + manage flaky quarantine
@@ -891,6 +929,47 @@ export default function ExecutionEnginePage({
         </div>
       </div>
 
+      {/* REQ-34: Auto-Defect Logging from Failed Runs */}
+      {showAutoDefects && (
+        <div className="bg-white border border-rose-200 rounded-2xl p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bug className="w-4 h-4 text-rose-500" />
+              <h3 className="font-sans font-extrabold text-slate-900 text-sm">Auto-Defect Logging <span className="text-xs font-normal text-slate-400">(REQ-34)</span></h3>
+            </div>
+            <button onClick={loadAutoDefects} disabled={defectsLoading} className="p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+              <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${defectsLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input value={logDefectRunId} onChange={e => setLogDefectRunId(e.target.value)}
+              placeholder="Run ID (e.g. RUN-abc123)"
+              className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-rose-400" />
+            <button onClick={handleLogDefect} disabled={loggingDefect || !logDefectRunId}
+              className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 text-white text-xs rounded-lg hover:bg-rose-700 disabled:opacity-50">
+              {loggingDefect ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Bug className="w-3 h-3" />} Log Defect
+            </button>
+          </div>
+          {defectMsg && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-1 font-mono">{defectMsg}</div>}
+          {autoDefects.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-xs font-mono">No auto-defects logged yet. Enter a failed Run ID above to create one.</div>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {autoDefects.map((def: any, i: number) => (
+                <div key={i} className="p-2 bg-rose-50 border border-rose-100 rounded-lg text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-rose-700">{def.id}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${def.severity === 'High' || def.severity === 'Critical' ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{def.severity}</span>
+                  </div>
+                  <div className="text-slate-600 mt-0.5 line-clamp-1">{def.title}</div>
+                  <div className="text-slate-400 text-[10px] font-mono mt-0.5">Run: {def.runId} · {new Date(def.createdAt).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* REQ-53: Flaky Test Quarantine Panel */}
       {showQuarantine && (
         <div className="bg-white border border-orange-200 rounded-2xl p-5 shadow-xs space-y-3">
@@ -1013,6 +1092,15 @@ export default function ExecutionEnginePage({
                 </button>
               )}
               {abortMsg && <span className="text-xs text-red-600 font-mono">{abortMsg}</span>}
+              {/* REQ-34: Auto-Defect toggle */}
+              <button
+                onClick={() => { setShowAutoDefects(!showAutoDefects); if (!showAutoDefects) loadAutoDefects(); }}
+                aria-label="Toggle auto-defect panel"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-mono font-bold transition-all ${showAutoDefects ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+              >
+                <Bug className="w-3.5 h-3.5" />
+                Auto-Defect {autoDefects.length > 0 && <span className="bg-rose-200 text-rose-800 text-[9px] px-1.5 rounded-full font-bold">{autoDefects.length}</span>}
+              </button>
               {/* REQ-53: Flaky Quarantine toggle */}
               <button
                 onClick={() => { setShowQuarantine(!showQuarantine); if (!showQuarantine) loadQuarantine(); }}
