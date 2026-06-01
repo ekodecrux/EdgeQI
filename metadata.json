@@ -1,0 +1,6 @@
+{
+  "name": "Agentic AI Quality Intelligence Platform",
+  "description": "An end-to-end, full-stack autonomous quality engineering system harnessing agentic AI to intelligently generate, execute, heal, and optimize tests across functional, performance, and security domains.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,627 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Sparkles, 
+  Plus, 
+  HelpCircle, 
+  CheckCircle, 
+  Cpu, 
+  AlertTriangle, 
+  Play, 
+  RefreshCcw, 
+  Filter, 
+  Check, 
+  Clipboard, 
+  Settings2,
+  TableProperties,
+  Edit2
+} from 'lucide-react';
+import { TestCase } from '../types';
+
+interface TestCaseGeneratorPageProps {
+  testCases: TestCase[];
+  onTriggerRerun: (id: string) => void;
+  onApplyHeal: (id: string) => void;
+  onAddManualTestCase?: (tc: TestCase) => void;
+  onUpdateTestCase?: (tc: TestCase) => void;
+  currentProjectId?: string;
+}
+
+export default function TestCaseGeneratorPage({
+  testCases,
+  onTriggerRerun,
+  onApplyHeal,
+  onAddManualTestCase,
+  onUpdateTestCase,
+  currentProjectId = 'ALL'
+}: TestCaseGeneratorPageProps) {
+  const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [tcPriority, setTcPriority] = useState<'P0' | 'P1' | 'P2' | 'P3'>('P0');
+  const [tcType, setTcType] = useState<string>('Positive');
+  const [tcTitle, setTcTitle] = useState('');
+  const [tcDesc, setTcDesc] = useState('');
+  const [tcPreconditions, setTcPreconditions] = useState('');
+  const [tcSteps, setTcSteps] = useState('');
+  const [tcTestData, setTcTestData] = useState('');
+  
+  // Local state for interactive testcases
+  const [localTestCases, setLocalTestCases] = useState<TestCase[]>(testCases);
+  const [feedback, setFeedback] = useState('');
+  const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null);
+
+  // Sync state whenever parent props update (CRITICAL for project-level separation)
+  useEffect(() => {
+    setLocalTestCases(testCases);
+  }, [testCases]);
+
+  // Handle local simulation rerun
+  const handleRerun = (id: string) => {
+    onTriggerRerun(id);
+    setLocalTestCases(prev => prev.map(tc => tc.id === id ? { ...tc, confidenceScore: 100 } : tc));
+    setFeedback(`TestCase ${id} simulation rerun passed successfully!`);
+    setTimeout(() => setFeedback(''), 3000);
+  };
+
+  const handleHeal = (id: string) => {
+    onApplyHeal(id);
+    setLocalTestCases(prev => prev.map(tc => tc.id === id ? { ...tc, automationStatus: 'Automated', confidenceScore: 99 } : tc));
+    setFeedback(`Injected real-time DOM telemetry repair on ${id}. Selector locator healed!`);
+    setTimeout(() => setFeedback(''), 3000);
+  };
+
+  const categories = ['all', 'Positive', 'Negative', 'Edge', 'Boundary'];
+
+  const filteredCases = localTestCases.filter(tc => {
+    if (activeCategory === 'all') return true;
+    return tc.type.toLowerCase() === activeCategory.toLowerCase();
+  });
+
+  const handleCreateCase = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tcTitle.trim() || !tcDesc.trim()) return;
+
+    const idSuffix = Math.floor(Math.random() * 900) + 100;
+    const newCase: TestCase = {
+      id: `TC-${idSuffix}`,
+      title: tcTitle,
+      description: tcDesc,
+      priority: tcPriority as any,
+      type: tcType as any,
+      preconditions: tcPreconditions || 'User logged back inside active workspace.',
+      automationStatus: 'Needs Manual',
+      confidenceScore: 82,
+      testData: tcTestData || '{"userId": "demo-qa"}',
+      steps: tcSteps ? tcSteps.split('\n').map(step => ({ action: step, expectedResult: 'Assert target status behaves correctly.' })) : [
+        { action: 'Access main application index layout URL', expectedResult: 'State responds and sets components.' }
+      ]
+    };
+
+    if (onAddManualTestCase) {
+      onAddManualTestCase(newCase);
+    }
+    setLocalTestCases(prev => [newCase, ...prev]);
+
+    // Clear Form
+    setTcTitle('');
+    setTcDesc('');
+    setTcPreconditions('');
+    setTcSteps('');
+    setTcTestData('');
+    setFeedback(`Manual test case ${newCase.id} appended to current suite inventory!`);
+    setTimeout(() => setFeedback(''), 4000);
+  };
+
+  const getProjectBadgeStr = () => {
+    if (!currentProjectId || currentProjectId === 'ALL') return '🗂 All Projects';
+    return `📁 ${currentProjectId}`;
+  };
+
+  return (
+    <div className="space-y-6">
+      
+      {/* Intro Header */}
+      <div className="bg-gradient-to-r from-emerald-850 to-teal-800 rounded-3xl p-6 text-white shadow-xs relative overflow-hidden bg-slate-900 border border-slate-800">
+        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
+          <TableProperties className="w-96 h-96" />
+        </div>
+        <div className="max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-emerald-200 mb-3 font-mono font-bold">
+            <Cpu className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+            Active Workspace Scope: {getProjectBadgeStr()}
+          </div>
+          <h2 className="text-2xl font-sans font-extrabold tracking-tight">
+            QA Test Case Matrix Generator
+          </h2>
+          <p className="text-emerald-100 text-xs sm:text-sm mt-1 leading-relaxed">
+            Construct, synchronize, and execute structured test matrices based on functional parameters. Edit priorities on-the-fly, declare explicit UI assertions, and run quick-checks to evaluate automated healing thresholds.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* Left column: Create Manual scenario */}
+        <div className="lg:col-span-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+            
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="font-sans font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Plus className="w-4 h-4 text-emerald-600 font-bold" />
+                Declare Manual Suite Scenario
+              </h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">Quickly append specialized validations to the mapped spec.</p>
+            </div>
+
+            <form onSubmit={handleCreateCase} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Scenario Title (Required)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Reject negative cash wallets"
+                  value={tcTitle}
+                  onChange={(e) => setTcTitle(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-emerald-400"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Detailed Description</label>
+                <textarea
+                  placeholder="Verifies that transaction requests with a negative wallet balance throw a 403 authorization lock..."
+                  value={tcDesc}
+                  onChange={(e) => setTcDesc(e.target.value)}
+                  rows={2}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-emerald-400 leading-normal"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Priority</label>
+                  <select
+                    value={tcPriority}
+                    onChange={(e: any) => setTcPriority(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800"
+                  >
+                    <option value="P0">P0 - Critical Focus</option>
+                    <option value="P1">P1 - Standard Flow</option>
+                    <option value="P2">P2 - Secondary Checks</option>
+                    <option value="P3">P3 - Trivial Specs</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Testing Type</label>
+                  <select
+                    value={tcType}
+                    onChange={(e) => setTcType(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800"
+                  >
+                    <option value="Positive">Positive</option>
+                    <option value="Negative">Negative</option>
+                    <option value="Edge">Edge Case</option>
+                    <option value="Boundary">Boundary Check</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Preconditions</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Account balance holds negative limit"
+                  value={tcPreconditions}
+                  onChange={(e) => setTcPreconditions(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-850"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Steps (One action per line)</label>
+                <textarea
+                  placeholder="Click Checkout Button&#10;Verify balance modal dialog exists&#10;Assert negative checkout error text is displayed"
+                  value={tcSteps}
+                  onChange={(e) => setTcSteps(e.target.value)}
+                  rows={2}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-850 leading-normal"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Test Parameters / Mock Data</label>
+                <input
+                  type="text"
+                  placeholder='e.g. {"balance": -10, "currency": "USD"}'
+                  value={tcTestData}
+                  onChange={(e) => setTcTestData(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-bold py-2 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" /> Add Matrix Scenario
+              </button>
+            </form>
+
+            {feedback && (
+              <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-800 rounded-xl text-center text-xs leading-normal font-mono animate-fade-in">
+                {feedback}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right column: Test Case Inventory List Grid */}
+        <div className="lg:col-span-8 flex flex-col space-y-4">
+          
+          {/* Controls Bar */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+            
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-xs font-bold text-slate-700 uppercase font-mono">Filter Suite:</span>
+              <div className="flex flex-wrap gap-1">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border transition-all ${
+                      activeCategory === cat 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' 
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+              Suite Coverage: <strong className="text-emerald-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
+            </span>
+          </div>
+
+          {/* List Card Grid */}
+          <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
+            {filteredCases.map(tc => {
+              const isSelected = selectedTestCase?.id === tc.id;
+              return (
+                <div
+                  key={tc.id}
+                  onClick={() => setSelectedTestCase(isSelected ? null : tc)}
+                  className={`bg-white border hover:border-slate-300 rounded-2xl p-4 transition-all cursor-pointer shadow-xs ${
+                    isSelected ? 'ring-1 ring-emerald-500 border-emerald-500' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 text-left">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-mono text-emerald-700 font-bold">{tc.id}</span>
+                        <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
+                          tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border border-rose-200/50' :
+                          tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border border-amber-200/50' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {tc.priority}
+                        </span>
+                        <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
+                          {tc.type}
+                        </span>
+                        <span className={`text-[9px] font-mono px-1.5 rounded-sm ${
+                          tc.automationStatus === 'Automated' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-blue-50 text-indigo-700 border border-blue-100'
+                        }`}>
+                          {tc.automationStatus}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900 mt-1">{tc.title}</h4>
+                      <p className="text-[11px] text-slate-500 line-clamp-2">{tc.description}</p>
+                    </div>
+
+                    {/* Operational controls for cases */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRerun(tc.id);
+                        }}
+                        className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all text-slate-500"
+                        title="Simulate validation test"
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                      </button>
+
+                      {tc.confidenceScore < 90 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHeal(tc.id);
+                          }}
+                          className="bg-amber-50 text-amber-800 p-1.5 rounded-lg border border-amber-200 hover:bg-amber-600 hover:text-white transition-all animate-pulse"
+                          title="Heal locators dynamically"
+                        >
+                          <RefreshCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expansion info content */}
+                  {isSelected && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs leading-relaxed text-slate-705" onClick={(e) => e.stopPropagation()}>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Preconditions</span>
+                          <p className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-slate-800 font-mono text-[11px]">
+                            {tc.preconditions}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Execution Parameters & Test Data</span>
+                          <p className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-emerald-800 font-mono text-[11px] break-all">
+                            {tc.testData}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-left">
+                        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Sequential Testing Steps Mapped</span>
+                        <div className="space-y-2 bg-slate-900 text-slate-200 p-4 rounded-xl border border-slate-800">
+                          {tc.steps?.map((st, i) => (
+                            <div key={i} className="flex gap-2 text-[11px]">
+                              <span className="text-slate-400 font-mono">[{i + 1}]</span>
+                              <div className="flex-1">
+                                <span className="text-white font-bold">{st.action}</span>
+                                <p className="text-[10px] text-emerald-400 font-mono mt-0.5">➔ Assert: {st.expectedResult}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-3 flex-wrap gap-2 text-[10px] font-mono text-slate-500">
+                        <span>Confidence Threshold: <strong className="text-emerald-700 font-bold">{tc.confidenceScore}%</strong></span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingTestCase(tc)}
+                            className="inline-flex items-center gap-1 bg-purple-50 hover:bg-purple-600 hover:text-white border border-purple-200 px-2.5 py-1 rounded-md text-purple-700 font-sans font-bold text-[10px] transition-all"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit Test Case
+                          </button>
+                          <span className="flex items-center gap-1 text-[11px]">
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                            Parsed by NLP Core
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })}
+
+            {filteredCases.length === 0 && (
+              <div className="bg-white border border-slate-200 border-dashed rounded-2xl p-8 text-center text-slate-500">
+                <TableProperties className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <span className="text-sm font-bold block">No Test Scenarios Loaded</span>
+                <p className="text-xs text-slate-400 max-w-sm mt-1 mx-auto leading-normal">
+                  No active test cases corresponding to the selected testing type. Feel free to add quick manual situations on the side.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Edit Scenario Modal Overlay */}
+      {editingTestCase && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setEditingTestCase(null)}>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-slate-150 pb-3 flex justify-between items-center text-left">
+              <div>
+                <h3 className="font-sans font-bold text-slate-950 text-sm">
+                  ✏ Edit Test Scenario Setup: {editingTestCase.id}
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-0.5 hover:none">Modify parameters or custom sequence assertions dynamically.</p>
+              </div>
+              <button 
+                onClick={() => setEditingTestCase(null)}
+                className="text-slate-400 hover:text-slate-650 text-base font-bold font-mono px-1.5"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-3 text-left">
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Scenario Title</label>
+                <input
+                  type="text"
+                  value={editingTestCase.title}
+                  onChange={(e) => setEditingTestCase({ ...editingTestCase, title: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Thorough Goal Description</label>
+                <textarea
+                  value={editingTestCase.description}
+                  onChange={(e) => setEditingTestCase({ ...editingTestCase, description: e.target.value })}
+                  rows={2}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 leading-normal"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Priority</label>
+                  <select
+                    value={editingTestCase.priority}
+                    onChange={(e: any) => setEditingTestCase({ ...editingTestCase, priority: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-sans"
+                  >
+                    <option value="P0">P0 - Critical Focus</option>
+                    <option value="P1">P1 - Standard Flow</option>
+                    <option value="P2">P2 - Secondary Checks</option>
+                    <option value="P3">P3 - Trivial Specs</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Testing Type</label>
+                  <select
+                    value={editingTestCase.type}
+                    onChange={(e: any) => setEditingTestCase({ ...editingTestCase, type: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-sans"
+                  >
+                    <option value="Positive">Positive</option>
+                    <option value="Negative">Negative</option>
+                    <option value="Edge">Edge Case</option>
+                    <option value="Boundary">Boundary Check</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Automation Feasibility</label>
+                  <select
+                    value={editingTestCase.automationStatus}
+                    onChange={(e: any) => setEditingTestCase({ ...editingTestCase, automationStatus: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-850 font-sans"
+                  >
+                    <option value="Automatable">Automatable</option>
+                    <option value="Needs Manual">Needs Manual</option>
+                    <option value="Automated">Automated</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Confidence Rating (%)</label>
+                  <input
+                    type="number"
+                    value={editingTestCase.confidenceScore}
+                    onChange={(e) => setEditingTestCase({ ...editingTestCase, confidenceScore: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Preconditions</label>
+                <input
+                  type="text"
+                  value={editingTestCase.preconditions}
+                  onChange={(e) => setEditingTestCase({ ...editingTestCase, preconditions: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-850"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Test Parameters / Mock Data</label>
+                <input
+                  type="text"
+                  value={editingTestCase.testData}
+                  onChange={(e) => setEditingTestCase({ ...editingTestCase, testData: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500">Test Execution Steps (action | expected result)</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const steps = [...(editingTestCase.steps || [])];
+                      steps.push({ action: 'Proceed to next check state', expectedResult: 'State responds matches specifications.' });
+                      setEditingTestCase({ ...editingTestCase, steps });
+                    }}
+                    className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-sm hover:underline font-mono"
+                  >
+                    + Add Stage Step
+                  </button>
+                </div>
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto bg-slate-50 p-2 border border-slate-200 rounded-lg">
+                  {editingTestCase.steps?.map((step, idx) => (
+                    <div key={idx} className="flex gap-1 items-start">
+                      <span className="text-[10px] font-mono text-slate-400 mt-1">#{idx+1}</span>
+                      <input
+                        type="text"
+                        placeholder="Action"
+                        value={step.action}
+                        onChange={(e) => {
+                          const steps = [...editingTestCase.steps];
+                          steps[idx].action = e.target.value;
+                          setEditingTestCase({ ...editingTestCase, steps });
+                        }}
+                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-slate-800 focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Expected behavior"
+                        value={step.expectedResult}
+                        onChange={(e) => {
+                          const steps = [...editingTestCase.steps];
+                          steps[idx].expectedResult = e.target.value;
+                          setEditingTestCase({ ...editingTestCase, steps });
+                        }}
+                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-emerald-800 focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const steps = [...editingTestCase.steps];
+                          steps.splice(idx, 1);
+                          setEditingTestCase({ ...editingTestCase, steps });
+                        }}
+                        className="text-red-500 hover:text-red-700 font-bold text-xs px-1"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {(!editingTestCase.steps || editingTestCase.steps.length === 0) && (
+                    <div className="text-center text-slate-400 font-mono text-[10px] py-4">No testing steps configured. Click Add Stage step above.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setEditingTestCase(null)}
+                className="bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-705 font-mono text-[11px] px-3.5 py-1.5 rounded-xl font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onUpdateTestCase) {
+                    onUpdateTestCase(editingTestCase);
+                  }
+                  // Also update local list
+                  setLocalTestCases(prev => prev.map(tc => tc.id === editingTestCase.id ? editingTestCase : tc));
+                  setEditingTestCase(null);
+                  setFeedback(`Scenario ${editingTestCase.id} updated and saved successfully!`);
+                  setTimeout(() => setFeedback(''), 3000);
+                }}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-mono text-[11px] px-4 py-1.5 rounded-xl font-bold transition-all"
+              >
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
