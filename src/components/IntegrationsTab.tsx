@@ -13,6 +13,13 @@ export default function IntegrationsTab() {
   const [trEmail, setTrEmail] = useState('');
   const [trToken, setTrToken] = useState('');
   const [trProject, setTrProject] = useState('1');
+  // REQ-95: Azure DevOps state
+  const [azureOrgUrl, setAzureOrgUrl] = useState('');
+  const [azureProject, setAzureProject] = useState('');
+  const [azurePat, setAzurePat] = useState('');
+  const [azureSyncing, setAzureSyncing] = useState(false);
+  const [azureResults, setAzureResults] = useState<any[]>([]);
+  const [azureError, setAzureError] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [results, setResults] = useState<SyncResult[]>([]);
   const [syncSource, setSyncSource] = useState('');
@@ -166,20 +173,101 @@ export default function IntegrationsTab() {
         </div>
       )}
 
-      {/* Azure DevOps */}
+      {/* Azure DevOps — REQ-95: Full live + demo sync */}
       {activeInt === 'azuredevops' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
             <span className="text-2xl">🟪</span>
-            <h3 className="text-white font-semibold">Azure DevOps Integration</h3>
+            <div>
+              <h3 className="text-white font-semibold">Azure DevOps Integration</h3>
+              <p className="text-xs text-slate-400">Sync test cases as Work Items to Azure Test Plans</p>
+            </div>
           </div>
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-sm text-amber-300">
-            Azure DevOps sync is available via the CI/CD Webhook integration. Configure a service hook in Azure DevOps to send events to your iQStudio webhook URL.
+
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">Organization URL</label>
+              <input type="text" placeholder="https://dev.azure.com/your-org" value={azureOrgUrl}
+                onChange={e => setAzureOrgUrl(e.target.value)} aria-label="Azure DevOps organization URL"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">Project Name</label>
+                <input type="text" placeholder="MyProject" value={azureProject}
+                  onChange={e => setAzureProject(e.target.value)} aria-label="Azure DevOps project name"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">Personal Access Token (PAT)</label>
+                <input type="password" placeholder="PAT token..." value={azurePat}
+                  onChange={e => setAzurePat(e.target.value)} aria-label="Azure DevOps PAT"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
+              </div>
+            </div>
           </div>
-          <div className="mt-4 space-y-2 text-xs text-slate-400">
+
+          <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-700/40 rounded-lg p-3">
+            <Settings className="w-3.5 h-3.5 text-blue-400" />
+            Leave URL and PAT empty to run in <span className="text-amber-400 font-mono">Demo Mode</span> with generated test items.
+          </div>
+
+          {azureError && <div role="alert" className="bg-red-500/10 border border-red-500/30 rounded p-2 text-red-400 text-xs">{azureError}</div>}
+
+          <button
+            onClick={async () => {
+              setAzureSyncing(true); setAzureError(''); setAzureResults([]);
+              try {
+                const res = await fetch('/api/quality/integrations/azure/sync', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ orgUrl: azureOrgUrl, project: azureProject, pat: azurePat }),
+                });
+                const data = await res.json();
+                if (!res.ok) { setAzureError(data.error || 'Sync failed'); }
+                else { setAzureResults(data.items || []); }
+              } catch (e: any) { setAzureError(e.message); }
+              finally { setAzureSyncing(false); }
+            }}
+            disabled={azureSyncing}
+            aria-label="Sync test cases to Azure DevOps"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white transition-all disabled:opacity-50"
+          >
+            {azureSyncing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Syncing to Azure DevOps...</> : <>🟪 Sync Test Cases to Azure DevOps</>}
+          </button>
+
+          {azureResults.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white font-semibold flex items-center gap-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> {azureResults.length} Items Synced
+                </span>
+                <span className="text-[9px] font-mono text-amber-400">{azureResults[0]?.url?.includes('dev.azure.com') ? '✅ Live' : '🎭 Demo'}</span>
+              </div>
+              <div className="overflow-x-auto max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-slate-500 border-b border-slate-700">
+                    <th className="text-left py-1 pr-3">Azure ID</th>
+                    <th className="text-left py-1 pr-3">Title</th>
+                    <th className="text-left py-1 pr-3">State</th>
+                    <th className="text-left py-1">iQ TC</th>
+                  </tr></thead>
+                  <tbody>{azureResults.map((r, i) => (
+                    <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/30">
+                      <td className="py-1.5 pr-3 font-mono text-blue-400">#{r.id}</td>
+                      <td className="py-1.5 pr-3 text-slate-300">{(r.title || '').slice(0, 50)}</td>
+                      <td className="py-1.5 pr-3"><span className="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded text-[9px]">{r.state || 'Active'}</span></td>
+                      <td className="py-1.5 font-mono text-purple-400 text-[10px]">{r.iqStudioId}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-2 space-y-1 text-xs text-slate-400 border-t border-slate-700 pt-3">
             <p className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Azure Pipelines CI/CD config generator → CI/CD tab</p>
             <p className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Azure DevOps webhook receiver → CI/CD tab</p>
-            <p className="flex items-center gap-2"><Settings className="w-3.5 h-3.5 text-amber-400" /> Azure Test Plans API sync → coming soon</p>
+            <p className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Azure Test Plans Work Item sync ← this panel</p>
           </div>
         </div>
       )}

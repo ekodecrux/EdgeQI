@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, 
   Plus, 
@@ -17,7 +17,10 @@ import {
   Download,
   FileJson,
   FileText,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  Upload,
+  X
 } from 'lucide-react';
 import { TestCase } from '../types';
 
@@ -57,6 +60,17 @@ export default function TestCaseGeneratorPage({
   const [isExporting, setIsExporting] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [regenFeedback, setRegenFeedback] = useState<Record<string, string>>({});
+
+  // REQ-28: Clone state
+  const [cloningId, setCloningId] = useState<string | null>(null);
+
+  // REQ-26: Bulk import state
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importJson, setImportJson] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; failed: number } | null>(null);
+  const bulkFileRef = useRef<HTMLInputElement>(null);
 
   // Sync state whenever parent props update (CRITICAL for project-level separation)
   useEffect(() => {
@@ -128,6 +142,55 @@ export default function TestCaseGeneratorPage({
     setTimeout(() => setFeedback(''), 3000);
   };
 
+  // REQ-28: Clone test case
+  const handleClone = async (tc: TestCase) => {
+    setCloningId(tc.id);
+    try {
+      const res = await fetch(`/api/quality/testcases/${tc.id}/clone`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success && data.testCase) {
+        setLocalTestCases(prev => [...prev, data.testCase]);
+        setFeedback(`Cloned ${tc.id} → ${data.testCase.id}`);
+        setTimeout(() => setFeedback(''), 3000);
+      }
+    } catch (e: any) {
+      setFeedback(`Clone failed: ${e.message}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } finally { setCloningId(null); }
+  };
+
+  // REQ-26: Bulk import test cases
+  const handleBulkImport = async () => {
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      if (importFile) {
+        formData.append('file', importFile);
+      } else if (importJson.trim()) {
+        formData.append('testCasesJson', importJson.trim());
+      } else {
+        setFeedback('Provide a CSV file or JSON data to import.');
+        setTimeout(() => setFeedback(''), 3000);
+        return;
+      }
+      const res = await fetch('/api/quality/testcases/bulk-import', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) {
+        setImportResult({ imported: data.imported, failed: data.failed });
+        setLocalTestCases(prev => [...prev, ...(data.testCases || [])]);
+        setFeedback(`Imported ${data.imported} test cases successfully!`);
+        setTimeout(() => setFeedback(''), 4000);
+        setImportFile(null); setImportJson('');
+      } else {
+        setFeedback(`Import failed: ${data.error}`);
+        setTimeout(() => setFeedback(''), 3000);
+      }
+    } catch (e: any) {
+      setFeedback(`Import error: ${e.message}`);
+      setTimeout(() => setFeedback(''), 3000);
+    } finally { setImporting(false); }
+  };
+
   const categories = ['all', 'Positive', 'Negative', 'Edge', 'Boundary'];
 
   const filteredCases = localTestCases.filter(tc => {
@@ -178,6 +241,73 @@ export default function TestCaseGeneratorPage({
   return (
     <div className="space-y-6">
       
+      {/* REQ-26: Bulk Import Modal */}
+      {showBulkImport && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Upload className="w-4 h-4 text-blue-600" /> Bulk Import Test Cases
+              </h3>
+              <button onClick={() => { setShowBulkImport(false); setImportResult(null); }} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-slate-500">Import test cases from a CSV file or paste JSON data. CSV headers: <span className="font-mono text-xs bg-slate-100 px-1 rounded">title, description, priority, type, preconditions, testData, steps</span></p>
+              
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-500 mb-1">Upload CSV File</label>
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  ref={bulkFileRef}
+                  onChange={e => setImportFile(e.target.files?.[0] || null)}
+                  aria-label="Upload CSV file for bulk import"
+                  className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                {importFile && <p className="text-[10px] text-blue-600 mt-1 font-mono">Selected: {importFile.name}</p>}
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+                <div className="relative flex justify-center text-[10px] font-mono text-slate-400"><span className="bg-white px-2">or paste JSON</span></div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-500 mb-1">JSON Array</label>
+                <textarea
+                  placeholder='[{"title":"Login test","priority":"P1","type":"Positive","steps":"Enter username"}]'
+                  value={importJson}
+                  onChange={e => setImportJson(e.target.value)}
+                  rows={4}
+                  aria-label="JSON data for bulk import"
+                  className="w-full border border-slate-200 rounded-lg p-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              {importResult && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 font-mono">
+                  ✅ Imported {importResult.imported} test cases · {importResult.failed} failed
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => { setShowBulkImport(false); setImportResult(null); }} className="px-4 py-2 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button
+                  onClick={handleBulkImport}
+                  disabled={importing || (!importFile && !importJson.trim())}
+                  aria-label="Start bulk import"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {importing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Importing...</> : <><Upload className="w-3.5 h-3.5" /> Import Now</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Intro Header */}
       <div className="bg-gradient-to-r from-emerald-850 to-teal-800 rounded-3xl p-6 text-white shadow-xs relative overflow-hidden bg-slate-900 border border-slate-800">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
@@ -344,13 +474,13 @@ export default function TestCaseGeneratorPage({
               <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
                 Suite Coverage: <strong className="text-emerald-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
               </span>
-              {/* Export buttons (REQ-25) */}
+              {/* Export + Import buttons */}
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleExport('csv')}
                   disabled={isExporting || filteredCases.length === 0}
                   className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
-                  title="Export as CSV"
+                  title="Export as CSV" aria-label="Export test cases as CSV"
                 >
                   {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
                   CSV
@@ -359,10 +489,18 @@ export default function TestCaseGeneratorPage({
                   onClick={() => handleExport('json')}
                   disabled={isExporting || filteredCases.length === 0}
                   className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
-                  title="Export as JSON"
+                  title="Export as JSON" aria-label="Export test cases as JSON"
                 >
                   {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileJson className="w-3 h-3" />}
                   JSON
+                </button>
+                {/* REQ-26: Bulk Import button */}
+                <button
+                  onClick={() => setShowBulkImport(true)}
+                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-mono transition-all"
+                  title="Bulk import test cases" aria-label="Bulk import test cases"
+                >
+                  <Upload className="w-3 h-3" /> Import
                 </button>
               </div>
             </div>
@@ -416,6 +554,16 @@ export default function TestCaseGeneratorPage({
                         <Play className="w-3.5 h-3.5" />
                       </button>
 
+                      {/* REQ-28: Clone button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleClone(tc); }}
+                        disabled={cloningId === tc.id}
+                        className="bg-blue-50 text-blue-700 p-1.5 rounded-lg border border-blue-200 hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50"
+                        title="Clone this test case" aria-label={`Clone test case ${tc.id}`}
+                      >
+                        {cloningId === tc.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
                       {/* AI Regenerate button (REQ-29) */}
                       <button
                         onClick={(e) => {
@@ -424,7 +572,7 @@ export default function TestCaseGeneratorPage({
                         }}
                         disabled={regeneratingId === tc.id}
                         className="bg-purple-50 text-purple-700 p-1.5 rounded-lg border border-purple-200 hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
-                        title="AI Regenerate this test case"
+                        title="AI Regenerate this test case" aria-label={`AI regenerate test case ${tc.id}`}
                       >
                         {regeneratingId === tc.id
                           ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />

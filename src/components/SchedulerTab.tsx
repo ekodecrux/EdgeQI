@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Play, Pause, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Calendar, Settings2 } from 'lucide-react';
+import { Clock, Plus, Play, Pause, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Calendar, Settings2, Bell, X } from 'lucide-react';
 
 interface Schedule {
   id: string;
@@ -30,6 +30,14 @@ export default function SchedulerTab() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
+
+  // REQ-54: Notification modal state
+  const [showNotifModal, setShowNotifModal] = useState<string | null>(null);
+  const [notifWebhook, setNotifWebhook] = useState('');
+  const [notifEmail, setNotifEmail] = useState('');
+  const [notifOnSuccess, setNotifOnSuccess] = useState(true);
+  const [notifOnFailure, setNotifOnFailure] = useState(true);
+  const [notifSaving, setNotifSaving] = useState(false);
 
   // New schedule form state — uses 'cron' field (matches server API)
   const [formName, setFormName] = useState('');
@@ -125,6 +133,23 @@ export default function SchedulerTab() {
     }
   };
 
+  // REQ-54: Save notification config
+  const saveNotification = async (scheduleId: string) => {
+    setNotifSaving(true);
+    try {
+      const res = await fetch(`/api/quality/schedules/${scheduleId}/notifications`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: notifWebhook, emailTo: notifEmail, onSuccess: notifOnSuccess, onFailure: notifOnFailure }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showMsg('Notification settings saved.');
+        setShowNotifModal(null);
+      }
+    } catch (e: any) { showMsg(`Failed: ${e.message}`, 'error'); }
+    finally { setNotifSaving(false); }
+  };
+
   const statusIcon = (status?: string) => {
     if (status === 'success') return <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />;
     if (status === 'failed') return <XCircle className="w-3.5 h-3.5 text-red-500" />;
@@ -139,6 +164,56 @@ export default function SchedulerTab() {
 
   return (
     <div className="space-y-6">
+
+      {/* REQ-54: Notification modal */}
+      {showNotifModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Bell className="w-4 h-4 text-indigo-600" /> Completion Notifications
+              </h3>
+              <button onClick={() => setShowNotifModal(null)}><X className="w-5 h-5 text-slate-400 hover:text-slate-600" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-slate-500">Configure notifications for schedule: <span className="font-mono font-bold">{schedules.find(s => s.id === showNotifModal)?.name}</span></p>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Webhook URL (POST on completion)</label>
+                <input type="text" placeholder="https://hooks.slack.com/services/..." value={notifWebhook}
+                  onChange={e => setNotifWebhook(e.target.value)} aria-label="Notification webhook URL"
+                  className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Email To</label>
+                <input type="email" placeholder="qa-team@company.com" value={notifEmail}
+                  onChange={e => setNotifEmail(e.target.value)} aria-label="Notification email"
+                  className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              </div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={notifOnSuccess} onChange={e => setNotifOnSuccess(e.target.checked)} aria-label="Notify on success" className="rounded text-indigo-600" />
+                  Notify on success
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={notifOnFailure} onChange={e => setNotifOnFailure(e.target.checked)} aria-label="Notify on failure" className="rounded text-indigo-600" />
+                  Notify on failure
+                </label>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowNotifModal(null)} className="px-4 py-2 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button
+                  onClick={() => saveNotification(showNotifModal!)}
+                  disabled={notifSaving}
+                  aria-label="Save notification settings"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {notifSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />} Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-sm relative overflow-hidden">
@@ -367,10 +442,18 @@ export default function SchedulerTab() {
                     {s.enabled ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                     {s.enabled ? 'Pause' : 'Enable'}
                   </button>
+                  {/* REQ-54: Notification config button */}
+                  <button
+                    onClick={() => { setShowNotifModal(s.id); setNotifWebhook(''); setNotifEmail(''); setNotifOnSuccess(true); setNotifOnFailure(true); }}
+                    className="p-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-all"
+                    title="Configure completion notifications" aria-label={`Configure notifications for ${s.name}`}
+                  >
+                    <Bell className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => deleteSchedule(s)}
                     className="p-1.5 rounded-xl border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-all"
-                    title="Delete schedule"
+                    title="Delete schedule" aria-label={`Delete schedule ${s.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

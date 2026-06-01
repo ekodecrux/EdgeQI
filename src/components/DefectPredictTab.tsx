@@ -16,7 +16,8 @@ import {
   CheckCircle,
   Code,
   RefreshCw,
-  Loader2
+  Loader2,
+  FileJson
 } from 'lucide-react';
 import { DefectHotspot, ImpactReport } from '../types';
 
@@ -26,6 +27,15 @@ interface DefectPredictProps {
   onPredictHotspots: (title: string, description: string) => Promise<void>;
   onAnalyzeImpact: (changeTrigger: string, description: string) => Promise<void>;
   isAnalyzing: boolean;
+}
+
+// REQ-65: Defect export helper
+async function exportDefects(format: 'csv' | 'json') {
+  const res = await fetch(`/api/quality/defects/export?format=${format}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `defects.${format}`; a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function DefectPredictTab({
@@ -153,13 +163,28 @@ export default function DefectPredictTab({
       <div className="xl:col-span-6 space-y-6">
         <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
           <div>
-            <h3 className="font-sans font-semibold text-lg text-slate-900 flex items-center gap-2">
-              <Crosshair className="w-5 h-5 text-rose-600" />
-              AI Defect Hotspot Heatmap
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Visualize module risk scores compiled from historical defect patterns and time-based developer trends.
-            </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-sans font-semibold text-lg text-slate-900 flex items-center gap-2">
+                  <Crosshair className="w-5 h-5 text-rose-600" />
+                  AI Defect Hotspot Heatmap
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Visualize module risk scores compiled from historical defect patterns and time-based developer trends.
+                </p>
+              </div>
+              {/* REQ-65: Export buttons */}
+              <div className="flex gap-1 flex-shrink-0 ml-2">
+                <button onClick={() => exportDefects('csv')} aria-label="Export defects as CSV"
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border border-rose-200 text-rose-700 hover:bg-rose-50">
+                  <Download className="w-3 h-3" /> CSV
+                </button>
+                <button onClick={() => exportDefects('json')} aria-label="Export defects as JSON"
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border border-rose-200 text-rose-700 hover:bg-rose-50">
+                  <FileJson className="w-3 h-3" /> JSON
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Graphical Risk Grid / Heatmap representation */}

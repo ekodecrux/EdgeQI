@@ -214,6 +214,10 @@ export default function ExecutionEnginePage({
   const [sseConnected, setSseConnected] = useState(false);
   const [sseEventSource, setSseEventSource] = useState<EventSource | null>(null);
 
+  // REQ-56: Execution abort state
+  const [abortingRunId, setAbortingRunId] = useState<string | null>(null);
+  const [abortMsg, setAbortMsg] = useState('');
+
   // Custom execution thresholds parameter configurations
   const [successThreshold, setSuccessThreshold] = useState<number>(85);
   const [durationThreshold, setDurationThreshold] = useState<number>(4.4); // target maximum duration in seconds
@@ -398,6 +402,20 @@ export default function ExecutionEnginePage({
     sseEventSource?.close();
     setSseEventSource(null);
     setSseConnected(false);
+  };
+
+  // REQ-56: Abort a running execution
+  const handleAbortRun = async (runId: string) => {
+    setAbortingRunId(runId);
+    try {
+      const res = await fetch(`/api/quality/execution/runs/${runId}/abort`, { method: 'POST' });
+      const data = await res.json();
+      setAbortMsg(data.message || 'Abort signal sent');
+      setTimeout(() => setAbortMsg(''), 4000);
+    } catch (e: any) {
+      setAbortMsg(`Abort failed: ${e.message}`);
+      setTimeout(() => setAbortMsg(''), 4000);
+    } finally { setAbortingRunId(null); }
   };
 
   // Handle Locator Self Healing Trigger
@@ -779,23 +797,39 @@ export default function ExecutionEnginePage({
               <Layers className="w-3.5 h-3.5" />
               Parallel Run
             </button>
-            <button
-              onClick={onTriggerRun}
-              disabled={isRunning}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-450 text-white font-sans font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all uppercase tracking-wider"
-            >
-              {isRunning ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Running Grid Suite...
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 text-indigo-200 animate-pulse animate-bounce" />
-                  Launch Suite Run
-                </>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onTriggerRun}
+                disabled={isRunning}
+                aria-label="Launch test suite run"
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-450 text-white font-sans font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all uppercase tracking-wider"
+              >
+                {isRunning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Running Grid Suite...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 text-indigo-200 animate-pulse animate-bounce" />
+                    Launch Suite Run
+                  </>
+                )}
+              </button>
+              {/* REQ-56: Abort button — visible when running */}
+              {isRunning && currentRunId && (
+                <button
+                  onClick={() => handleAbortRun(currentRunId)}
+                  disabled={abortingRunId === currentRunId}
+                  aria-label="Abort current test run"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-100 text-red-700 border border-red-200 text-xs font-mono font-bold hover:bg-red-200 transition-all"
+                >
+                  {abortingRunId === currentRunId ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : '⏹'}
+                  Abort
+                </button>
               )}
-            </button>
+              {abortMsg && <span className="text-xs text-red-600 font-mono">{abortMsg}</span>}
+            </div>
           </div>
         </div>
 

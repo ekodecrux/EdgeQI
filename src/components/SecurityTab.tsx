@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap, Download } from 'lucide-react';
+
+// REQ-83: Security report export
+async function exportSecurityReport(format: 'csv' | 'json') {
+  const res = await fetch(`/api/quality/security/export?format=${format}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `security-report.${format}`; a.click();
+  URL.revokeObjectURL(url);
+}
 import { SecurityVulnerability } from '../types';
 
 interface SecurityProps {
@@ -200,14 +209,27 @@ export default function SecurityTab({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* 1. Vulnerability logs list */}
         <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-          <div>
-            <h3 className="font-sans font-semibold text-base text-slate-900 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-rose-600" />
-              Scanned Vulnerability Log
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              {mergedVulns.length} finding{mergedVulns.length !== 1 ? 's' : ''} across SAST / DAST / SCA / Container scans.
-            </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="font-sans font-semibold text-base text-slate-900 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-rose-600" />
+                Scanned Vulnerability Log
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {mergedVulns.length} finding{mergedVulns.length !== 1 ? 's' : ''} across SAST / DAST / SCA / Container scans.
+              </p>
+            </div>
+            {/* REQ-83: Export buttons */}
+            <div className="flex gap-1 flex-shrink-0 ml-2">
+              <button onClick={() => exportSecurityReport('csv')} aria-label="Export security report as CSV"
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border border-rose-200 text-rose-700 hover:bg-rose-50">
+                <Download className="w-3 h-3" /> CSV
+              </button>
+              <button onClick={() => exportSecurityReport('json')} aria-label="Export security report as JSON"
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border border-rose-200 text-rose-700 hover:bg-rose-50">
+                <Download className="w-3 h-3" /> JSON
+              </button>
+            </div>
           </div>
 
           {/* List of scanned bugs */}

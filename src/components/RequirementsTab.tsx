@@ -1,6 +1,28 @@
-import React, { useState, useRef } from 'react';
-import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
+
+// REQ-12: Status workflow
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  draft:     { label: 'Draft',     color: 'text-slate-600',  bg: 'bg-slate-100',   border: 'border-slate-300' },
+  in_review: { label: 'In Review', color: 'text-amber-700',  bg: 'bg-amber-50',    border: 'border-amber-300' },
+  approved:  { label: 'Approved',  color: 'text-emerald-700',bg: 'bg-emerald-50',  border: 'border-emerald-300' },
+  archived:  { label: 'Archived',  color: 'text-slate-400',  bg: 'bg-slate-50',    border: 'border-slate-200' },
+};
+
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  draft:     ['in_review'],
+  in_review: ['approved', 'draft'],
+  approved:  ['archived', 'in_review'],
+  archived:  ['draft'],
+};
+
+const STATUS_ICONS: Record<string, React.ElementType> = {
+  draft:     Clock,
+  in_review: Eye,
+  approved:  CheckCircle,
+  archived:  Archive,
+};
 
 interface RequirementsProps {
   requirements: RequirementDoc[];
@@ -9,12 +31,7 @@ interface RequirementsProps {
     title: string, 
     content: string, 
     sourceType: 'file' | 'text' | 'url' | 'voice',
-    crawlerSettings?: {
-      username?: string;
-      password?: string;
-      sapGuiWeb?: boolean;
-      salesforceShadow?: boolean;
-    }
+    crawlerSettings?: { username?: string; password?: string; sapGuiWeb?: boolean; salesforceShadow?: boolean; }
   ) => Promise<void>;
   isGenerating: boolean;
   onGenerateTestCaseCode: (testCaseId: string) => void;
@@ -46,88 +63,197 @@ export default function RequirementsTab({
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
 
+  // REQ-12: Status workflow
+  const [reqStatuses, setReqStatuses] = useState<Record<string, string>>({});
+  const [statusLoading, setStatusLoading] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<Record<string, string>>({});
+
+  // REQ-08: Parent/child linking
+  const [showParentModal, setShowParentModal] = useState<string | null>(null); // reqId
+  const [parentSearch, setParentSearch] = useState('');
+  const [parentLinking, setParentLinking] = useState(false);
+  const [reqParents, setReqParents] = useState<Record<string, string | null>>({});
+
+  // REQ-10: Diff viewer
+  const [showDiffModal, setShowDiffModal] = useState<string | null>(null);
+  const [diffData, setDiffData] = useState<any>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [snapshotting, setSnapshotting] = useState<string | null>(null);
+
+  // REQ-15: Export
+  const [isExporting, setIsExporting] = useState(false);
+
+  // REQ-85: Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+
+  // REQ-27: TC versions
+  const [showTcVersions, setShowTcVersions] = useState<string | null>(null);
+  const [tcVersions, setTcVersions] = useState<any[]>([]);
+  const [tcVersionsLoading, setTcVersionsLoading] = useState(false);
+
+  // Load req statuses from existing requirements
+  useEffect(() => {
+    const s: Record<string, string> = {};
+    const p: Record<string, string | null> = {};
+    requirements.forEach(r => {
+      s[r.id] = (r as any).status || 'draft';
+      p[r.id] = (r as any).parentId || null;
+    });
+    setReqStatuses(s);
+    setReqParents(p);
+  }, [requirements]);
+
+  // REQ-12: Status transition
+  const handleStatusTransition = async (reqId: string, newStatus: string) => {
+    setStatusLoading(reqId);
+    try {
+      const res = await fetch(`/api/quality/requirements/${reqId}/status`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReqStatuses(prev => ({ ...prev, [reqId]: newStatus }));
+        setStatusMsg(prev => ({ ...prev, [reqId]: `✓ ${newStatus}` }));
+        setTimeout(() => setStatusMsg(prev => { const n = { ...prev }; delete n[reqId]; return n; }), 2000);
+      } else {
+        setStatusMsg(prev => ({ ...prev, [reqId]: `Error: ${data.error}` }));
+        setTimeout(() => setStatusMsg(prev => { const n = { ...prev }; delete n[reqId]; return n; }), 3000);
+      }
+    } catch {
+      setStatusMsg(prev => ({ ...prev, [reqId]: 'Network error' }));
+    } finally { setStatusLoading(null); }
+  };
+
+  // REQ-08: Set parent
+  const handleSetParent = async (reqId: string, parentId: string | null) => {
+    setParentLinking(true);
+    try {
+      const res = await fetch(`/api/quality/requirements/${reqId}/parent`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReqParents(prev => ({ ...prev, [reqId]: parentId }));
+        setShowParentModal(null);
+      }
+    } finally { setParentLinking(false); }
+  };
+
+  // REQ-10: Create snapshot
+  const handleSnapshot = async (reqId: string) => {
+    setSnapshotting(reqId);
+    try {
+      await fetch(`/api/quality/requirements/${reqId}/snapshot`, { method: 'POST' });
+      setStatusMsg(prev => ({ ...prev, [reqId]: '📸 Snapshot saved' }));
+      setTimeout(() => setStatusMsg(prev => { const n = { ...prev }; delete n[reqId]; return n; }), 2000);
+    } finally { setSnapshotting(null); }
+  };
+
+  // REQ-10: Show diff
+  const handleShowDiff = async (reqId: string) => {
+    setShowDiffModal(reqId);
+    setDiffLoading(true);
+    try {
+      const res = await fetch(`/api/quality/requirements/${reqId}/diff`);
+      setDiffData(await res.json());
+    } finally { setDiffLoading(false); }
+  };
+
+  // REQ-15: Export requirements
+  const handleExport = async (format: 'csv' | 'json') => {
+    setIsExporting(true);
+    try {
+      const res = await fetch(`/api/quality/requirements/export?format=${format}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `requirements.${format}`; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setIsExporting(false); }
+  };
+
+  // REQ-85: Semantic search
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const res = await fetch('/api/quality/rag/search-advanced', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery, topK: 10 }),
+      });
+      const data = await res.json();
+      // Also filter local requirements for name match
+      const localMatches = requirements.filter(r =>
+        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.content || '').toLowerCase().includes(searchQuery.toLowerCase())
+      ).map(r => ({ ...r, relevanceScore: 99, source: 'local' }));
+      setSearchResults([...localMatches, ...(data.results || [])].slice(0, 15));
+    } finally { setSearching(false); }
+  };
+
+  // REQ-27: Load TC versions
+  const handleLoadTcVersions = async (tcId: string) => {
+    setShowTcVersions(tcId);
+    setTcVersionsLoading(true);
+    try {
+      const res = await fetch(`/api/quality/testcases/${tcId}/versions`);
+      const data = await res.json();
+      setTcVersions(data.versions || []);
+    } finally { setTcVersionsLoading(false); }
+  };
+
   const startVoiceInput = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setVoiceTranscript('Speech recognition not supported in this browser. Try Chrome.');
-      return;
-    }
+    if (!SpeechRecognition) { setVoiceTranscript('Speech recognition not supported in this browser. Try Chrome.'); return; }
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
     recognitionRef.current = recognition;
-
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
     recognition.onerror = (e: any) => { setIsListening(false); setVoiceTranscript('Error: ' + e.error); };
     recognition.onresult = (e: any) => {
       let transcript = '';
-      for (let i = 0; i < e.results.length; i++) {
-        transcript += e.results[i][0].transcript;
-      }
-      setVoiceTranscript(transcript);
-      setContent(transcript);
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      setVoiceTranscript(transcript); setContent(transcript);
       if (!title) setTitle('Voice requirement ' + new Date().toLocaleTimeString());
     };
     recognition.start();
   };
 
-  const stopVoiceInput = () => {
-    recognitionRef.current?.stop();
-    setIsListening(false);
-  };
+  const stopVoiceInput = () => { recognitionRef.current?.stop(); setIsListening(false); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorText('');
-
     if (sourceType === 'url') {
-      if (!content.trim() || !content.startsWith('http')) {
-        setErrorText('Please specify a valid URL to crawl (starting with http/https).');
-        return;
-      }
+      if (!content.trim() || !content.startsWith('http')) { setErrorText('Please specify a valid URL to crawl (starting with http/https).'); return; }
     } else if (sourceType === 'file') {
       const pendingFile = (window as any).__pendingUploadFile as File | undefined;
-      if (!pendingFile) {
-        setErrorText('Please select a file to upload.');
-        return;
-      }
+      if (!pendingFile) { setErrorText('Please select a file to upload.'); return; }
       try {
-        // Real file upload via multipart form
         const formData = new FormData();
-        formData.append('file', pendingFile);
-        formData.append('projectId', 'PROJ-WEB');
+        formData.append('file', pendingFile); formData.append('projectId', 'PROJ-WEB');
         const resp = await fetch('/api/quality/requirements/upload-file', { method: 'POST', body: formData });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || 'Upload failed');
         await onAddRequirement(data.requirement.title, data.requirement.content, 'file', {});
-        // Reset
         setTitle(''); setContent(''); setUploadedFileName('');
-        (window as any).__pendingUploadFile = undefined;
-        return;
-      } catch (err: any) {
-        setErrorText('File upload failed: ' + err.message);
-        return;
-      }
+        (window as any).__pendingUploadFile = undefined; return;
+      } catch (err: any) { setErrorText('File upload failed: ' + err.message); return; }
     } else {
-      if (!title.trim() || !content.trim()) {
-        setErrorText('Title and requirement description are required.');
-        return;
-      }
+      if (!title.trim() || !content.trim()) { setErrorText('Title and requirement description are required.'); return; }
     }
-
     try {
-      await onAddRequirement(title, content, sourceType, {
-        username, password, sapGuiWeb, salesforceShadow
-      });
+      await onAddRequirement(title, content, sourceType, { username, password, sapGuiWeb, salesforceShadow });
       setTitle(''); setContent(''); setUploadedFileName('');
-      setUsername(''); setPassword('');
-      setSapGuiWeb(false); setSalesforceShadow(false);
+      setUsername(''); setPassword(''); setSapGuiWeb(false); setSalesforceShadow(false);
       (window as any).__pendingUploadFile = undefined;
-    } catch (e: any) {
-      setErrorText('Generation process errored: ' + e.message);
-    }
+    } catch (e: any) { setErrorText('Generation process errored: ' + e.message); }
   };
 
   const handleFileUploadMock = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,23 +261,224 @@ export default function RequirementsTab({
     if (file) {
       setUploadedFileName(file.name);
       setTitle(file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "));
-      // Store the actual File object in content as a signal to handleSubmit
       setContent(`__FILE__:${file.name}`);
-      // Keep the file reference for upload
       (window as any).__pendingUploadFile = file;
     }
   };
 
+  const filteredParentOptions = requirements.filter(r =>
+    r.id !== showParentModal &&
+    (r.title.toLowerCase().includes(parentSearch.toLowerCase()) || r.id.toLowerCase().includes(parentSearch.toLowerCase()))
+  ).slice(0, 10);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* ─── DIFF MODAL (REQ-10) ──────────────────────────────────────────── */}
+      {showDiffModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <GitBranch className="w-4 h-4 text-purple-600" /> Requirement Diff Viewer
+              </h3>
+              <button onClick={() => setShowDiffModal(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              {diffLoading && <p className="text-xs text-slate-500 text-center">Loading diff...</p>}
+              {!diffLoading && diffData && (
+                <>
+                  {!diffData.hasDiff ? (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-slate-600">{diffData.message}</p>
+                      <button
+                        onClick={() => { handleSnapshot(showDiffModal!); setShowDiffModal(null); }}
+                        className="px-4 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700"
+                      >
+                        📸 Create First Snapshot
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-500">Comparing {diffData.snapshotCount} snapshots for <span className="font-mono font-bold">{showDiffModal}</span></p>
+                      <div className="space-y-1">
+                        {diffData.diff?.map((d: any) => (
+                          <div key={d.field} className={`grid grid-cols-3 gap-2 p-2 rounded-lg text-xs ${d.changed ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
+                            <span className="font-mono font-bold text-slate-600 uppercase text-[10px]">{d.field}</span>
+                            <span className={`font-mono ${d.changed ? 'text-red-600 line-through' : 'text-slate-500'}`}>{d.old}</span>
+                            <span className={`font-mono ${d.changed ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>{d.new}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-2 border-t border-slate-200">
+                        {diffData.snapshots?.map((s: any, i: number) => (
+                          <div key={i} className="text-[10px] text-slate-500 font-mono">{s.timestamp} — {s.details}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PARENT MODAL (REQ-08) ────────────────────────────────────────── */}
+      {showParentModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Link className="w-4 h-4 text-blue-600" /> Link Parent Requirement
+              </h3>
+              <button onClick={() => setShowParentModal(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-slate-500">Select a parent for <span className="font-mono font-bold">{showParentModal}</span></p>
+              <input
+                type="text"
+                placeholder="Search requirements..."
+                value={parentSearch}
+                onChange={e => setParentSearch(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                aria-label="Search parent requirements"
+              />
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                <button
+                  onClick={() => handleSetParent(showParentModal!, null)}
+                  className="w-full text-left p-2 rounded-lg text-xs text-red-600 hover:bg-red-50 border border-red-100"
+                >
+                  ✕ Remove parent (make top-level)
+                </button>
+                {filteredParentOptions.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleSetParent(showParentModal!, r.id)}
+                    className="w-full text-left p-2 rounded-lg text-xs hover:bg-purple-50 border border-slate-100 hover:border-purple-200"
+                  >
+                    <span className="font-mono text-purple-700 mr-2">{r.id}</span>{r.title}
+                  </button>
+                ))}
+                {filteredParentOptions.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No requirements found</p>}
+              </div>
+              {parentLinking && <p className="text-xs text-slate-500 text-center">Linking...</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TC VERSION MODAL (REQ-27) ────────────────────────────────────── */}
+      {showTcVersions && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <History className="w-4 h-4 text-purple-600" /> TC Version History — {showTcVersions}
+              </h3>
+              <button onClick={() => setShowTcVersions(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              {tcVersionsLoading && <p className="text-xs text-slate-500 text-center">Loading...</p>}
+              {!tcVersionsLoading && tcVersions.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-4">No version history yet. Regenerate or edit this TC to create history.</p>
+              )}
+              {tcVersions.map((v, i) => (
+                <div key={i} className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs font-mono">
+                  <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                    <span>{v.action}</span>
+                    <span>{new Date(v.timestamp).toLocaleString()}</span>
+                  </div>
+                  <p className="text-slate-600 truncate">{v.details}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Requirements Input Section */}
       <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 space-y-6 shadow-sm">
-        <div>
-          <h3 className="font-sans font-semibold text-lg text-slate-900 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600" />
-            Requirement Parser Agent
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">Ingest software requirements to auto-compile detailed QA test cases.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="font-sans font-semibold text-lg text-slate-900 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              Requirement Parser Agent
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Ingest software requirements to auto-compile detailed QA test cases.</p>
+          </div>
+          {/* REQ-15: Export buttons */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleExport('csv')}
+              disabled={isExporting || requirements.length === 0}
+              title="Export requirements as CSV"
+              aria-label="Export requirements as CSV"
+              className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-mono rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            >
+              <Download className="w-3 h-3" /> CSV
+            </button>
+            <button
+              onClick={() => handleExport('json')}
+              disabled={isExporting || requirements.length === 0}
+              title="Export requirements as JSON"
+              aria-label="Export requirements as JSON"
+              className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-mono rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+            >
+              <Download className="w-3 h-3" /> JSON
+            </button>
+          </div>
+        </div>
+
+        {/* REQ-85: Semantic search bar */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search requirements semantically..."
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); if (!e.target.value) { setSearchResults([]); setShowSearch(false); } }}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                aria-label="Semantic search requirements"
+                className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
+            <button
+              onClick={() => { handleSearch(); setShowSearch(true); }}
+              disabled={searching}
+              aria-label="Run semantic search"
+              className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50"
+            >
+              {searching ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Search'}
+            </button>
+          </div>
+          {showSearch && searchResults.length > 0 && (
+            <div className="space-y-1 max-h-40 overflow-y-auto bg-slate-50 rounded-xl border border-slate-200 p-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[9px] font-mono uppercase text-slate-500">{searchResults.length} results</span>
+                <button onClick={() => { setShowSearch(false); setSearchResults([]); setSearchQuery(''); }} className="text-[9px] text-slate-400 hover:text-slate-600">Clear</button>
+              </div>
+              {searchResults.map((r, i) => (
+                <div key={i} className="p-1.5 bg-white rounded border border-slate-100 text-xs">
+                  <div className="flex justify-between">
+                    <span className="font-mono text-purple-700 text-[10px]">{r.id || 'DOC'}</span>
+                    {r.relevanceScore && <span className="text-[9px] text-emerald-600 font-mono">score: {r.relevanceScore}</span>}
+                  </div>
+                  <p className="text-slate-700 truncate">{r.title || r.filename || 'Document'}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {showSearch && searchResults.length === 0 && !searching && (
+            <p className="text-[10px] text-slate-400 text-center py-1">No results for "{searchQuery}"</p>
+          )}
         </div>
 
         {/* Ingest Methods selectors */}
@@ -160,11 +487,10 @@ export default function RequirementsTab({
             <button
               key={mode}
               type="button"
+              aria-label={`Switch to ${mode} input mode`}
               onClick={() => { setSourceType(mode); setTitle(''); setContent(''); setUploadedFileName(''); }}
               className={`py-2 rounded-lg text-[10px] font-mono font-medium capitalize transition-all ${
-                sourceType === mode 
-                  ? 'bg-purple-600 text-white' 
-                  : 'text-slate-500 hover:text-slate-800'
+                sourceType === mode ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               {mode}
@@ -180,6 +506,7 @@ export default function RequirementsTab({
               placeholder="e.g. JWT Auth Expiry handler"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              aria-label="Requirement title"
               className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans"
             />
           </div>
@@ -192,6 +519,7 @@ export default function RequirementsTab({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={6}
+                aria-label="Requirement description text"
                 className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans leading-relaxed"
               />
             </div>
@@ -203,15 +531,14 @@ export default function RequirementsTab({
                 type="file"
                 accept=".txt,.pdf,.md,.doc,.docx,.csv"
                 onChange={handleFileUploadMock}
+                aria-label="Upload requirement file"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
               <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
               <p className="text-xs text-slate-700 font-semibold">Drag & drop requirement file here</p>
               <p className="text-[10px] text-slate-500 mt-1">Accepts PDF, Word, TXT, Excel or Markdown</p>
               {uploadedFileName && (
-                <div className="mt-4 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700 font-mono">
-                  Loaded: {uploadedFileName}
-                </div>
+                <div className="mt-4 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700 font-mono">Loaded: {uploadedFileName}</div>
               )}
             </div>
           )}
@@ -219,10 +546,9 @@ export default function RequirementsTab({
           {sourceType === 'url' && (
             <div className="space-y-4 text-left font-sans animate-fade-in">
               <div className="bg-purple-50/60 p-3.5 rounded-xl border border-purple-150 text-[11px] text-purple-950 leading-relaxed space-y-1.5">
-                <span className="font-bold font-mono flex items-center gap-1 text-purple-705"><Globe className="w-4 h-4 text-purple-600 animate-pulse animate-duration-1000" /> Active UI Discovery Crawler</span>
-                <p className="leading-normal text-slate-600">No requirement documents? Enter target URL to browse & map active web views directly! Emits structured, Playwright-automatable test scenarios instantly.</p>
+                <span className="font-bold font-mono flex items-center gap-1 text-purple-705"><Globe className="w-4 h-4 text-purple-600 animate-pulse" /> Active UI Discovery Crawler</span>
+                <p className="leading-normal text-slate-600">No requirement documents? Enter target URL to browse & map active web views directly!</p>
               </div>
-
               <div>
                 <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1.5 font-bold">App under test (URL)</label>
                 <input
@@ -230,55 +556,30 @@ export default function RequirementsTab({
                   placeholder="https://sap-gateway.company.com/sap/bc/gui/sap/its/webgui"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans font-medium"
+                  aria-label="Target URL for crawling"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3 text-left">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5 font-semibold font-mono">Crawl Auth Username</label>
-                  <input
-                    type="text"
-                    placeholder="sap_tester"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
-                  />
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">Crawl Auth Username</label>
+                  <input type="text" placeholder="sap_tester" value={username} onChange={(e) => setUsername(e.target.value)} aria-label="Crawl username" className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5 font-semibold font-mono">Crawl Auth Password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
-                  />
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">Crawl Auth Password</label>
+                  <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Crawl password" className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
                 </div>
               </div>
-
-              <div className="pt-2 border-t border-slate-100 space-y-2 text-left">
+              <div className="pt-2 border-t border-slate-100 space-y-2">
                 <span className="block text-[10px] font-mono uppercase tracking-wider text-slate-405 font-bold">COTS / ERP Adapters</span>
-                <div className="grid grid-cols-1 gap-2 text-slate-650 text-[11px] font-sans">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={sapGuiWeb}
-                      onChange={(e) => setSapGuiWeb(e.target.checked)}
-                      className="rounded border-slate-300 text-purple-650 focus:ring-purple-500"
-                    />
-                    <span>SAP Web GUI dynamic adapters (handles Frame mappings & WebGUI controls)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={salesforceShadow}
-                      onChange={(e) => setSalesforceShadow(e.target.checked)}
-                      className="rounded border-slate-300 text-purple-650 focus:ring-purple-500"
-                    />
-                    <span>Salesforce LWC/ServiceNow Shadow DOM Penetrating resolver</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-650">
+                  <input type="checkbox" checked={sapGuiWeb} onChange={(e) => setSapGuiWeb(e.target.checked)} aria-label="Enable SAP Web GUI adapter" className="rounded border-slate-300 text-purple-650" />
+                  SAP Web GUI dynamic adapters
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-650">
+                  <input type="checkbox" checked={salesforceShadow} onChange={(e) => setSalesforceShadow(e.target.checked)} aria-label="Enable Salesforce Shadow DOM resolver" className="rounded border-slate-300 text-purple-650" />
+                  Salesforce LWC/ServiceNow Shadow DOM resolver
+                </label>
               </div>
             </div>
           )}
@@ -286,19 +587,19 @@ export default function RequirementsTab({
           {sourceType === 'voice' && (
             <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-center space-y-3">
               <div className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center transition-all ${isListening ? 'bg-red-500 animate-pulse' : 'bg-purple-100'}`}>
-                <Volume2 className={`w-6 h-6 ${isListening ? 'text-white' : 'text-purple-600'}`} />
+                <Volume2 className={`w-6 h-6 ${isListening ? 'text-white' : 'text-purple-600'}`} aria-hidden="true" />
               </div>
-              <p className="text-xs text-slate-700 font-semibold">
-                {isListening ? '🔴 Listening… speak your requirement' : 'Click to start voice input (REQ-04)'}
+              <p className="text-xs text-slate-700 font-semibold" aria-live="polite">
+                {isListening ? '🔴 Listening… speak your requirement' : 'Click to start voice input'}
               </p>
               <div className="flex gap-2 justify-center">
                 {!isListening ? (
-                  <button type="button" onClick={startVoiceInput}
+                  <button type="button" onClick={startVoiceInput} aria-label="Start voice recording"
                     className="px-4 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 flex items-center gap-2">
                     <Volume2 className="w-3.5 h-3.5" /> Start Recording
                   </button>
                 ) : (
-                  <button type="button" onClick={stopVoiceInput}
+                  <button type="button" onClick={stopVoiceInput} aria-label="Stop voice recording"
                     className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 flex items-center gap-2">
                     <Square className="w-3.5 h-3.5" /> Stop Recording
                   </button>
@@ -309,7 +610,7 @@ export default function RequirementsTab({
                 </button>
               </div>
               {voiceTranscript && (
-                <div className="mt-2 p-2 bg-white border border-slate-200 rounded text-xs text-slate-700 text-left font-mono leading-relaxed max-h-24 overflow-y-auto">
+                <div className="mt-2 p-2 bg-white border border-slate-200 rounded text-xs text-slate-700 text-left font-mono leading-relaxed max-h-24 overflow-y-auto" aria-live="polite">
                   {voiceTranscript}
                 </div>
               )}
@@ -318,7 +619,7 @@ export default function RequirementsTab({
           )}
 
           {errorText && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs text-center font-mono">
+            <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs text-center font-mono">
               {errorText}
             </div>
           )}
@@ -326,42 +627,103 @@ export default function RequirementsTab({
           <button
             type="submit"
             disabled={isGenerating}
+            aria-label="Analyze requirements and generate test cases"
             className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-mono font-bold transition-all ${
-              isGenerating
-                ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-sm'
+              isGenerating ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-sm'
             }`}
           >
-            {isGenerating ? (
-              <>
-                <RefreshCcw className="w-4 h-4 animate-spin" />
-                Agents parsing requirements...
-              </>
-            ) : (
-              <>
-                Analyze & Compile Cases
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
+            {isGenerating ? (<><RefreshCcw className="w-4 h-4 animate-spin" />Agents parsing requirements...</>) : (<>Analyze & Compile Cases<ArrowRight className="w-4 h-4" /></>)}
           </button>
         </form>
 
-        {/* Existing requirements index log */}
+        {/* Existing requirements list — with status workflow + parent/diff controls */}
         <div className="pt-4 border-t border-slate-200 space-y-2">
-          <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500">Parsed Inventory Logs</span>
-          <div className="space-y-2 max-h-[150px] overflow-y-auto">
-            {requirements.map((req) => (
-              <div key={req.id} className="bg-slate-50 border border-slate-205 rounded-xl p-3 flex items-start gap-2.5 text-xs">
-                <FileText className="w-4 h-4 text-purple-600 mt-0.5" />
-                <div className="flex-1 text-slate-800">
-                  <div className="flex justify-between font-bold">
-                    <span>{req.title}</span>
-                    <span className="text-slate-400 font-mono text-[9px]">{req.id}</span>
+          <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500">Parsed Inventory Logs ({requirements.length})</span>
+          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+            {requirements.map((req) => {
+              const status = reqStatuses[req.id] || (req as any).status || 'draft';
+              const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.draft;
+              const StatusIcon = STATUS_ICONS[status] || Clock;
+              const allowedNext = STATUS_TRANSITIONS[status] || [];
+              const parentId = reqParents[req.id];
+              const parentReq = parentId ? requirements.find(r => r.id === parentId) : null;
+              const childCount = requirements.filter(r => reqParents[r.id] === req.id).length;
+
+              return (
+                <div key={req.id} className="bg-slate-50 border border-slate-205 rounded-xl p-3 space-y-2 text-xs">
+                  <div className="flex items-start gap-2">
+                    <FileText className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-1">
+                        <span className="font-bold text-slate-800 truncate">{req.title}</span>
+                        <span className="text-slate-400 font-mono text-[9px] flex-shrink-0">{req.id}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{req.content}</p>
+
+                      {/* Parent info */}
+                      {parentReq && (
+                        <div className="flex items-center gap-1 mt-1 text-[9px] text-blue-600 font-mono">
+                          <ChevronRight className="w-3 h-3" aria-hidden="true" />child of {parentReq.id}: {parentReq.title.slice(0, 30)}
+                        </div>
+                      )}
+                      {childCount > 0 && (
+                        <div className="flex items-center gap-1 mt-0.5 text-[9px] text-slate-500 font-mono">
+                          <ChevronDown className="w-3 h-3" aria-hidden="true" />{childCount} child requirement{childCount > 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 truncate mt-0.5">{req.content}</p>
+
+                  {/* REQ-12: Status workflow bar */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${statusInfo.bg} ${statusInfo.color} ${statusInfo.border}`}>
+                      <StatusIcon className="w-2.5 h-2.5" aria-hidden="true" />
+                      {statusInfo.label}
+                    </span>
+                    {statusMsg[req.id] && (
+                      <span className="text-[9px] text-emerald-600 font-mono">{statusMsg[req.id]}</span>
+                    )}
+                    {allowedNext.map(next => (
+                      <button
+                        key={next}
+                        onClick={() => handleStatusTransition(req.id, next)}
+                        disabled={statusLoading === req.id}
+                        aria-label={`Move requirement ${req.id} to ${next} status`}
+                        className={`px-2 py-0.5 text-[9px] font-mono rounded-full border transition-all hover:bg-white ${STATUS_LABELS[next]?.border || 'border-slate-200'} ${STATUS_LABELS[next]?.color || 'text-slate-600'} ${statusLoading === req.id ? 'opacity-50' : ''}`}
+                      >
+                        → {STATUS_LABELS[next]?.label || next}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Action buttons: parent link, snapshot, diff */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <button
+                      onClick={() => { setShowParentModal(req.id); setParentSearch(''); }}
+                      aria-label={`Set parent for requirement ${req.id}`}
+                      className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono rounded border border-blue-200 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Link className="w-2.5 h-2.5" aria-hidden="true" /> {parentId ? 'Re-link' : 'Link Parent'}
+                    </button>
+                    <button
+                      onClick={() => handleSnapshot(req.id)}
+                      disabled={snapshotting === req.id}
+                      aria-label={`Create snapshot of requirement ${req.id}`}
+                      className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono rounded border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    >
+                      {snapshotting === req.id ? <RefreshCcw className="w-2.5 h-2.5 animate-spin" /> : '📸'} Snapshot
+                    </button>
+                    <button
+                      onClick={() => handleShowDiff(req.id)}
+                      aria-label={`View diff for requirement ${req.id}`}
+                      className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono rounded border border-amber-200 text-amber-700 hover:bg-amber-50"
+                    >
+                      <GitBranch className="w-2.5 h-2.5" aria-hidden="true" /> Diff
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -380,17 +742,17 @@ export default function RequirementsTab({
           </div>
 
           {/* Test case dynamic cards list */}
-          <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+          <div role="list" aria-label="Generated test cases" className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
             {testCases.map((tc) => {
               const isSelected = selectedTestCase?.id === tc.id;
               return (
                 <div
                   key={tc.id}
+                  role="listitem"
                   onClick={() => setSelectedTestCase(isSelected ? null : tc)}
+                  aria-expanded={isSelected}
                   className={`border rounded-xl p-3 select-none cursor-pointer transition-all ${
-                    isSelected 
-                      ? 'bg-purple-50/50 border-purple-400' 
-                      : 'bg-slate-50 border-slate-150 hover:border-slate-350 hover:bg-slate-100/60'
+                    isSelected ? 'bg-purple-50/50 border-purple-400' : 'bg-slate-50 border-slate-150 hover:border-slate-350 hover:bg-slate-100/60'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -410,15 +772,24 @@ export default function RequirementsTab({
                       <h4 className="text-xs font-semibold text-slate-900">{tc.title}</h4>
                     </div>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onGenerateTestCaseCode(tc.id);
-                      }}
-                      className="text-[10px] font-mono text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-600 px-2.5 py-1 rounded-lg border border-purple-200 transition-all flex items-center gap-1 shadow-xs"
-                    >
-                      <Plus className="w-3 h-3" /> Script
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* REQ-27: Version history button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleLoadTcVersions(tc.id); }}
+                        aria-label={`View version history for test case ${tc.id}`}
+                        title="TC version history"
+                        className="text-[9px] font-mono text-slate-500 hover:text-purple-700 bg-white hover:bg-purple-50 p-1 rounded border border-slate-200 transition-all"
+                      >
+                        <History className="w-3 h-3" aria-hidden="true" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onGenerateTestCaseCode(tc.id); }}
+                        aria-label={`Generate script for test case ${tc.id}`}
+                        className="text-[10px] font-mono text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-600 px-2.5 py-1 rounded-lg border border-purple-200 transition-all flex items-center gap-1 shadow-xs"
+                      >
+                        <Plus className="w-3 h-3" aria-hidden="true" /> Script
+                      </button>
+                    </div>
                   </div>
 
                   {/* Expansion info content */}
@@ -428,12 +799,10 @@ export default function RequirementsTab({
                         <span className="text-[10px] font-bold text-slate-400 uppercase block font-mono">Assertion Target Description</span>
                         <p>{tc.description}</p>
                       </div>
-
                       <div>
                         <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono">System Preconditions</span>
                         <p className="font-mono text-[11px] text-slate-600">{tc.preconditions}</p>
                       </div>
-
                       <div>
                         <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono mb-1">Execution Steps</span>
                         <ol className="list-decimal list-inside space-y-1 bg-white p-2.5 rounded-lg border border-slate-150 shadow-inner">
@@ -445,7 +814,6 @@ export default function RequirementsTab({
                           ))}
                         </ol>
                       </div>
-
                       <div className="flex gap-4">
                         <div className="flex-1">
                           <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono">Test Parameters Data</span>
@@ -465,9 +833,9 @@ export default function RequirementsTab({
         </div>
 
         <div className="flex items-center gap-2 mt-4 bg-slate-50 p-2.5 rounded-xl border border-slate-205 text-[11px]">
-          <HelpCircle className="w-4 h-4 text-slate-400" />
+          <HelpCircle className="w-4 h-4 text-slate-400" aria-hidden="true" />
           <span className="text-slate-500">
-            Expand any suite card above to evaluate preconditions, multi-step actions, expected UI values and launch manual and automatic script builders.
+            Expand any suite card to evaluate preconditions, steps, and launch script builders. Use status buttons to advance requirements through the Draft→Review→Approved workflow.
           </span>
         </div>
       </div>
