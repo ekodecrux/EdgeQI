@@ -295,239 +295,148 @@ export default function DashboardMetrics({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeInUp">
       {/* Persona Selector Banner */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+      <div className="glass-card p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-            <Users className="w-4 h-4 text-purple-650" />
+          <h3 className="panel-title flex items-center gap-2">
+            <Users className="w-4 h-4 text-blue-500" />
             Unified Results Dashboard
           </h3>
-          <p className="text-[11px] text-slate-500 font-sans">Toggle specific metrics optimized for your current stakeholder persona</p>
+          <p className="text-[11px] text-slate-500">Toggle metrics optimized for your stakeholder persona</p>
         </div>
 
-        <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-          <button
-            onClick={() => setPersona('tactical')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
-              persona === 'tactical' 
-                ? 'bg-purple-650 text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/40'
-            }`}
-          >
-            Tactical (QA Lead)
-          </button>
-          <button
-            onClick={() => setPersona('operational')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
-              persona === 'operational' 
-                ? 'bg-purple-650 text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/40'
-            }`}
-          >
-            Operational (QA Engineer)
-          </button>
-          <button
-            onClick={() => setPersona('strategic')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
-              persona === 'strategic' 
-                ? 'bg-purple-650 text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/40'
-            }`}
-          >
-            Strategic (Director)
-          </button>
+        <div className="flex gap-1.5 metal-surface p-1.5 rounded-xl">
+          {(['tactical','operational','strategic'] as const).map(p => (
+            <button key={p} onClick={() => setPersona(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
+                persona === p ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
+              }`}>
+              {p === 'tactical' ? 'Tactical (QA Lead)' : p === 'operational' ? 'Operational (Engineer)' : 'Strategic (Director)'}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Connected Agentic AI Ingress Banner */}
-      <div className="bg-gradient-to-r from-purple-950 via-indigo-900 to-slate-900 border border-purple-850 rounded-2xl p-5 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md relative overflow-hidden">
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-6 -translate-y-6">
-          <Cpu className="w-48 h-48 animate-pulse text-purple-300" />
+      <div className="rounded-2xl p-5 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden" style={{background:'linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1e40af 100%)',border:'1px solid rgba(59,130,246,0.2)'}}>
+        <div className="absolute right-0 top-0 opacity-[0.06] pointer-events-none">
+          <Cpu className="w-48 h-48" />
         </div>
         <div className="space-y-1.5 relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 bg-purple-500/20 border border-purple-400/30 text-purple-300 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-            <Zap className="w-3 h-3 text-purple-400 animate-pulse" />
+          <div className="inline-flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+            <Zap className="w-3 h-3 text-blue-400 animate-pulse" />
             Connected AI Cycle Standby
           </div>
           <h4 className="text-sm sm:text-base font-sans font-extrabold tracking-tight">
             Execute Multi-Module Connected Agentic AI QA Process
           </h4>
-          <p className="text-xs text-indigo-200 leading-relaxed">
+          <p className="text-xs text-blue-200 leading-relaxed">
             Stitch code generation, diagnostic defect sweeps, live clustered selenium browser regressions, 
-            and real-time self-healing telemetry directly. Keep your dashboard updated continuously.
+            and real-time self-healing telemetry directly.
           </p>
         </div>
-        <button
-          onClick={onNavigateToAgentic}
-          className="relative z-10 bg-white hover:bg-slate-50 text-purple-950 px-4 py-2 rounded-xl text-xs font-mono font-extrabold uppercase shrink-0 transition-transform hover:scale-[1.02] shadow-sm cursor-pointer flex items-center gap-1"
-        >
-          Kickstart Engine <ArrowRight className="w-4 h-4 text-purple-800" />
+        <button onClick={onNavigateToAgentic}
+          className="relative z-10 bg-white hover:bg-blue-50 text-blue-900 px-4 py-2 rounded-xl text-xs font-mono font-extrabold uppercase shrink-0 transition-all hover:scale-[1.02] shadow-md cursor-pointer flex items-center gap-1">
+          Kickstart Engine <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 
       {/* Top Defective Modules Quick Ingress Summary Widget */}
-      <div id="top-defective-modules-widget" className="bg-gradient-to-r from-rose-50/50 to-slate-50 border border-rose-100 rounded-2xl p-5 space-y-3.5 shadow-sm">
+      <div id="top-defective-modules-widget" className="glass-card p-5 space-y-3.5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-rose-500 text-white rounded-lg">
-              <AlertOctagon className="w-4 h-4 animate-pulse" />
+            <span className="p-1.5 bg-red-500 text-white rounded-lg">
+              <AlertOctagon className="w-4 h-4" />
             </span>
             <div>
-              <h4 className="text-xs font-sans font-extrabold text-slate-900 uppercase tracking-tight">
+              <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-tight">
                 Top Defect Hotspot Modules
               </h4>
-              <p className="text-[11px] text-slate-500">
-                Action Required: The top 3 modules with the highest active and historical failure profiles.
-              </p>
+              <p className="text-[11px] text-slate-500">Top 3 modules with highest active and historical failure profiles.</p>
             </div>
           </div>
-          <span className="text-[9px] font-mono font-bold bg-rose-100 text-rose-805 border border-rose-200 px-2.5 py-0.5 rounded-full uppercase self-start sm:self-auto">
-            Escalation Level 1
-          </span>
+          <span className="badge badge-red">Escalation Level 1</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {topDefectiveModules.map((m, idx) => {
-            const rankColors = [
-              { bg: 'bg-rose-500/10 text-rose-700 border-rose-200', text: 'text-rose-700', badge: 'bg-rose-600' },
-              { bg: 'bg-amber-500/10 text-amber-705 border-amber-200', text: 'text-amber-705', badge: 'bg-amber-600' },
-              { bg: 'bg-orange-500/10 text-orange-705 border-orange-200', text: 'text-orange-705', badge: 'bg-orange-600' },
-            ];
-            const style = rankColors[idx] || rankColors[2];
-
-            return (
-              <div 
-                key={m.id}
-                id={`module-defect-card-${m.id}`}
-                className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 flex flex-col justify-between hover:shadow-xs transition-all relative overflow-hidden group"
-              >
-                {/* Visual rank accent background badge */}
-                <div className="absolute right-0 top-0 opacity-5 pointer-events-none transform translate-x-3 -translate-y-2 select-none">
-                  <span className="text-5xl font-mono font-bold">#{idx + 1}</span>
+          {topDefectiveModules.map((m, idx) => (
+            <div key={m.id} id={`module-defect-card-${m.id}`}
+              className="stat-card flex flex-col justify-between group relative overflow-hidden">
+              <div className="absolute right-0 top-0 opacity-[0.03] pointer-events-none select-none">
+                <span className="text-5xl font-mono font-bold">#{idx + 1}</span>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold text-slate-400">RANK #{idx + 1}</span>
+                  <span className="badge badge-red">{m.defectCount} Defect{m.defectCount !== 1 ? 's' : ''}</span>
                 </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-bold text-slate-400">RANK #{idx + 1}</span>
-                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${style.bg}`}>
-                      {m.defectCount} Defect{m.defectCount !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-
-                  <h5 className="text-xs sm:text-sm font-sans font-extrabold text-slate-850 group-hover:text-purple-700 transition-colors">
-                    {m.name}
-                  </h5>
-
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
-                    <span>Health Index:</span>
-                    <strong className={m.health < 80 ? 'text-rose-650' : 'text-slate-705'}>{m.health}%</strong>
-                    <span className="text-slate-300">|</span>
-                    <span>Risk:</span>
-                    <strong className={m.risk === 'Critical' || m.risk === 'High' ? 'text-rose-500' : 'text-slate-650'}>{m.risk}</strong>
-                  </div>
-                </div>
-
-                <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono italic">
-                    Devs: {m.name === 'User Authentication' ? 'Core Identity Sec' : m.name === 'Billing & Card Payments' ? 'E-Comm Billing Devs' : m.name === 'WebSocket Dispatcher' ? 'Live Systems Engine' : 'QA Automation Team'}
-                  </span>
-                  
-                  <button
-                    onClick={() => onNavigateToModule && onNavigateToModule(m.id)}
-                    className="text-[10px] font-mono text-purple-750 hover:text-purple-650 font-bold flex items-center gap-1 bg-purple-50 hover:bg-purple-105 px-2.5 py-1 rounded-lg border border-purple-200 transition-all shadow-xs shrink-0 cursor-pointer"
-                  >
-                    Drill Down <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
+                <h5 className="text-xs sm:text-sm font-extrabold text-slate-800 group-hover:text-blue-700 transition-colors">{m.name}</h5>
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+                  <span>Health:</span>
+                  <strong className={m.health < 80 ? 'text-red-600' : 'text-blue-600'}>{m.health}%</strong>
+                  <span className="text-slate-300">|</span>
+                  <span>Risk:</span>
+                  <strong className={m.risk === 'Critical' || m.risk === 'High' ? 'text-red-500' : 'text-slate-600'}>{m.risk}</strong>
                 </div>
               </div>
-            );
-          })}
+              <div className="mt-3 pt-2 border-t border-slate-100/80 flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 font-mono italic">
+                  {m.name === 'User Authentication' ? 'Core Identity Sec' : m.name === 'Billing & Card Payments' ? 'E-Comm Billing Devs' : 'QA Automation Team'}
+                </span>
+                <button onClick={() => onNavigateToModule && onNavigateToModule(m.id)}
+                  className="btn-ghost text-[10px] flex items-center gap-1">
+                  Drill Down <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* 1. TACTICAL LEADER VIEW */}
       {persona === 'tactical' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Sprint Progress Widget */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="glass-card p-5 space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono flex items-center justify-between">
               <span>Sprint Validation Progress</span>
-              <span className="text-green-650 font-bold">{totalTests > 0 ? automationPct : 0}% Automated</span>
+              <span className="text-blue-600 font-bold">{automationPct}% Automated</span>
             </h4>
-            
-            <div className="relative pt-2">
-              <div className="overflow-hidden h-3 text-xs flex rounded-full bg-slate-100 border border-slate-200">
-                <div style={{ width: `${totalTests > 0 ? automationPct : 0}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-purple-650 rounded-full" />
-              </div>
+            <div className="progress-bar-track h-3">
+              <div className="progress-bar-fill" style={{ width: `${automationPct}%` }} />
             </div>
-
             <div className="grid grid-cols-3 gap-2 pt-2">
-              <div className="text-center p-2 rounded-lg bg-slate-50">
-                <span className="text-lg font-mono font-bold text-slate-800">{totalTests}</span>
-                <p className="text-[10px] text-slate-500">Scoped</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-slate-50">
-                <span className="text-lg font-mono font-bold text-green-650 font-extrabold">{passedTests}</span>
-                <p className="text-[10px] text-slate-505">Automated</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-slate-50">
-                <span className="text-lg font-mono font-bold text-rose-600 font-extrabold">{failedCount}</span>
-                <p className="text-[10px] text-slate-505">Needs Manual</p>
-              </div>
+              {[{val:totalTests,lbl:'Scoped',col:'text-slate-800'},{val:passedTests,lbl:'Automated',col:'text-blue-600'},{val:failedCount,lbl:'Needs Manual',col:'text-red-500'}].map(s => (
+                <div key={s.lbl} className="text-center p-2 rounded-xl bg-blue-50/50 border border-blue-100/50">
+                  <span className={`text-xl font-mono font-extrabold ${s.col}`}>{s.val}</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{s.lbl}</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Test Coverage Trend Grid */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+          <div className="glass-card p-5 space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono flex items-center justify-between">
               <span>Coverage Trend Analysis</span>
-              <span className="text-purple-650 flex items-center gap-1 font-bold">
-                <TrendingUp className="w-3.5 h-3.5" /> +12.4%
-              </span>
+              <span className="text-blue-600 flex items-center gap-1 font-bold"><TrendingUp className="w-3.5 h-3.5" /> +12.4%</span>
             </h4>
-
-            {/* Custom SVG Line graph */}
-            <div className="relative h-20 w-full bg-slate-50 rounded-lg p-2 border border-slate-200 flex items-end">
+            <div className="relative h-20 w-full bg-blue-50/40 rounded-xl p-2 border border-blue-100/60">
               <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
-                <path
-                  d="M 0 25 Q 20 18 40 14 T 80 8 T 100 4"
-                  fill="none"
-                  stroke="#a855f7"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M 0 25 Q 20 18 40 14 T 80 8 T 100 4 L 100 30 L 0 30 Z"
-                  fill="url(#gradient-tactical)"
-                  opacity="0.1"
-                />
-                <defs>
-                  <linearGradient id="gradient-tactical" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#a855f7" />
-                    <stop offset="100%" stopColor="#faf5ff" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
+                <path d="M 0 25 Q 20 18 40 14 T 80 8 T 100 4" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M 0 25 Q 20 18 40 14 T 80 8 T 100 4 L 100 30 L 0 30 Z" fill="rgba(37,99,235,0.06)" />
               </svg>
-              <div className="absolute top-2 right-2 text-[9px] font-mono text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                Target: 95%
-              </div>
+              <div className="absolute top-2 right-2 chip">Target: 95%</div>
             </div>
-
-            <p className="text-[11px] text-slate-600 leading-relaxed">AI automatically mapping newly ingested requirements has closed the core gaps in Stripe Billing Modules, exceeding initial release milestones.</p>
+            <p className="text-[11px] text-slate-600 leading-relaxed">AI mapping newly ingested requirements has closed core gaps in Billing Modules, exceeding release milestones.</p>
           </div>
 
-          {/* Healing Queue Diagnostics */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+          <div className="glass-card p-5 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono flex items-center justify-between">
               <span>Agentic Healing Queue</span>
-              <span className="text-amber-700 font-mono text-[10px] font-semibold">0 Awaiting Approval</span>
+              <span className="badge badge-amber">0 Pending</span>
             </h4>
-
-            <div className="space-y-2 max-h-[120px] overflow-y-auto">
-              <div className="text-[11px] text-slate-400 italic p-2.5 text-center">
-                No healing tasks pending. Run test cases to detect broken locators.
-              </div>
+            <div className="text-[11px] text-slate-400 italic p-3 text-center">
+              No healing tasks pending. Run test cases to detect broken locators.
             </div>
           </div>
         </div>
@@ -535,42 +444,24 @@ export default function DashboardMetrics({
 
       {/* 2. OPERATIONAL ENGINEER VIEW */}
       {persona === 'operational' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 glass-card p-5 space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Real-time Suite Execution Registry</h4>
-
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="table-glass">
                 <thead>
-                  <tr className="border-b border-slate-200 text-slate-400 font-mono font-bold text-[10px]">
-                    <th className="pb-2">Test ID</th>
-                    <th className="pb-2">Target Title</th>
-                    <th className="pb-2">Priority</th>
-                    <th className="pb-2">Status</th>
-                    <th className="pb-1 text-right">Actions</th>
-                  </tr>
+                  <tr><th>Test ID</th><th>Title</th><th>Priority</th><th>Status</th><th className="text-right">Actions</th></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-sans">
+                <tbody>
                   {testCases.map((tc) => (
-                    <tr key={tc.id} className="hover:bg-slate-50">
-                      <td className="py-3 font-mono font-bold text-purple-700">{tc.id}</td>
-                      <td className="py-3 text-slate-800 font-medium truncate max-w-[220px]">{tc.title}</td>
-                      <td className="py-3"><span className="px-1.5 py-0.5 rounded font-mono text-[9px] bg-slate-100 text-slate-650 border border-slate-200">{tc.priority}</span></td>
-                      <td className="py-3">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                          tc.automationStatus === 'Automated' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                          'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                        }`}>
-                          {tc.automationStatus}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right">
-                        <button
-                          onClick={() => onTriggerRerun(tc.id)}
-                          className="text-[10px] text-purple-700 hover:text-purple-600 font-mono flex items-center gap-1 ml-auto bg-purple-50 px-2 py-1 rounded border border-purple-200 hover:bg-purple-100 transition-all shadow-xs"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          Rerun Mock
+                    <tr key={tc.id}>
+                      <td className="font-mono font-bold text-blue-600">{tc.id}</td>
+                      <td className="font-medium truncate max-w-[220px]">{tc.title}</td>
+                      <td><span className="badge badge-slate">{tc.priority}</span></td>
+                      <td><span className={`badge ${tc.automationStatus === 'Automated' ? 'badge-green' : 'badge-blue'}`}>{tc.automationStatus}</span></td>
+                      <td className="text-right">
+                        <button onClick={() => onTriggerRerun(tc.id)} className="btn-ghost flex items-center gap-1 ml-auto">
+                          <RefreshCw className="w-3 h-3" /> Rerun
                         </button>
                       </td>
                     </tr>
@@ -580,22 +471,16 @@ export default function DashboardMetrics({
             </div>
           </div>
 
-          {/* Operational Log telemetry widget */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+          <div className="glass-card p-5 space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Virtual Automation Logs</h4>
-
-            <div className="bg-slate-900 border border-slate-950 p-3 rounded-lg h-56 font-mono text-[10px] text-emerald-400 overflow-y-auto space-y-1.5 shadow-inner">
+            <div className="code-block h-56 overflow-y-auto">
               <p className="text-slate-500 italic">No execution logs yet. Add requirements and generate test cases to begin.</p>
             </div>
-
-            <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
-              <div className="flex items-center gap-2 text-xs text-purple-700 font-sans font-semibold">
-                <Shield className="w-4 h-4 text-purple-650" />
-                Security DAST Scanner
+            <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+              <div className="flex items-center gap-2 text-xs text-blue-700 font-semibold">
+                <Shield className="w-4 h-4 text-blue-500" /> Security DAST Scanner
               </div>
-              <p className="text-[11px] text-slate-650 mt-1">
-                DAST scanner ready. Run a security scan to detect vulnerabilities.
-              </p>
+              <p className="text-[11px] text-slate-500 mt-1">DAST scanner ready. Run a security scan to detect vulnerabilities.</p>
             </div>
           </div>
         </div>
@@ -603,85 +488,59 @@ export default function DashboardMetrics({
 
       {/* 3. STRATEGIC DIRECTOR VIEW */}
       {persona === 'strategic' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Release Readiness Gauge */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="glass-card p-5 space-y-4 flex flex-col justify-between">
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Release Readiness score</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Release Readiness Score</h4>
               <p className="text-xs text-slate-400">Auto-calculated risk threshold</p>
             </div>
-
-            <div className="flex items-center gap-4 py-3">
-              <div className="relative w-24 h-24 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-95">
-                  <circle cx="48" cy="48" r="40" stroke="#f1f5f9" strokeWidth="8" fill="transparent" />
-                  <circle cx="48" cy="48" r="40" stroke="#a855f7" strokeWidth="8" fill="transparent"
-                          strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - 0.92)} strokeLinecap="round" />
+            <div className="flex items-center gap-4 py-2">
+              <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
+                <svg className="w-full h-full transform -rotate-95" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="40" stroke="#dbeafe" strokeWidth="8" fill="transparent" />
+                  <circle cx="48" cy="48" r="40" stroke="#2563eb" strokeWidth="8" fill="transparent"
+                    strokeDasharray="251.2" strokeDashoffset={251.2 * 0.08} strokeLinecap="round" />
                 </svg>
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-xl font-mono font-bold text-slate-800">92%</span>
-                  <span className="text-[9px] text-green-650 font-bold uppercase font-sans">Ready</span>
+                  <span className="text-xl font-mono font-extrabold text-blue-700">92%</span>
+                  <span className="text-[9px] text-blue-500 font-bold uppercase">Ready</span>
                 </div>
               </div>
-
               <div className="space-y-2 flex-grow text-xs font-mono text-slate-600">
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span>Regression Suite:</span>
-                  <span className="text-emerald-650 font-bold">Passed</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span>Heal Threshold:</span>
-                  <span className="text-emerald-650 font-bold">98% Healed</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Critical Vulnerabilities:</span>
-                  <span className="text-rose-600 font-bold">1 Alert</span>
-                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-1"><span>Regression Suite:</span><span className="text-blue-600 font-bold">Passed</span></div>
+                <div className="flex justify-between border-b border-slate-100 pb-1"><span>Heal Threshold:</span><span className="text-blue-600 font-bold">98% Healed</span></div>
+                <div className="flex justify-between"><span>Critical Vulns:</span><span className="text-red-500 font-bold">1 Alert</span></div>
               </div>
             </div>
-
-            <p className="text-[11px] text-slate-500 italic">Ready to deploy. Security blocker must resolve for higher compliance parameters.</p>
+            <p className="text-[11px] text-slate-500 italic">Ready to deploy. Security blocker must resolve for higher compliance.</p>
           </div>
 
-          {/* Quality Business ROI Calculator */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Quality Business ROI Meter</h4>
-
-            <div className="grid grid-cols-2 gap-3 text-sans">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-202">
-                <span className="text-xl font-mono font-bold text-purple-705">$45,200</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">Estimated Manual Saving</p>
-              </div>
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-202">
-                <span className="text-xl font-mono font-bold text-purple-705">95%</span>
-                <p className="text-[10px] text-slate-500 mt-0.5">Cycle Speedup Gain</p>
-              </div>
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-202 col-span-2 flex items-center justify-between">
-                <div>
-                  <span className="text-sm font-mono font-bold text-slate-800">4.2 Hrs</span>
-                  <p className="text-[10px] text-slate-500">Average Manual testing reduced/deploy</p>
+          <div className="glass-card p-5 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Quality Business ROI</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {[{val:'$45,200',lbl:'Manual Savings'},{val:'95%',lbl:'Cycle Speedup'}].map(s => (
+                <div key={s.lbl} className="stat-card">
+                  <div className="stat-value text-2xl">{s.val}</div>
+                  <div className="stat-label">{s.lbl}</div>
                 </div>
-                <Star className="w-5 h-5 text-amber-500 fill-amber-500 animate-pulse" />
+              ))}
+              <div className="stat-card col-span-2 flex items-center justify-between">
+                <div><div className="stat-value text-xl">4.2 Hrs</div><div className="stat-label">Saved per Deploy</div></div>
+                <Star className="w-5 h-5 text-blue-400" />
               </div>
             </div>
           </div>
 
-          {/* AI Hotspots Heatmap index overview */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+          <div className="glass-card p-5 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Predictive Hotspot Indexes</h4>
-
-            <div className="space-y-2 max-h-[140px] overflow-y-auto scrollbar-thin">
+            <div className="space-y-2 max-h-[180px] overflow-y-auto scrollbar-thin">
               {defects.slice(0, 3).map((hot, idx) => (
-                <div key={idx} className="bg-slate-50 relative p-2.5 rounded-lg flex items-center justify-between text-xs border border-slate-100">
+                <div key={idx} className="bg-white/60 p-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between">
                   <div>
-                    <h5 className="font-semibold text-slate-800">{hot.moduleName}</h5>
+                    <p className="font-semibold text-slate-800 text-xs">{hot.moduleName}</p>
                     <p className="text-[10px] text-slate-500 font-mono">{hot.commonFailureType}</p>
                   </div>
-                  <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold border ${
-                    hot.predictedRiskScore > 80 ? 'bg-rose-50 text-rose-700 border-rose-250' :
-                    hot.predictedRiskScore > 50 ? 'bg-amber-50 text-amber-700 border-amber-255' :
-                    'bg-slate-100 text-slate-500 border-slate-200'
-                  }`}>
+                  <span className={`badge ${hot.predictedRiskScore > 80 ? 'badge-red' : hot.predictedRiskScore > 50 ? 'badge-amber' : 'badge-slate'}`}>
                     {hot.predictedRiskScore}% Risk
                   </span>
                 </div>
@@ -692,110 +551,63 @@ export default function DashboardMetrics({
       )}
 
       {/* PANEL: Promptable Chart Generator & Draggable Metric Sandbox */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6 shadow-sm">
+      <div className="glass-card p-6 space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-purple-600" />
-              AI Prompt & Drag-Drop Chart Sandbox Engine
+            <h3 className="panel-title flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-500" />
+              AI Prompt & Chart Sandbox Engine
             </h3>
             <p className="text-xs text-slate-500">
-              Instantly compile visual QA charts with natural language prompts or by selecting interactive metric blocks.
+              Compile visual QA charts with natural language prompts or by selecting interactive metric blocks.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono uppercase bg-purple-50 text-purple-800 border border-purple-200 px-2 py-1 rounded">
-              LLM Visualization Provider: Connected
-            </span>
-          </div>
+          <span className="chip">LLM Provider: Connected</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Controls & Metric blocks selection */}
           <div className="lg:col-span-4 space-y-4">
             <form onSubmit={handleCustomPromptSubmit} className="space-y-3">
-              <label className="block text-[11px] font-mono text-slate-505 uppercase tracking-wider">
-                Generate via AI Prompt (Natural Language)
-              </label>
+              <label className="block text-[11px] font-mono text-slate-500 uppercase tracking-wider">AI Prompt (Natural Language)</label>
               <div className="relative">
-                <input
-                  type="text"
-                  value={chartPrompt}
-                  onChange={(e) => setChartPrompt(e.target.value)}
+                <input type="text" value={chartPrompt} onChange={(e) => setChartPrompt(e.target.value)}
                   placeholder="e.g., compare automated vs manual coverage"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 pr-10 text-xs text-slate-805 focus:outline-none focus:ring-1 focus:ring-purple-400 font-sans shadow-xs placeholder-slate-400"
-                />
-                <button
-                  type="submit"
-                  disabled={isGeneratingChart}
-                  className="absolute right-2 top-2 text-purple-650 hover:text-purple-550 transition-colors"
-                >
-                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  className="input-glass w-full pr-9" />
+                <button type="submit" disabled={isGeneratingChart} className="absolute right-2 top-2 text-blue-500 hover:text-blue-700 transition-colors">
+                  <Sparkles className="w-4 h-4" />
                 </button>
               </div>
             </form>
 
-            {/* Quick Chart Preset buttons */}
             <div className="space-y-1.5">
-              <span className="block text-[10px] font-mono text-slate-450 uppercase">Quick presets Matrix</span>
+              <span className="block text-[10px] font-mono text-slate-400 uppercase tracking-wider">Quick Presets</span>
               <div className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleApplyPresetPrompt('compare automated vs manual coverage ratio', 'bar')}
-                  className="text-left px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center justify-between transition-all"
-                >
-                  <span>🤖 Automated vs Manual Coverage</span>
-                  <span className="text-[10px] font-mono text-purple-600 font-bold">Bar Chart</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyPresetPrompt('show defect hotspots versus module change risk', 'line')}
-                  className="text-left px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center justify-between transition-all"
-                >
-                  <span>🔮 AI Risk-Weighted Defect Hotspots</span>
-                  <span className="text-[10px] font-mono text-purple-600 font-bold">Line Graph</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyPresetPrompt('distribution of open vulnerabilities by priority level', 'pie')}
-                  className="text-left px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-center justify-between transition-all"
-                >
-                  <span>🛡️ Security Vulnerabilities Ratio</span>
-                  <span className="text-[10px] font-mono text-purple-600 font-bold">Pie Ratio</span>
-                </button>
+                {[
+                  {label:'🤖 Automated vs Manual Coverage', type:'bar' as const, prompt:'compare automated vs manual coverage ratio'},
+                  {label:'🔮 AI Risk-Weighted Defect Hotspots', type:'line' as const, prompt:'show defect hotspots versus module change risk'},
+                  {label:'🛡️ Security Vulnerabilities Ratio', type:'pie' as const, prompt:'distribution of open vulnerabilities by priority level'},
+                ].map(p => (
+                  <button key={p.label} type="button" onClick={() => handleApplyPresetPrompt(p.prompt, p.type)}
+                    className="text-left px-3 py-2 rounded-lg bg-white/60 hover:bg-blue-50/50 border border-slate-200/80 hover:border-blue-200 text-xs text-slate-700 flex items-center justify-between transition-all">
+                    <span>{p.label}</span>
+                    <span className="chip">{p.type}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Metric Blocks Sandbox with Click Simulation */}
             <div className="space-y-2">
-              <div>
-                <span className="block text-[11px] font-mono text-slate-505 uppercase tracking-wider">
-                  Drag / Add Metric Blocks to custom zone
-                </span>
-                <p className="text-[10px] text-slate-400 leading-normal">Click blocks to attach/detach them from the visualization rendering loop:</p>
-              </div>
-
+              <span className="block text-[11px] font-mono text-slate-500 uppercase tracking-wider">Metric Blocks</span>
               <div className="flex flex-wrap gap-1.5">
-                {[
-                  'Defect Densities',
-                  'Test Automation Coverage',
-                  'Security Vulns',
-                  'Model Score Confidence',
-                  'Compliance Rating',
-                  'Virtual Concurrent Load'
-                ].map((metric) => {
+                {['Defect Densities','Test Automation Coverage','Security Vulns','Model Score Confidence','Compliance Rating','Virtual Concurrent Load'].map((metric) => {
                   const isActive = activeSandboxMetrics.includes(metric);
                   return (
-                    <button
-                      key={metric}
-                      onClick={() => toggleMetricInSandbox(metric)}
+                    <button key={metric} onClick={() => toggleMetricInSandbox(metric)}
                       className={`text-[10px] font-mono px-2 py-1.5 rounded-lg border transition-all ${
-                        isActive
-                          ? 'bg-purple-50 text-purple-750 border-purple-300 shadow-inner'
-                          : 'bg-white text-slate-650 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      {isActive ? '✓ ' : '+ '} {metric}
+                        isActive ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white/60 text-slate-600 border-slate-200 hover:border-blue-200'
+                      }`}>
+                      {isActive ? '✓ ' : '+ '}{metric}
                     </button>
                   );
                 })}
@@ -804,234 +616,135 @@ export default function DashboardMetrics({
           </div>
 
           {/* Interactive Chart Display Output Zone */}
-          <div className="lg:col-span-8 bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between min-h-[290px] relative">
-            {isGeneratingChart ? (
-              <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center space-y-2 rounded-2xl backdrop-blur-xs z-10 transition-all">
-                <RefreshCw className="w-6 h-6 text-purple-600 animate-spin" />
-                <span className="text-xs text-slate-600 font-mono">Agentic model compiling chart elements...</span>
+          <div className="lg:col-span-8 metal-surface rounded-2xl p-5 flex flex-col justify-between min-h-[290px] relative">
+            {isGeneratingChart && (
+              <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center space-y-2 rounded-2xl backdrop-blur-sm z-10">
+                <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
+                <span className="text-xs text-slate-600 font-mono">Compiling chart elements...</span>
               </div>
-            ) : null}
-
+            )}
             <div>
-              <div className="flex justify-between items-center border-b border-slate-250 pb-2 mb-4">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-2 mb-4">
                 <span className="text-xs font-mono font-bold text-slate-700">{chartTitleText}</span>
                 <div className="flex gap-1">
-                  {(['bar', 'line', 'pie'] as const).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setRenderedChartType(type)}
-                      className={`px-2 py-1 text-[9px] font-mono uppercase rounded ${
-                        renderedChartType === type
-                          ? 'bg-purple-600 text-white font-bold'
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {type}
-                    </button>
+                  {(['bar','line','pie'] as const).map((type) => (
+                    <button key={type} onClick={() => setRenderedChartType(type)}
+                      className={`px-2 py-1 text-[9px] font-mono uppercase rounded transition-all ${
+                        renderedChartType === type ? 'bg-blue-600 text-white font-bold' : 'bg-white/70 text-slate-600 border border-slate-200 hover:border-blue-300'
+                      }`}>{type}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Dynamic Chart Box */}
               <div className="h-44 flex items-end justify-between px-6 pt-4 relative">
-                {/* Horizontal reference grids */}
-                <div className="absolute inset-x-0 bottom-4 h-[1px] bg-slate-200" />
-                <div className="absolute inset-x-0 bottom-16 h-[1px] bg-slate-205 border-dashed" />
-                <div className="absolute inset-x-0 bottom-28 h-[1px] bg-slate-205 border-dashed" />
+                <div className="absolute inset-x-0 bottom-4 h-[1px] bg-slate-200/60" />
+                <div className="absolute inset-x-0 bottom-16 h-[1px] bg-slate-200/40" />
+                <div className="absolute inset-x-0 bottom-28 h-[1px] bg-slate-200/40" />
 
-                {/* Render BAR Chart type */}
                 {renderedChartType === 'bar' && (
                   <div className="w-full flex justify-around items-end h-full z-10 relative">
                     {activeSandboxMetrics.map((item, idx) => {
-                      const heights = [70, 92, 45, 80, 62, 85];
-                      const currentHeight = heights[idx % heights.length];
+                      const heights = [70,92,45,80,62,85];
+                      const h = heights[idx % heights.length];
                       return (
                         <div key={item} className="flex flex-col items-center w-1/5 group">
-                          <div className="text-[9px] font-mono text-purple-700 font-extrabold mb-1 bg-white px-1 py-0.2 rounded shadow-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                            {currentHeight}%
-                          </div>
-                          <div
-                            style={{ height: `${currentHeight}%` }}
-                            className="bg-purple-600 rounded-t-md w-12 hover:bg-purple-500 hover:shadow-md transition-all shadow-indigo-100"
-                          />
+                          <div className="text-[9px] font-mono text-blue-700 font-bold mb-1 opacity-0 group-hover:opacity-100 transition-opacity">{h}%</div>
+                          <div style={{height:`${h}%`}} className="bg-gradient-to-t from-blue-700 to-blue-400 rounded-t-md w-10 hover:from-blue-600 hover:to-blue-300 transition-all shadow-md shadow-blue-100" />
                           <span className="text-[9px] text-slate-500 font-mono mt-2 truncate w-20 text-center">{item}</span>
                         </div>
                       );
                     })}
-                    {activeSandboxMetrics.length === 0 && (
-                      <div className="w-full text-center text-slate-400 text-xs pb-12">No active Sandbox metric selected. Click metric blocks to compile layout.</div>
-                    )}
+                    {activeSandboxMetrics.length === 0 && <div className="w-full text-center text-slate-400 text-xs pb-12">No metric selected. Click metric blocks to add.</div>}
                   </div>
                 )}
 
-                {/* Render LINE Chart type */}
                 {renderedChartType === 'line' && (
-                  <div className="w-full h-full relative z-10 flex items-end">
+                  <div className="w-full h-full relative z-10">
                     <svg className="w-full h-32" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <path
-                        d="M 10 21 Q 30 12 50 19 T 80 5 T 90 2"
-                        className="stroke-purple-600"
-                        fill="none"
-                        strokeWidth="1.5"
-                      />
-                      {activeSandboxMetrics.map((item, index) => {
-                        const offsets = [10, 30, 50, 70, 90];
-                        const offset = offsets[index % offsets.length];
-                        return (
-                          <circle key={item} cx={offset} cy="12" r="2.5" className="fill-purple-600" />
-                        );
+                      <path d="M 10 21 Q 30 12 50 19 T 80 5 T 90 2" fill="none" stroke="#2563eb" strokeWidth="1.5" />
+                      {activeSandboxMetrics.map((item, i) => {
+                        const offsets = [10,30,50,70,90];
+                        return <circle key={item} cx={offsets[i % offsets.length]} cy="12" r="2.5" fill="#2563eb" />;
                       })}
                     </svg>
-                    <div className="absolute inset-x-0 bottom-[-15px] flex justify-around text-[9px] text-slate-500 font-mono">
-                      {activeSandboxMetrics.map(item => (
-                        <span key={item} className="truncate max-w-[90px]">{item}</span>
-                      ))}
-                    </div>
                   </div>
                 )}
 
-                {/* Render PIE Chart type */}
                 {renderedChartType === 'pie' && (
                   <div className="w-full flex items-center justify-center p-4">
-                    <div className="relative w-24 h-24 rounded-full border-4 border-purple-600 border-t-rose-500 border-r-indigo-400 flex items-center justify-center rotate-45 transform">
+                    <div className="relative w-24 h-24 rounded-full flex items-center justify-center" style={{background:'conic-gradient(#2563eb 0% 45%, #3b82f6 45% 70%, #93c5fd 70% 100%)'}}>
                       <div className="absolute w-16 h-16 rounded-full bg-white flex items-center justify-center">
-                        <span className="text-[10px] font-mono text-purple-850 font-bold -rotate-45">100% Active</span>
+                        <span className="text-[10px] font-mono text-blue-700 font-bold">Active</span>
                       </div>
                     </div>
                     <div className="ml-8 space-y-1 text-[10px] font-mono">
-                      <div className="flex items-center gap-1.5 text-purple-700 font-semibold"><span className="w-2.5 h-2.5 bg-purple-600 rounded" /> Primary Inbound Metric</div>
-                      <div className="flex items-center gap-1.5 text-rose-600 font-semibold"><span className="w-2.5 h-2.5 bg-rose-500 rounded" /> Overlap Fail Threshold</div>
-                      <div className="flex items-center gap-1.5 text-indigo-650 font-semibold"><span className="w-2.5 h-2.5 bg-indigo-400 rounded" /> Secondary Confidence</div>
+                      <div className="flex items-center gap-1.5 text-blue-700 font-semibold"><span className="w-2.5 h-2.5 bg-blue-600 rounded" /> Primary Metric</div>
+                      <div className="flex items-center gap-1.5 text-blue-500 font-semibold"><span className="w-2.5 h-2.5 bg-blue-400 rounded" /> Secondary</div>
+                      <div className="flex items-center gap-1.5 text-blue-300 font-semibold"><span className="w-2.5 h-2.5 bg-blue-200 rounded" /> Confidence</div>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="mt-4 text-[10px] font-mono text-slate-505 flex justify-between bg-white p-2.5 rounded-lg border border-slate-100 shadow-inner">
-              <span>Sandbox Status: Evaluated in real-time</span>
-              <span className="text-purple-650 font-bold">Query Cost: $0.0003</span>
+            <div className="mt-4 text-[10px] font-mono text-slate-500 flex justify-between bg-white/50 p-2.5 rounded-xl border border-slate-100">
+              <span>Sandbox Status: Real-time</span>
+              <span className="text-blue-600 font-bold">Query Cost: $0.0003</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* DRILL DOWNS AND DROPDOWNS FILTERS MATRIX */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-2 border-b border-slate-205">
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-200/60">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-indigo-600" />
-              Comprehensive Multi-Module Drill-Down Matrix
+            <h3 className="panel-title flex items-center gap-2">
+              <Layers className="w-4 h-4 text-blue-500" /> Multi-Module Drill-Down Matrix
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Explore granular coverage metrics and verify specific failure points by drill-down selectors.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Explore granular coverage metrics and verify specific failure points.</p>
           </div>
-
           <div className="flex flex-wrap items-center gap-2">
-            {/* Category Selection dropdown */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono text-slate-400">Category:</span>
-              <select
-                value={selectedModuleCategory}
-                onChange={(e) => setSelectedModuleCategory(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-slate-805 rounded px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 font-sans cursor-pointer"
-              >
-                {modulesList.map(m => (
-                  <option key={m.name} value={m.name}>{m.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Priority filter */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono text-slate-400">Priority:</span>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-slate-800 rounded px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 font-sans cursor-pointer"
-              >
-                <option value="All">All Priorities</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
+            <select value={selectedModuleCategory} onChange={(e) => setSelectedModuleCategory(e.target.value)} className="input-glass text-xs">
+              {modulesList.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+            </select>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="input-glass text-xs">
+              {['All','Critical','High','Medium','Low'].map(p => <option key={p} value={p}>{p === 'All' ? 'All Priorities' : p}</option>)}
+            </select>
           </div>
         </div>
 
-        {/* Drill down outputs */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-202 space-y-1">
-            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">Assigned Module Healthy Index</span>
-            <span className="text-lg font-mono font-bold text-slate-800">{currentDrillDownModule?.health}%</span>
-            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-              <div 
-                style={{ width: `${currentDrillDownModule?.health}%` }} 
-                className={`h-full ${currentDrillDownModule?.health > 80 ? 'bg-indigo-600' : 'bg-rose-500'}`} 
-              />
+          {[
+            {label:'Health Index', val:`${currentDrillDownModule?.health}%`, sub:'', bar:true},
+            {label:'Automation Coverage', val:currentDrillDownModule?.automation||'', sub:'Matched on repo logs', bar:false},
+            {label:'Risk Matrix', val:currentDrillDownModule?.risk||'', sub:'Predicted defect index', bar:false},
+            {label:'Open Bugs', val:`${currentDrillDownModule?.bugs} OPEN`, sub:'Requiring sweep', bar:false},
+          ].map(s => (
+            <div key={s.label} className="stat-card space-y-1">
+              <div className="stat-label">{s.label}</div>
+              <div className={`stat-value text-xl ${s.label === 'Open Bugs' ? 'text-red-500' : ''}`}>{s.val}</div>
+              {s.bar && (
+                <div className="progress-bar-track"><div className="progress-bar-fill" style={{width:`${currentDrillDownModule?.health||0}%`}} /></div>
+              )}
+              {s.sub && <p className="text-[10px] text-slate-400">{s.sub}</p>}
             </div>
-          </div>
-
-          <div className="bg-slate-55 p-4 rounded-xl border border-slate-202 space-y-1 bg-slate-50">
-            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">Automated Regression Coverage</span>
-            <span className="text-lg font-mono font-bold text-slate-800">{currentDrillDownModule?.automation}</span>
-            <p className="text-[10px] text-slate-500">Matched on eclipse repo logs</p>
-          </div>
-
-          <div className="bg-slate-55 p-4 rounded-xl border border-slate-202 space-y-1 bg-slate-50">
-            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">Associated Risk Matrix</span>
-            <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border inline-block ${
-              currentDrillDownModule?.risk === 'Critical' || currentDrillDownModule?.risk === 'High'
-                ? 'bg-rose-50 text-rose-700 border-rose-200' 
-                : 'bg-green-50 text-green-700 border-green-200'
-            }`}>
-              {currentDrillDownModule?.risk} Risk
-            </span>
-            <p className="text-[10px] text-slate-400">Predicted defect index</p>
-          </div>
-
-          <div className="bg-slate-55 p-4 rounded-xl border border-slate-202 space-y-1 bg-slate-50">
-            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">Total bugs identified</span>
-            <span className="text-lg font-mono font-bold text-rose-600">{currentDrillDownModule?.bugs} OPEN</span>
-            <p className="text-[10px] text-slate-505">Requiring verification sweep</p>
-          </div>
+          ))}
         </div>
 
-        {/* Filters Results table */}
-        <div className="overflow-x-auto bg-slate-50 border border-slate-200 p-4 rounded-xl">
-          <span className="text-[10px] font-mono uppercase text-slate-550 tracking-wider font-bold block mb-3">Filtered Test Scenarios List</span>
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-400 font-mono text-[9px] uppercase">
-                <th className="pb-2">ID</th>
-                <th className="pb-2">Target Title</th>
-                <th className="pb-2">Confidence Level</th>
-                <th className="pb-2">Run Ingress Status</th>
-                <th className="pb-1 text-right">Rerun Inline</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+        <div className="overflow-x-auto">
+          <span className="text-[10px] font-mono uppercase text-slate-500 tracking-wider font-bold block mb-3">Filtered Test Scenarios</span>
+          <table className="table-glass">
+            <thead><tr><th>ID</th><th>Title</th><th>Confidence</th><th>Status</th><th className="text-right">Action</th></tr></thead>
+            <tbody>
               {drillDownTestCases.map((tc) => (
-                <tr key={tc.id} className="hover:bg-slate-100/50">
-                  <td className="py-2.5 font-mono text-purple-700 font-bold">{tc.id}</td>
-                  <td className="py-2.5 font-medium text-slate-850">{tc.title}</td>
-                  <td className="py-2.5 font-mono text-slate-500">{tc.confidenceScore}% Acc</td>
-                  <td className="py-2.5">
-                    <span className={`inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full ${
-                      tc.automationStatus === 'Automated' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-indigo-50 text-indigo-700 border border-indigo-150'
-                    }`}>
-                      {tc.automationStatus}
-                    </span>
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onTriggerRerun(tc.id)}
-                      className="px-2 py-0.5 text-[9px] font-mono bg-purple-50 text-purple-705 hover:bg-purple-100 border border-purple-200 rounded transition-all"
-                    >
-                      Rerun
-                    </button>
+                <tr key={tc.id}>
+                  <td className="font-mono font-bold text-blue-600">{tc.id}</td>
+                  <td className="font-medium">{tc.title}</td>
+                  <td className="font-mono text-slate-500">{tc.confidenceScore}%</td>
+                  <td><span className={`badge ${tc.automationStatus === 'Automated' ? 'badge-green' : 'badge-blue'}`}>{tc.automationStatus}</span></td>
+                  <td className="text-right">
+                    <button type="button" onClick={() => onTriggerRerun(tc.id)} className="btn-ghost">Rerun</button>
                   </td>
                 </tr>
               ))}
@@ -1041,10 +754,10 @@ export default function DashboardMetrics({
       </div>
 
       {/* INTEGRATIONS SYSTEM CONNECTIONS HUB */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+      <div className="glass-card p-6 space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-slate-905 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-emerald-600" />
+          <h3 className="panel-title flex items-center gap-2">
+            <Activity className="w-4 h-4 text-blue-500" />
             Enterprise Test Management Integrations Hub
           </h3>
           <p className="text-xs text-slate-500 mt-1">
@@ -1058,21 +771,21 @@ export default function DashboardMetrics({
               key={t.name}
               className={`p-4 rounded-xl border transition-all hover:scale-[1.01] flex flex-col justify-between ${
                 t.status === 'connected' 
-                  ? 'bg-emerald-50/40 border-emerald-300' 
+                  ? 'bg-blue-50/40 border-blue-300' 
                   : t.status === 'configuring'
-                    ? 'bg-purple-50/40 border-purple-200'
-                    : 'bg-slate-50 border-slate-202 opacity-70'
+                    ? 'bg-blue-50/20 border-blue-200'
+                    : 'bg-slate-50 border-slate-200 opacity-70'
               }`}
             >
               <div>
                 <div className="flex justify-between items-start mb-2">
-                  <span className={`text-[10px] font-mono uppercase tracking-wider font-extrabold ${t.iconColor}`}>
+                  <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-blue-500">
                     {t.name.split(' ')[1] || t.name}
                   </span>
-                  <span className={`text-[9px] font-mono px-1.5 py-0.3 rounded border font-semibold ${
-                    t.status === 'connected' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                    t.status === 'configuring' ? 'bg-purple-50 text-purple-700 border-purple-200 animate-pulse' :
-                    'bg-slate-205 text-slate-600 border-slate-200'
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border font-semibold ${
+                    t.status === 'connected' ? 'badge badge-green' :
+                    t.status === 'configuring' ? 'badge badge-blue animate-pulse' :
+                    'badge badge-slate'
                   }`}>
                     {t.status === 'connected' ? 'Connected' : t.status === 'configuring' ? 'Configuring' : 'Offline'}
                   </span>
@@ -1086,7 +799,7 @@ export default function DashboardMetrics({
                 <button
                   type="button"
                   onClick={() => toggleToolStatus(idx)}
-                  className="text-purple-600 hover:text-purple-550 hover:underline font-bold"
+                  className="text-blue-600 hover:text-blue-700 hover:underline font-bold"
                 >
                   {t.status === 'connected' ? 'Disconnect' : 'Connect'}
                 </button>
@@ -1097,23 +810,23 @@ export default function DashboardMetrics({
       </div>
 
       {/* CUSTOM PLAYER REQ: Local Customers LLM Configuration Broker Panel */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-3 border-b border-slate-150">
+      <div className="glass-card p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-3 border-b border-blue-100/60">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-purple-650" />
+            <h3 className="panel-title flex items-center gap-1.5">
+              <Cpu className="w-4 h-4 text-blue-500" />
               Hybrid AI & Local LLM Orchestrator Broker
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">Configure dedicated local host LLMs or change models to match enterprise privacy frameworks.</p>
           </div>
-          <span className="text-[9px] font-mono uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold self-start sm:self-auto">
+          <span className="badge badge-green self-start sm:self-auto">
             Gateway: Active
           </span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="space-y-3 lg:col-span-1">
-            <span className="block text-[10px] font-mono text-slate-450 uppercase font-bold">Select Active LLM Core</span>
+            <span className="block text-[10px] font-mono text-slate-500 uppercase font-bold">Select Active LLM Core</span>
             <div className="space-y-1">
               {[
                 { id: 'ollama', name: 'Llama-3 (Ollama Local)', type: 'Custom Local' },
@@ -1128,10 +841,10 @@ export default function DashboardMetrics({
                     const notify = model.id.includes('ollama') || model.id.includes('mistral') ? 'Offline local network link established' : 'Connected directly over standard provider endpoints';
                     alert(`Switched model loop to ${model.name}. ${notify}.`);
                   }}
-                  className="w-full text-left p-2.5 rounded-lg border border-slate-200 hover:border-purple-300 bg-slate-50 hover:bg-purple-50/20 text-xs text-slate-700 flex flex-col justify-between transition-all"
+                  className="w-full text-left p-2.5 rounded-lg border border-slate-200 hover:border-blue-300 bg-white/60 hover:bg-blue-50/30 text-xs text-slate-700 flex flex-col justify-between transition-all"
                 >
                   <span className="font-semibold text-slate-800">{model.name}</span>
-                  <span className="text-[9px] font-mono text-slate-450 uppercase mt-0.5">{model.type}</span>
+                  <span className="text-[9px] font-mono text-slate-500 uppercase mt-0.5">{model.type}</span>
                 </button>
               ))}
             </div>
@@ -1145,7 +858,7 @@ export default function DashboardMetrics({
                   type="text"
                   placeholder="e.g. http://localhost:11434"
                   defaultValue="http://localhost:11434"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-400 font-mono shadow-xs"
+                  className="input-glass w-full font-mono"
                 />
               </div>
 
@@ -1155,35 +868,35 @@ export default function DashboardMetrics({
                   type="password"
                   value="••••••••••••••••••••••••••••"
                   readOnly
-                  className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-500 font-mono focus:outline-none shadow-xs cursor-default"
+                  className="input-glass w-full font-mono cursor-default opacity-70"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-505 mb-1">In-House Model Overrides parameter</label>
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">In-House Model Overrides parameter</label>
                 <input
                   type="text"
                   placeholder="llama3:instruct"
                   defaultValue="llama3:instruct"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-400 font-mono shadow-xs"
+                  className="input-glass w-full font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-505 mb-1">Temperature Threshold</label>
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">Temperature Threshold</label>
                 <input
                   type="range"
                   min="0"
                   max="10"
                   defaultValue="2"
-                  className="w-full h-8 cursor-pointer mt-1 focus:outline-none"
+                  className="w-full h-8 cursor-pointer mt-1 focus:outline-none accent-blue-600"
                 />
               </div>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div className="metal-surface p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div className="text-[10px] text-slate-600 font-mono">
-                <span className="text-slate-400 font-semibold block uppercase">Direct Eclipse / CLI integration params</span>
+                <span className="text-slate-500 font-semibold block uppercase">Direct Eclipse / CLI integration params</span>
                 Local Ollama container port 11434 telemetry is active. Supports automatic fallback to SaaS if local capacity hits limits.
               </div>
               <button
@@ -1191,7 +904,7 @@ export default function DashboardMetrics({
                 onClick={() => {
                   alert("Connection successful! Ollama telemetry responded in 14ms.");
                 }}
-                className="px-4 py-2 text-[11px] font-mono bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-all font-bold shadow-sm whitespace-nowrap self-end sm:self-auto"
+                className="btn-primary whitespace-nowrap self-end sm:self-auto"
               >
                 Test Local Pipeline Link
               </button>
@@ -1201,78 +914,64 @@ export default function DashboardMetrics({
       </div>
 
       {/* NFR-09: SLA / Response-Time Monitor Widget */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+      <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-violet-600" />
-              API Response-Time SLA Monitor
+            <h3 className="panel-title flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-blue-500" /> API Response-Time SLA Monitor
+              <span className="chip">NFR-09</span>
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Live p50/p95/p99 latency across all /api/* routes. SLA target: &lt;2000ms.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Live p50/p95/p99 latency. SLA target: &lt;2000ms.</p>
           </div>
-          <button onClick={loadSla} disabled={slaLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+          <button onClick={loadSla} disabled={slaLoading} className="btn-primary flex items-center gap-1.5">
             {slaLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading...</> : <><RefreshCw className="w-3.5 h-3.5" /> Refresh SLA</>}
           </button>
         </div>
         {slaData ? (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {[
-              { label: 'Samples', value: slaData.sampleCount, unit: '' },
-              { label: 'Avg', value: slaData.avg, unit: 'ms' },
-              { label: 'p50', value: slaData.p50, unit: 'ms' },
-              { label: 'p95', value: slaData.p95, unit: 'ms' },
-              { label: 'p99', value: slaData.p99, unit: 'ms' },
-            ].map(m => (
-              <div key={m.label} className={`border rounded-xl p-3 text-center ${m.label === 'p95' && slaData.p95 > 2000 ? 'bg-rose-50 border-rose-200' : m.label === 'p95' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                <div className="text-base font-bold text-slate-800">{m.value}{m.unit}</div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase">{m.label}</div>
+            {[{label:'Samples',value:slaData.sampleCount,unit:''},{label:'Avg',value:slaData.avg,unit:'ms'},{label:'p50',value:slaData.p50,unit:'ms'},{label:'p95',value:slaData.p95,unit:'ms'},{label:'p99',value:slaData.p99,unit:'ms'}].map(m => (
+              <div key={m.label} className="stat-card text-center">
+                <div className="stat-value text-xl">{m.value}{m.unit}</div>
+                <div className="stat-label">{m.label}</div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Refresh SLA" to measure API response-time latencies.</p>
-        )}
+        ) : <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Refresh SLA" to measure API latencies.</p>}
         {slaData && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold border ${slaData.status === 'healthy' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : slaData.status === 'degraded' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold border ${slaData.status === 'healthy' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
             <span className="uppercase">{slaData.status}</span>
-            <span className="font-normal text-slate-500">— breach rate: {slaData.slaBreachRate}% of {slaData.sampleCount} sampled requests exceeded 2s SLA</span>
+            <span className="font-normal text-slate-500">— breach rate: {slaData.slaBreachRate}% exceeded 2s SLA</span>
           </div>
         )}
       </div>
 
       {/* REQ-91: Widget Config Panel toggle button */}
       <div className="flex justify-end">
-        <button onClick={() => setShowWidgetConfig(v => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors">
-          <Settings className="w-3.5 h-3.5" /> Customize Widgets
+        <button onClick={() => setShowWidgetConfig(v => !v)} className="btn-ghost flex items-center gap-1.5">
+          <Settings className="w-3.5 h-3.5" /> Customize Widgets <span className="chip ml-1">REQ-91</span>
         </button>
       </div>
 
       {/* REQ-91: Widget Config Modal */}
       {showWidgetConfig && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                <Settings className="w-4 h-4 text-slate-500" /> Dashboard Widget Config
-              </h3>
-              <button onClick={() => setShowWidgetConfig(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+        <div className="modal-overlay">
+          <div className="glass-card-lg w-full max-w-sm">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200/60">
+              <h3 className="panel-title flex items-center gap-2"><Settings className="w-4 h-4 text-blue-500" /> Dashboard Widgets</h3>
+              <button onClick={() => setShowWidgetConfig(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-2">
               {widgetConfig.map(w => (
-                <label key={w.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                <label key={w.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-blue-50/50 cursor-pointer transition-colors">
                   <input type="checkbox" checked={w.visible}
-                    onChange={e => setWidgetConfig(prev => prev.map(c => c.id === w.id ? { ...c, visible: e.target.checked } : c))}
+                    onChange={e => setWidgetConfig(prev => prev.map(c => c.id === w.id ? {...c, visible: e.target.checked} : c))}
                     className="accent-blue-600 w-4 h-4" />
                   <span className="text-sm text-slate-700">{w.label}</span>
                 </label>
               ))}
               <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
-                <button onClick={() => setShowWidgetConfig(false)} className="px-4 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button onClick={saveWidgetConfig} className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">Save Layout</button>
+                <button onClick={() => setShowWidgetConfig(false)} className="btn-ghost">Cancel</button>
+                <button onClick={saveWidgetConfig} className="btn-primary">Save Layout</button>
               </div>
             </div>
           </div>
@@ -1280,138 +979,115 @@ export default function DashboardMetrics({
       )}
 
       {/* NFR-05: Uptime / Service Availability Monitor */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+      <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
-              <Server className="w-4 h-4 text-emerald-600" />
-              Service Uptime &amp; Availability <span className="text-[10px] text-slate-400 font-mono ml-1">(NFR-05)</span>
+            <h3 className="panel-title flex items-center gap-2">
+              <Server className="w-4 h-4 text-blue-500" /> Service Uptime &amp; Availability
+              <span className="chip">NFR-05</span>
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Process uptime, sub-service health, and SLA availability target (≥99.5%).</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Process uptime, sub-service health, SLA availability target (≥99.5%).</p>
           </div>
-          <button onClick={loadUptime} disabled={uptimeLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+          <button onClick={loadUptime} disabled={uptimeLoading} className="btn-primary flex items-center gap-1.5">
             {uptimeLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Checking…</> : <><RefreshCw className="w-3.5 h-3.5" /> Refresh</>}
           </button>
         </div>
-
         {uptimeData ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Uptime seconds */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                <Clock className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-                <div className="text-base font-bold text-slate-800 font-mono">
-                  {uptimeData.uptimeSeconds >= 3600
-                    ? `${(uptimeData.uptimeSeconds / 3600).toFixed(1)}h`
-                    : `${Math.round(uptimeData.uptimeSeconds / 60)}m`}
-                </div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase">Process Uptime</div>
+              <div className="stat-card text-center">
+                <Clock className="w-4 h-4 text-blue-400 mx-auto mb-1" />
+                <div className="stat-value text-xl">{uptimeData.uptimeSeconds >= 3600 ? `${(uptimeData.uptimeSeconds/3600).toFixed(1)}h` : `${Math.round(uptimeData.uptimeSeconds/60)}m`}</div>
+                <div className="stat-label">Process Uptime</div>
               </div>
-              {/* Availability % */}
-              <div className={`border rounded-xl p-3 text-center ${uptimeData.uptimePct >= 99.5 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                <div className="text-base font-bold font-mono text-slate-800">{uptimeData.uptimePct}%</div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase">Availability</div>
-                <div className={`text-[9px] font-mono font-bold mt-0.5 ${uptimeData.uptimePct >= 99.5 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {uptimeData.uptimePct >= 99.5 ? '✓ SLA MET' : '⚠ BELOW SLA'}
-                </div>
+              <div className="stat-card text-center">
+                <div className="stat-value text-xl">{uptimeData.uptimePct}%</div>
+                <div className="stat-label">Availability</div>
+                <div className={`text-[9px] font-mono font-bold mt-0.5 ${uptimeData.uptimePct >= 99.5 ? 'text-blue-600' : 'text-amber-600'}`}>{uptimeData.uptimePct >= 99.5 ? '✓ SLA MET' : '⚠ BELOW SLA'}</div>
               </div>
-              {/* DB health */}
-              <div className={`border rounded-xl p-3 text-center ${uptimeData.checks.database === 'ok' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
-                <Database className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+              <div className="stat-card text-center">
+                <Database className="w-4 h-4 mx-auto mb-1 text-blue-400" />
                 <div className="text-[10px] font-bold font-mono text-slate-800 capitalize">{uptimeData.checks.database}</div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase">SQLite DB</div>
+                <div className="stat-label">SQLite DB</div>
               </div>
-              {/* Playwright health */}
-              <div className={`border rounded-xl p-3 text-center ${uptimeData.checks.playwright === 'ok' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                <CheckCircle2 className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+              <div className="stat-card text-center">
+                <CheckCircle2 className="w-4 h-4 mx-auto mb-1 text-blue-400" />
                 <div className="text-[10px] font-bold font-mono text-slate-800 capitalize">{uptimeData.checks.playwright}</div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase">Playwright</div>
+                <div className="stat-label">Playwright</div>
               </div>
             </div>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold border ${uptimeData.status === 'healthy' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono font-bold border ${uptimeData.status === 'healthy' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
               <span className="uppercase">{uptimeData.status}</span>
               <span className="font-normal text-slate-500">— last checked {new Date(uptimeData.timestamp).toLocaleTimeString()}</span>
             </div>
           </>
-        ) : (
-          <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Refresh" to load uptime and availability metrics.</p>
-        )}
+        ) : <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Refresh" to load uptime metrics.</p>}
       </div>
 
       {/* REQ-89: Run Failure Alert Log */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+      <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
-              <Bell className="w-4 h-4 text-rose-500" />
-              Run Failure Alert Log <span className="text-[10px] text-slate-400 font-mono ml-1">(REQ-89)</span>
+            <h3 className="panel-title flex items-center gap-2">
+              <Bell className="w-4 h-4 text-blue-500" /> Run Failure Alert Log
+              <span className="chip">REQ-89</span>
             </h3>
             <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Failure events from automated test runs with severity classification.</p>
           </div>
-          <button onClick={loadAlertLog} disabled={alertLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+          <button onClick={loadAlertLog} disabled={alertLoading} className="btn-primary flex items-center gap-1.5">
             {alertLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…</> : <><RefreshCw className="w-3.5 h-3.5" /> Refresh</>}
           </button>
         </div>
         {alertLog.length > 0 ? (
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-thin">
             {alertLog.map((alert: any) => (
-              <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-xl border text-xs ${alert.acknowledged ? 'bg-slate-50 border-slate-200 opacity-60' : alert.severity === 'critical' ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'}`}>
-                <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${alert.acknowledged ? 'bg-slate-400' : alert.severity === 'critical' ? 'bg-rose-500 animate-pulse' : 'bg-amber-500'}`} />
+              <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-xl border text-xs ${alert.acknowledged ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white/70 border-slate-200'}`}>
+                <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${alert.acknowledged ? 'bg-slate-400' : alert.severity === 'critical' ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono font-bold text-[10px] text-slate-600">{alert.runId}</span>
-                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase ${alert.severity === 'critical' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{alert.severity}</span>
+                    <span className={`badge ${alert.severity === 'critical' ? 'badge-red' : 'badge-amber'}`}>{alert.severity}</span>
                     {alert.acknowledged && <span className="text-[9px] font-mono text-slate-400">✓ acknowledged</span>}
                   </div>
                   <p className="text-slate-700 mt-0.5">{alert.message}</p>
                   <p className="text-[10px] text-slate-400 font-mono">{new Date(alert.at).toLocaleString()}</p>
                 </div>
                 {!alert.acknowledged && (
-                  <button onClick={() => acknowledgeAlert(alert.id)}
-                    className="text-[10px] font-mono text-slate-500 hover:text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded shrink-0">
-                    Ack
-                  </button>
+                  <button onClick={() => acknowledgeAlert(alert.id)} className="btn-ghost text-[10px]">Ack</button>
                 )}
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-xs text-slate-400 font-mono text-center py-3">No run failure alerts logged yet. Alerts appear when runs exceed failure thresholds.</p>
-        )}
+        ) : <p className="text-xs text-slate-400 font-mono text-center py-3">No failure alerts. Alerts appear when runs exceed failure thresholds.</p>}
       </div>
 
       {/* NFR-01: Bundle Size Budget Monitor */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+      <div className="glass-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-sans font-semibold text-sm text-slate-900 flex items-center gap-2">
-              <HardDrive className="w-4 h-4 text-indigo-500" />
-              Bundle Size Budget Monitor <span className="text-[10px] text-slate-400 font-mono ml-1">(NFR-01)</span>
+            <h3 className="panel-title flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-blue-500" /> Bundle Size Budget Monitor
+              <span className="chip">NFR-01</span>
             </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Checks dist output against size budgets: Server ≤300KB, Client JS ≤1500KB, CSS ≤200KB.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Server ≤300KB · Client JS ≤1500KB · CSS ≤200KB</p>
           </div>
-          <button onClick={loadBundleSize} disabled={bundleLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50">
+          <button onClick={loadBundleSize} disabled={bundleLoading} className="btn-primary flex items-center gap-1.5">
             {bundleLoading ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Checking…</> : <><RefreshCw className="w-3.5 h-3.5" /> Check Budgets</>}
           </button>
         </div>
         {bundleData.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {bundleData.map((item: any) => (
-              <div key={item.name} className={`border rounded-xl p-3 text-center ${item.within ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
-                <div className={`text-base font-bold font-mono ${item.within ? 'text-emerald-700' : 'text-rose-700'}`}>{item.sizeKb} KB</div>
-                <div className="text-[9px] font-mono text-slate-500 uppercase mt-0.5">{item.name}</div>
-                <div className={`text-[9px] font-mono font-bold mt-0.5 ${item.within ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {item.within ? `✓ within ${item.limitKb}KB` : `⚠ over ${item.limitKb}KB limit`}
+              <div key={item.name} className="stat-card text-center">
+                <div className={`stat-value text-xl ${item.within ? 'text-blue-600' : 'text-red-500'}`}>{item.sizeKb} KB</div>
+                <div className="stat-label">{item.name}</div>
+                <div className={`text-[9px] font-mono font-bold mt-0.5 ${item.within ? 'text-blue-500' : 'text-red-500'}`}>
+                  {item.within ? `✓ within ${item.limitKb}KB` : `⚠ over ${item.limitKb}KB`}
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Check Budgets" to measure current dist bundle sizes against performance budgets.</p>
-        )}
+        ) : <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Check Budgets" to measure bundle sizes.</p>}
       </div>
     </div>
   );

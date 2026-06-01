@@ -110,45 +110,46 @@ function TestPlansTab() {
     } catch { /* silent */ }
   };
 
-  const statusColors: Record<string,string> = { draft:'bg-slate-100 text-slate-600', active:'bg-emerald-50 text-emerald-700', completed:'bg-blue-50 text-blue-700', archived:'bg-slate-50 text-slate-400' };
+  const statusColors: Record<string,string> = { draft:'badge badge-slate', active:'badge badge-green', completed:'badge badge-blue', archived:'badge badge-slate' };
 
   return (
-    <div className="space-y-5">
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+    <div className="space-y-5 animate-fadeInUp">
+      <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-sans font-semibold text-slate-900 flex items-center gap-2">
-              <TableProperties className="w-4 h-4 text-teal-600" /> Test Plans <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-30)</span>
+            <h3 className="panel-title flex items-center gap-2">
+              <TableProperties className="w-4 h-4 text-blue-500" /> Test Plans
+              <span className="chip">REQ-30</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">Create and manage test execution plans with milestones and test case associations.</p>
           </div>
-          <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-colors">
+          <button onClick={() => setShowForm(v => !v)} className="btn-primary flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> New Plan
           </button>
         </div>
-        {feedback && <div className="mb-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
+        {feedback && <div className="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
         {showForm && (
-          <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div className="mb-4 p-4 metal-surface rounded-xl space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Plan Name *</label>
                 <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Sprint 23 Regression"
-                  className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                  className="input-glass w-full" />
               </div>
               <div>
                 <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Milestone</label>
                 <input value={form.milestone} onChange={e => setForm(f => ({...f, milestone: e.target.value}))} placeholder="v2.4.0 Release"
-                  className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                  className="input-glass w-full" />
               </div>
             </div>
             <div>
               <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Description</label>
               <textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} rows={2} placeholder="Scope and objectives..."
-                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                className="input-glass w-full" />
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100">Cancel</button>
-              <button onClick={createPlan} disabled={saving || !form.name.trim()} className="px-4 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50">
+              <button onClick={() => setShowForm(false)} className="btn-ghost">Cancel</button>
+              <button onClick={createPlan} disabled={saving || !form.name.trim()} className="btn-primary">
                 {saving ? 'Creating…' : 'Create Plan'}
               </button>
             </div>
@@ -161,19 +162,19 @@ function TestPlansTab() {
         ) : (
           <div className="space-y-2">
             {plans.map(plan => (
-              <div key={plan.id} className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:border-teal-300 transition-all">
+              <div key={plan.id} className="flex items-start gap-3 p-3 bg-white/60 border border-slate-200/80 rounded-xl hover:border-blue-300 hover:bg-blue-50/30 transition-all">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-slate-900 text-sm">{plan.name}</span>
-                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full ${statusColors[plan.status] || 'bg-slate-100 text-slate-600'}`}>{plan.status}</span>
-                    {plan.milestone && <span className="text-[10px] font-mono text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">🏁 {plan.milestone}</span>}
+                    <span className={statusColors[plan.status] || 'badge badge-slate'}>{plan.status}</span>
+                    {plan.milestone && <span className="chip">🏁 {plan.milestone}</span>}
                   </div>
                   {plan.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{plan.description}</p>}
                   <p className="text-[10px] font-mono text-slate-400 mt-0.5">{plan.tcIds?.length || 0} test cases · Created {new Date(plan.createdAt).toLocaleDateString()}</p>
                   {/* REQ-31/32: Milestone progress inline */}
                   <PlanProgressPanel planId={plan.id} planName={plan.name} />
                 </div>
-                <button onClick={() => deletePlan(plan.id)} className="text-slate-400 hover:text-rose-500 shrink-0 mt-0.5 transition-colors">
+                <button onClick={() => deletePlan(plan.id)} className="text-slate-400 hover:text-red-500 shrink-0 mt-0.5 transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -205,25 +206,25 @@ function PlanProgressPanel({ planId, planName }: { planId: string; planName: str
   useEffect(() => { load(); }, [planId]);
 
   const statusColor: Record<string,string> = {
-    completed: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-    in_progress: 'text-amber-700 bg-amber-50 border-amber-200',
-    not_started: 'text-slate-600 bg-slate-50 border-slate-200',
+    completed: 'badge-green',
+    in_progress: 'badge-amber',
+    not_started: 'badge-slate',
   };
 
   if (loading) return <div className="text-xs text-slate-400 py-2">Loading progress…</div>;
   if (!progress) return null;
 
   return (
-    <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs space-y-2">
+    <div className="mt-3 p-3 bg-blue-50/60 border border-blue-200/60 rounded-xl text-xs space-y-2">
       <div className="flex items-center justify-between">
-        <span className="font-bold text-indigo-700">{planName} — Milestone Progress</span>
-        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold ${statusColor[progress.milestoneStatus] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{progress.milestoneStatus?.replace('_',' ')}</span>
+        <span className="font-bold text-blue-700 text-[11px]">{planName} — Milestone Progress</span>
+        <span className={`badge ${statusColor[progress.milestoneStatus] || 'badge-slate'}`}>{progress.milestoneStatus?.replace('_',' ')}</span>
       </div>
-      {progress.milestone && <div className="text-[10px] text-indigo-600 font-mono">🏁 {progress.milestone}</div>}
-      <div className="w-full bg-indigo-100 rounded-full h-1.5">
-        <div className="bg-indigo-500 h-1.5 rounded-full transition-all" style={{ width: `${progress.progress || 0}%` }} />
+      {progress.milestone && <div className="text-[10px] text-blue-600 font-mono">🏁 {progress.milestone}</div>}
+      <div className="progress-bar-track">
+        <div className="progress-bar-fill" style={{ width: `${progress.progress || 0}%` }} />
       </div>
-      <div className="flex justify-between text-[10px] text-indigo-600 font-mono">
+      <div className="flex justify-between text-[10px] text-blue-500 font-mono">
         <span>{progress.progress || 0}% complete</span>
         <span>{progress.passed}/{progress.tcCount} TCs passed</span>
       </div>
@@ -289,52 +290,57 @@ function ManualExecutionTab() {
     } catch { /* silent */ }
   };
 
-  const statusColors: Record<string,string> = { in_progress:'bg-amber-50 text-amber-700 border-amber-200', passed:'bg-emerald-50 text-emerald-700 border-emerald-200', failed:'bg-rose-50 text-rose-700 border-rose-200', blocked:'bg-orange-50 text-orange-700 border-orange-200' };
-  const stepColors: Record<string,string> = { pass:'bg-emerald-100 text-emerald-700', fail:'bg-rose-100 text-rose-700', skip:'bg-slate-100 text-slate-600', pending:'bg-slate-50 text-slate-400' };
+  const statusBadge: Record<string,string> = { in_progress:'badge badge-amber', passed:'badge badge-green', failed:'badge badge-red', blocked:'badge badge-red' };
+  const stepColors: Record<string,string> = { pass:'bg-green-100 text-green-700', fail:'bg-red-100 text-red-700', skip:'bg-slate-100 text-slate-600', pending:'bg-slate-50 text-slate-400' };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 animate-fadeInUp">
       <div className="lg:col-span-5 space-y-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="glass-card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-sans font-semibold text-slate-900 flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-orange-500" /> Manual Execution <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-33)</span>
+              <h3 className="panel-title flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-blue-500" /> Manual Execution
+                <span className="chip">REQ-33</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">Track manual test execution with step-by-step results.</p>
             </div>
-            <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors">
+            <button onClick={() => setShowForm(v => !v)} className="btn-primary flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" /> New Run
             </button>
           </div>
-          {feedback && <div className="mb-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
+          {feedback && <div className="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
           {showForm && (
-            <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div className="mb-4 p-3 metal-surface rounded-xl space-y-2">
               <input value={form.tcTitle} onChange={e => setForm(f => ({...f, tcTitle: e.target.value}))} placeholder="Test case title *"
-                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="input-glass w-full" />
               <input value={form.tester} onChange={e => setForm(f => ({...f, tester: e.target.value}))} placeholder="Tester name"
-                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="input-glass w-full" />
               <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Notes / context…"
-                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="input-glass w-full" />
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100">Cancel</button>
-                <button onClick={startRun} disabled={!form.tcTitle.trim()} className="px-4 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 disabled:opacity-50">Start Run</button>
+                <button onClick={() => setShowForm(false)} className="btn-ghost">Cancel</button>
+                <button onClick={startRun} disabled={!form.tcTitle.trim()} className="btn-primary">Start Run</button>
               </div>
             </div>
           )}
           {loading ? <div className="text-center py-8 text-slate-400 text-xs font-mono">Loading…</div> : runs.length === 0 ? (
             <div className="text-center py-8 text-slate-400 text-xs font-mono">No manual runs yet.</div>
           ) : (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin">
               {runs.map(run => (
                 <div key={run.id} onClick={() => setSelectedRun(run)}
-                  className={`p-3 border rounded-xl cursor-pointer transition-all ${selectedRun?.id === run.id ? 'border-orange-400 bg-orange-50/50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}>
+                  className={`p-3 border rounded-xl cursor-pointer transition-all ${
+                    selectedRun?.id === run.id
+                      ? 'border-blue-400 bg-blue-50/50 glow-blue'
+                      : 'border-slate-200/80 bg-white/50 hover:border-blue-300'
+                  }`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 text-sm truncate">{run.tcTitle}</p>
                       <p className="text-[10px] font-mono text-slate-500">Tester: {run.tester} · {run.steps?.length || 0} steps</p>
                     </div>
-                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${statusColors[run.status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>{run.status}</span>
+                    <span className={statusBadge[run.status] || 'badge badge-slate'}>{run.status}</span>
                   </div>
                 </div>
               ))}
@@ -345,16 +351,20 @@ function ManualExecutionTab() {
 
       <div className="lg:col-span-7">
         {selectedRun ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="glass-card p-5 space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <h4 className="font-semibold text-slate-900">{selectedRun.tcTitle}</h4>
                 <p className="text-xs text-slate-500">Tester: {selectedRun.tester} · Started: {selectedRun.startedAt ? new Date(selectedRun.startedAt).toLocaleString() : '—'}</p>
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5 flex-wrap">
                 {(['in_progress','passed','failed','blocked'] as const).map(s => (
                   <button key={s} onClick={() => updateStatus(selectedRun.id, s)}
-                    className={`text-[9px] font-mono font-bold px-2 py-1 rounded-lg border transition-all ${selectedRun.status === s ? statusColors[s] : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'}`}>
+                    className={`text-[9px] font-mono font-bold px-2 py-1 rounded-lg border transition-all ${
+                      selectedRun.status === s
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white/60 text-slate-500 border-slate-200 hover:border-blue-300'
+                    }`}>
                     {s}
                   </button>
                 ))}
@@ -362,9 +372,9 @@ function ManualExecutionTab() {
             </div>
             {selectedRun.notes && <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2">{selectedRun.notes}</p>}
             <div className="space-y-2">
-              <h5 className="text-xs font-mono font-bold text-slate-600 uppercase tracking-wider">Test Steps</h5>
+              <h5 className="text-xs font-mono font-bold text-slate-500 uppercase tracking-wider">Test Steps</h5>
               {(selectedRun.steps || []).map((step: any, i: number) => (
-                <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2">
+                <div key={i} className="border border-slate-200/80 bg-white/50 rounded-xl p-3 space-y-2">
                   <div className="flex items-start gap-2">
                     <span className="text-[10px] font-mono text-slate-400 mt-0.5 shrink-0">#{i+1}</span>
                     <div className="flex-1 min-w-0">
@@ -374,7 +384,7 @@ function ManualExecutionTab() {
                     <div className="flex gap-1 shrink-0">
                       {(['pass','fail','skip'] as const).map(r => (
                         <button key={r} onClick={() => updateStep(selectedRun.id, i, r, step.actual || '')}
-                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-all ${step.result === r ? stepColors[r] + ' font-bold border-transparent' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}>
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-all ${step.result === r ? stepColors[r] + ' font-bold border-transparent' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300'}`}>
                           {r}
                         </button>
                       ))}
@@ -384,14 +394,14 @@ function ManualExecutionTab() {
                     <input type="text" value={step.actual || ''} placeholder="Actual result observed…"
                       onChange={e => { const s = [...selectedRun.steps]; s[i] = {...s[i], actual: e.target.value}; setSelectedRun({...selectedRun, steps: s}); }}
                       onBlur={e => updateStep(selectedRun.id, i, step.result || 'pending', e.target.value)}
-                      className="w-full text-[11px] border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-300 font-mono" />
+                      className="input-glass w-full" />
                   )}
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className="h-full min-h-[300px] flex items-center justify-center bg-white border border-slate-200 rounded-2xl">
+          <div className="h-full min-h-[300px] flex items-center justify-center glass-card">
             <div className="text-center text-slate-400">
               <CheckSquare className="w-10 h-10 mx-auto mb-2 text-slate-300" />
               <p className="text-sm font-medium">Select a run to view steps</p>
@@ -937,166 +947,153 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+    <div className="min-h-screen text-slate-800 font-sans flex">
       {/* Auth Gate — show login if not authenticated */}
       {!authUser && <AuthModal onLogin={handleLogin} />}
-      
-      {/* Top Main Navigation Nav header Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-xl shadow-md">
-            <Zap className="w-5 h-5 text-white animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-sm font-sans font-extrabold tracking-tight text-slate-900 uppercase sm:text-base">
-              Agentic AI Quality Intelligence Platform
-            </h1>
-            <p className="text-[10px] sm:text-xs text-slate-500 font-mono">End-to-End Autonomous Quality Engineering Core</p>
+
+      {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
+      <aside className="sidebar">
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-900/40">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-white tracking-tight leading-tight">IQ Studio</p>
+              <p className="text-[9px] font-mono text-slate-400 leading-tight">AI Quality Platform</p>
+            </div>
           </div>
         </div>
 
-        {/* Global Toolbar and Controls */}
-        <div className="flex items-center gap-3">
-          {/* Quick Stats Banner links */}
-          <div className="hidden md:flex items-center gap-4 text-xs font-mono border-r border-slate-200 pr-4">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-slate-400 uppercase font-bold font-sans">Active Project Context</span>
-              <span className="text-emerald-600 font-extrabold text-right font-sans">Segregated Sandbox</span>
+        {/* Primary Nav */}
+        <div className="px-2 pt-3">
+          <span className="sidebar-section-label">Core Modules</span>
+          <nav className="flex flex-col mt-1">
+            {[
+              { id: 'agentic',          label: 'Agentic AI Engine',   icon: Zap },
+              { id: 'requirements',     label: 'Requirements',         icon: FileText },
+              { id: 'testcases',        label: 'Test Cases',           icon: TableProperties },
+              { id: 'traceability',     label: 'Traceability',         icon: Table },
+              { id: 'scripts',          label: 'Script Generator',     icon: Settings2 },
+              { id: 'defects',          label: 'Impact Analyzer',      icon: Crosshair },
+              { id: 'performance',      label: 'Performance Testing',  icon: Sliders },
+              { id: 'security',         label: 'Security Testing',     icon: ShieldAlert },
+              { id: 'dashboard',        label: 'QE Dashboard',         icon: TrendingUp },
+              { id: 'modules',          label: 'Module Quality',       icon: Layers },
+              { id: 'execution',        label: 'Execution Engine',     icon: Cpu },
+              { id: 'test-plans',       label: 'Test Plans',           icon: TableProperties },
+              { id: 'manual-execution', label: 'Manual Execution',     icon: CheckSquare },
+              { id: 'audit',            label: 'Audit Log',            icon: History },
+              { id: 'converter',        label: 'Enterprise Converter', icon: RefreshCw },
+            ].map((page) => {
+              const Icon = page.icon;
+              const isSelected = activeTab === page.id;
+              return (
+                <button
+                  key={page.id}
+                  onClick={() => setActiveTab(page.id as any)}
+                  className={`sidebar-item${isSelected ? ' active' : ''}`}
+                >
+                  <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-500'}`} />
+                  <span>{page.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <span className="sidebar-section-label mt-3">Config &amp; Integrations</span>
+          <nav className="flex flex-col mt-1">
+            {[
+              { id: 'scheduler',    label: 'Test Scheduler',    icon: Clock },
+              { id: 'analytics',    label: 'AI Analytics',      icon: BarChart3 },
+              { id: 'cicd',         label: 'CI/CD Integration', icon: GitBranch },
+              { id: 'integrations', label: 'TMS Integrations',  icon: Link },
+              { id: 'llm-config',   label: 'LLM Providers',     icon: Cpu },
+              { id: 'feedback',     label: 'Prompts & Feedback',icon: BookOpen },
+            ].map((page) => {
+              const Icon = page.icon;
+              const isSelected = activeTab === page.id;
+              return (
+                <button
+                  key={page.id}
+                  onClick={() => setActiveTab(page.id as any)}
+                  className={`sidebar-item${isSelected ? ' active' : ''}`}
+                >
+                  <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-500'}`} />
+                  <span>{page.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User footer */}
+        <div className="absolute bottom-0 left-0 right-0 border-t border-white/[0.06] p-3">
+          {authUser && (
+            <div className="flex items-center gap-2 px-1 mb-2">
+              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                <span className="text-[9px] font-bold text-white">{authUser.name.charAt(0)}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-slate-300 truncate">{authUser.name}</p>
+                <p className="text-[9px] text-slate-500 truncate">{authUser.role.replace('_', ' ')}</p>
+              </div>
+              <button onClick={handleLogout} title="Sign out" className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
+                <LogOut className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-[9px] font-mono text-slate-600 px-1">
+            <span>PORT 3000</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />LIVE</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
+      <div className="main-content flex flex-col min-h-screen" style={{ width: 'calc(100% - 240px)' }}>
+
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-sm font-extrabold tracking-tight text-slate-900">
+                Agentic AI Quality Intelligence
+              </h1>
+              <p className="text-[10px] text-slate-400 font-mono">Autonomous End-to-End Quality Engineering Core</p>
             </div>
           </div>
 
-          {/* Project Switcher Dropdown */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2 border-r border-slate-200 pr-4">
+              <span className="text-[10px] text-slate-400 font-mono uppercase">Context:</span>
+              <span className="text-[11px] font-bold text-blue-600 font-mono">Segregated Sandbox</span>
+            </div>
+
             <select
               value={currentProjectId}
               onChange={(e) => setCurrentProjectId(e.target.value)}
-              className="bg-slate-50 border border-slate-250 hover:border-purple-300 text-slate-800 font-sans font-bold text-xs rounded-xl p-2 focus:outline-none focus:ring-1 focus:ring-purple-400 shadow-sm"
+              className="input-glass text-xs"
             >
               <option value="ALL">🗂 All Projects</option>
               {allProjectIds.map(pid => (
                 <option key={pid} value={pid}>📁 {pid}</option>
               ))}
             </select>
+
+            <button
+              onClick={() => setChatbotOpen(!chatbotOpen)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <MessageSquareCode className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AI Copilot</span>
+            </button>
           </div>
+        </header>
 
-          <button
-            onClick={() => setChatbotOpen(!chatbotOpen)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs text-purple-700 hover:bg-slate-50 font-mono font-semibold shadow-sm transition-all hover:border-slate-300"
-          >
-            <MessageSquareCode className="w-4 h-4 text-purple-600" />
-            <span className="hidden sm:inline">Ask AI Copilot</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Responsive Sidebar + Page Canvas Layout */}
-      <main className="max-w-7xl mx-auto w-full p-4 md:p-6 flex-grow flex flex-col lg:flex-row gap-6">
-        
-        {/* Left Sidebar Navigation: Distinct Dedicated Modules Directory */}
-        <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-450 font-bold block">QE Command Board</span>
-              <p className="text-[10px] text-slate-500 leading-normal mt-0.5">Access specialized testing pages.</p>
-            </div>
-            
-            <nav className="flex flex-col gap-1">
-              {[
-                { id: 'agentic', label: 'Agentic AI Engine', icon: Zap, color: 'text-purple-650 font-black' },
-                { id: 'requirements', label: 'Requirement Analysis', icon: FileText, color: 'text-blue-600' },
-                { id: 'testcases', label: 'Test Case Generator', icon: TableProperties, color: 'text-emerald-600' },
-                { id: 'traceability', label: 'Traceability Matrix', icon: Table, color: 'text-teal-600' },
-                { id: 'scripts', label: 'Script Generator', icon: Settings2, color: 'text-amber-600' },
-                { id: 'defects', label: 'Impact Analyzer', icon: Crosshair, color: 'text-rose-600' },
-                { id: 'performance', label: 'Performance Testing', icon: Sliders, color: 'text-cyan-600' },
-                { id: 'security', label: 'Security Testing', icon: ShieldAlert, color: 'text-red-600' },
-                { id: 'dashboard', label: 'QE Dashboard', icon: TrendingUp, color: 'text-purple-600' },
-                { id: 'modules', label: 'Module Quality', icon: Layers, color: 'text-purple-650' },
-                { id: 'execution', label: 'Execution Engine', icon: Cpu, color: 'text-indigo-600' },
-                { id: 'test-plans', label: 'Test Plans', icon: TableProperties, color: 'text-teal-600' },
-                { id: 'manual-execution', label: 'Manual Execution', icon: CheckSquare, color: 'text-orange-600' },
-                { id: 'audit', label: 'Pipeline Audit Log', icon: History, color: 'text-slate-650' },
-                { id: 'converter', label: 'Enterprise Converter', icon: RefreshCw, color: 'text-pink-600' },
-              ].map((page) => {
-                const Icon = page.icon;
-                const isSelected = activeTab === page.id;
-                return (
-                  <button
-                    key={page.id}
-                    onClick={() => setActiveTab(page.id as any)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-left text-xs font-sans font-bold transition-all ${
-                      isSelected 
-                        ? 'bg-slate-900 text-white shadow-sm' 
-                        : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 py-1">
-                      <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : page.color}`} />
-                      <span>{page.label}</span>
-                    </div>
-                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
-                  </button>
-                );
-              })}
-              {/* Additional tools section */}
-              <div className="pt-2 mt-1 border-t border-slate-100">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block mb-1 px-1">Config &amp; Integrations</span>
-                {[
-                  { id: 'scheduler', label: 'Test Scheduler', icon: Clock, color: 'text-indigo-600' },
-                  { id: 'analytics', label: 'AI Analytics', icon: BarChart3, color: 'text-violet-600' },
-                  { id: 'cicd', label: 'CI/CD Integration', icon: GitBranch, color: 'text-cyan-600' },
-                  { id: 'integrations', label: 'TMS Integrations', icon: Link, color: 'text-sky-600' },
-                  { id: 'llm-config', label: 'LLM Providers', icon: Cpu, color: 'text-violet-600' },
-                  { id: 'feedback', label: 'Prompts & Feedback', icon: BookOpen, color: 'text-amber-600' },
-                ].map((page) => {
-                  const Icon = page.icon;
-                  const isSelected = activeTab === page.id;
-                  return (
-                    <button
-                      key={page.id}
-                      onClick={() => setActiveTab(page.id as any)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-left text-xs font-sans font-bold transition-all ${
-                        isSelected 
-                          ? 'bg-slate-900 text-white shadow-sm' 
-                          : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 py-1">
-                        <Icon className={`w-4 h-4 ${isSelected ? 'text-white' : page.color}`} />
-                        <span>{page.label}</span>
-                      </div>
-                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </nav>
-            
-            {/* User info */}
-            {authUser && (
-              <div className="border-t border-slate-100 pt-3">
-                <div className="flex items-center gap-2 px-1">
-                  <UserCircle className="w-5 h-5 text-indigo-500 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-700 truncate">{authUser.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{authUser.role.replace('_', ' ')}</p>
-                  </div>
-                  <button onClick={handleLogout} title="Sign out" className="p-1 text-slate-400 hover:text-red-500 rounded">
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[10px] font-mono text-slate-400">
-              <span>TCP INGRESS 3000</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            </div>
-          </div>
-        </aside>
-
-        {/* Right Active Viewport Canvas */}
-        <div className="flex-1 min-w-0">
+        {/* Page Content */}
+        <div className="flex-1 p-6">
           
           {activeTab === 'agentic' && (
             <AgenticOrchestrator
@@ -1231,41 +1228,38 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {activeTab === 'analytics' && <AnalyticsTab />}
 
           {activeTab === 'audit' && (
-            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-4">
+            <div className="glass-card p-6 space-y-4 animate-fadeInUp">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-sm font-sans font-semibold text-slate-800">Autonomous Decisional Audit Trail</h3>
+                  <h3 className="panel-title">Autonomous Decisional Audit Trail</h3>
                   <p className="text-xs text-slate-500 mt-1">Audit logs documenting exact actions performed by different agents.</p>
                 </div>
-                <button
-                  onClick={handleAddAuditLog}
-                  className="px-2.5 py-1 text-[11px] font-mono bg-slate-50 border border-slate-200 hover:border-slate-300 rounded text-slate-650 font-medium"
-                >
+                <button onClick={handleAddAuditLog} className="btn-ghost">
                   Force Sync Logs
                 </button>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs font-mono">
+                <table className="table-glass">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-500">
-                      <th className="pb-2">Audit ID</th>
-                      <th className="pb-2">Timestamp</th>
-                      <th className="pb-2">Action / Event</th>
-                      <th className="pb-2">Assigned Agent Node</th>
-                      <th className="pb-2">Audit Payload Details</th>
-                      <th className="pb-2 text-right">Cost Estimative</th>
+                    <tr>
+                      <th>Audit ID</th>
+                      <th>Timestamp</th>
+                      <th>Action / Event</th>
+                      <th>Agent Node</th>
+                      <th>Details</th>
+                      <th className="text-right">Cost</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                  <tbody>
                     {auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50">
-                        <td className="py-3 text-purple-600 font-bold">{log.id}</td>
-                        <td className="py-3 text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                        <td className="py-3 font-semibold text-slate-800">{log.action}</td>
-                        <td className="py-3 text-slate-600 font-medium">{log.affectedEntity}</td>
-                        <td className="py-3 text-slate-650 italic max-w-[280px] truncate">{log.details}</td>
-                        <td className="py-3 text-slate-400 text-right">${log.costEstimate || '0.0002'}</td>
+                      <tr key={log.id}>
+                        <td className="text-blue-600 font-bold font-mono">{log.id}</td>
+                        <td className="text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                        <td className="font-semibold text-slate-800">{log.action}</td>
+                        <td className="text-slate-600">{log.affectedEntity}</td>
+                        <td className="text-slate-500 italic max-w-[280px] truncate">{log.details}</td>
+                        <td className="text-slate-400 text-right font-mono">${log.costEstimate || '0.0002'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1274,7 +1268,16 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             </div>
           )}
         </div>
-      </main>
+
+        {/* Footer */}
+        <footer className="border-t border-slate-200/60 py-3 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-400 text-[10px] font-mono bg-white/50">
+          <span>© 2026 Agentic AI Quality Intelligence Platform · All pipelines active</span>
+          <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span>Port 3000 · SSL Active · 2 Workers Online</span>
+          </div>
+        </footer>
+      </div>
 
       {/* Global Slideout Chat Helper Copilot component */}
       <ChatbotSlideout
@@ -1282,15 +1285,6 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         isOpen={chatbotOpen}
         onClose={() => setChatbotOpen(false)}
       />
-
-      {/* Footer System Status details */}
-      <footer className="bg-white border-t border-slate-200 py-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-sm text-slate-400 text-[10px] font-mono">
-        <span>© 2026 Agentic AI Quality Intelligence Platform. All pipelines active.</span>
-        <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>Active ingress node: Port 3000 Inbound telemetry - SSL True</span>
-        </div>
-      </footer>
     </div>
   );
 }

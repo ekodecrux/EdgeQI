@@ -139,21 +139,21 @@ export default function CICDTab() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
-          <GitBranch className="w-5 h-5 text-cyan-400" />
+      <div className="glass-card p-4 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center">
+          <GitBranch className="w-5 h-5 text-blue-500" />
         </div>
         <div>
-          <h2 className="text-white font-bold text-lg">CI/CD Integration</h2>
-          <p className="text-slate-400 text-xs">Webhook receiver, config generators, pipeline triggers (REQ-38/39/62)</p>
+          <h2 className="panel-title">CI/CD Integration</h2>
+          <p className="text-slate-500 text-xs">Webhook receiver, config generators, pipeline triggers (REQ-38/39/62)</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Config Generator */}
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-          <h3 className="text-white font-semibold text-sm mb-4 flex items-center gap-2">
-            <Settings className="w-4 h-4 text-cyan-400" /> Config File Generator
+        <div className="glass-card p-5">
+          <h3 className="panel-title text-sm mb-4 flex items-center gap-2">
+            <Settings className="w-4 h-4 text-blue-500" /> Config File Generator
           </h3>
 
           {/* Platform selector */}
@@ -163,7 +163,7 @@ export default function CICDTab() {
                 key={p.id}
                 onClick={() => { setPlatform(p.id); if (allConfigs[p.id]) setGeneratedConfig(allConfigs[p.id]); }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                  platform === p.id ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-300' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-slate-500'
+                  platform === p.id ? 'btn-primary' : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300 hover:bg-blue-50/30'
                 }`}
               >
                 <span>{p.icon}</span>
@@ -174,21 +174,21 @@ export default function CICDTab() {
 
           <div className="space-y-3 mb-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Project Name</label>
+              <label className="block text-xs text-slate-500 mb-1">Project Name</label>
               <input value={projectName} onChange={e => setProjectName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+                className="input-glass w-full text-sm"
                 placeholder="my-project" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Test Command</label>
+              <label className="block text-xs text-slate-500 mb-1">Test Command</label>
               <input value={testCommand} onChange={e => setTestCommand(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-cyan-500"
+                className="input-glass w-full text-sm font-mono"
                 placeholder="npx playwright test" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Branches (comma-separated)</label>
+              <label className="block text-xs text-slate-500 mb-1">Branches (comma-separated)</label>
               <input value={branches} onChange={e => setBranches(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-cyan-500"
+                className="input-glass w-full text-sm font-mono"
                 placeholder="main, develop" />
             </div>
           </div>
@@ -196,7 +196,7 @@ export default function CICDTab() {
           <button
             onClick={generateConfig}
             disabled={generating}
-            className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white font-medium py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+            className="btn-primary w-full py-2 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             Generate Config
@@ -207,11 +207,11 @@ export default function CICDTab() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-slate-400 font-medium">Generated Config</span>
                 <div className="flex gap-2">
-                  <button onClick={copyConfig} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
-                    {copied ? <CheckCircle className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <button onClick={copyConfig} className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 border border-slate-200">
+                    {copied ? <CheckCircle className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
-                  <button onClick={downloadConfig} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
+                  <button onClick={downloadConfig} className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 border border-slate-200">
                     <Download className="w-3 h-3" /> Download
                   </button>
                 </div>
@@ -223,25 +223,25 @@ export default function CICDTab() {
 
         {/* Webhook Receiver */}
         <div className="space-y-4">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-            <h3 className="text-white font-semibold text-sm mb-4 flex items-center gap-2">
-              <Webhook className="w-4 h-4 text-violet-400" /> Webhook Receiver (REQ-38)
+          <div className="glass-card p-5">
+            <h3 className="panel-title text-sm mb-4 flex items-center gap-2">
+              <Webhook className="w-4 h-4 text-blue-500" /> Webhook Receiver (REQ-38)
             </h3>
-            <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-3 mb-3">
+            <div className="metal-surface rounded-lg p-3 mb-3">
               <p className="text-xs text-slate-500 mb-1">Your webhook URL:</p>
-              <p className="text-emerald-400 font-mono text-xs break-all">{webhookUrl}</p>
+              <p className="text-blue-600 font-mono text-xs break-all">{webhookUrl}</p>
             </div>
-            <div className="space-y-2 text-xs text-slate-400">
+            <div className="space-y-2 text-xs text-slate-500">
               <p className="flex items-start gap-2">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
                 Accepts GitHub, GitLab, Bitbucket webhook payloads
               </p>
               <p className="flex items-start gap-2">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
                 Auto-triggers execution on push/PR events
               </p>
               <p className="flex items-start gap-2">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
                 Logs all events in webhook history below
               </p>
             </div>
@@ -249,23 +249,23 @@ export default function CICDTab() {
             <div className="mt-4 bg-slate-950 rounded-lg p-3 border border-slate-700/50">
               <p className="text-xs text-slate-500 mb-1 font-medium">Test webhook curl:</p>
               <code className="text-[11px] text-cyan-300 font-mono break-all leading-relaxed">
-                {`curl -X POST ${webhookUrl} \\
-  -H 'Content-Type: application/json' \\
-  -H 'X-GitHub-Event: push' \\
+                {`curl -X POST ${webhookUrl} \
+  -H 'Content-Type: application/json' \
+  -H 'X-GitHub-Event: push' \
   -d '{"ref":"refs/heads/main","pusher":{"name":"dev"},"head_commit":{"message":"feat: new feature"}}'`}
               </code>
             </div>
           </div>
 
           {/* Supported Platforms */}
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-            <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-emerald-400" /> Supported CI/CD Platforms (REQ-39)
+          <div className="glass-card p-4">
+            <h3 className="panel-title text-sm mb-3 flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-blue-500" /> Supported CI/CD Platforms (REQ-39)
             </h3>
             <div className="grid grid-cols-2 gap-1.5">
               {['Jenkins', 'GitHub Actions', 'GitLab CI', 'CircleCI', 'Azure Pipelines', 'Bamboo', 'TeamCity', 'ArgoCD'].map(p => (
-                <div key={p} className="flex items-center gap-1.5 text-xs text-slate-300">
-                  <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
+                <div key={p} className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
                   {p}
                 </div>
               ))}
@@ -276,18 +276,18 @@ export default function CICDTab() {
 
       {/* Recent Webhook Events */}
       {integrations.length > 0 && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-          <h3 className="text-white font-semibold text-sm mb-4 flex items-center gap-2">
-            <Play className="w-4 h-4 text-cyan-400" /> Recent Webhook Events
+        <div className="glass-card p-5">
+          <h3 className="panel-title text-sm mb-4 flex items-center gap-2">
+            <Play className="w-4 h-4 text-blue-500" /> Recent Webhook Events
           </h3>
           <div className="space-y-2">
             {integrations.slice(0, 10).map((evt: any) => (
-              <div key={evt.id} className="flex items-center gap-3 bg-slate-900/50 rounded-lg px-3 py-2">
-                <div className={`w-2 h-2 rounded-full ${evt.active ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                <span className="text-xs text-slate-300 font-mono">{evt.id}</span>
-                <span className="text-xs text-slate-400">{evt.name}</span>
-                <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded font-mono">{evt.type}</span>
-                <span className="text-xs text-slate-500 ml-auto">{new Date(evt.created_at).toLocaleString()}</span>
+              <div key={evt.id} className="flex items-center gap-3 metal-surface rounded-lg px-3 py-2">
+                <div className={`w-2 h-2 rounded-full ${evt.active ? 'bg-green-400' : 'bg-slate-400'}`} />
+                <span className="text-xs text-slate-600 font-mono">{evt.id}</span>
+                <span className="text-xs text-slate-500">{evt.name}</span>
+                <span className="text-xs bg-blue-50 border border-blue-200 text-blue-600 px-2 py-0.5 rounded font-mono">{evt.type}</span>
+                <span className="text-xs text-slate-400 ml-auto">{new Date(evt.created_at).toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -295,51 +295,51 @@ export default function CICDTab() {
       )}
 
       {integrations.length === 0 && (
-        <div className="bg-slate-800/30 border border-dashed border-slate-700 rounded-xl p-8 text-center">
-          <Webhook className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm font-medium">No webhook events yet</p>
-          <p className="text-slate-500 text-xs mt-1">Configure your CI/CD platform to send webhooks to the URL above</p>
+        <div className="glass-card border-dashed p-8 text-center">
+          <Webhook className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 text-sm font-medium">No webhook events yet</p>
+          <p className="text-slate-400 text-xs mt-1">Configure your CI/CD platform to send webhooks to the URL above</p>
         </div>
       )}
 
       {/* REQ-87: Pipeline Status Panel */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+      <div className="glass-card p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-            <Layers className="w-4 h-4 text-cyan-400" /> Pipeline Status Tracker <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-87)</span>
+          <h3 className="panel-title text-sm flex items-center gap-2">
+            <Layers className="w-4 h-4 text-blue-500" /> Pipeline Status Tracker <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-87)</span>
           </h3>
           <button onClick={loadPipelines} disabled={pipelineLoading}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 border border-slate-200">
             <RefreshCw className={`w-3 h-3 ${pipelineLoading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
         {/* Add pipeline form */}
         <div className="flex gap-2 flex-wrap">
           <input value={newPipeline.name} onChange={e => setNewPipeline(p => ({...p, name: e.target.value}))}
-            placeholder="Pipeline name" className="flex-1 min-w-[140px] bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500" />
+            placeholder="Pipeline name" className="input-glass flex-1 min-w-[140px] text-xs" />
           <select value={newPipeline.stage} onChange={e => setNewPipeline(p => ({...p, stage: e.target.value}))}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500">
+            className="input-glass px-2 py-1.5 text-xs">
             {['build','test','deploy','scan'].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={newPipeline.status} onChange={e => setNewPipeline(p => ({...p, status: e.target.value}))}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-500">
+            className="input-glass px-2 py-1.5 text-xs">
             {['running','passed','failed','pending'].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button onClick={addPipeline} className="flex items-center gap-1 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded-lg transition-all">
+          <button onClick={addPipeline} className="btn-primary flex items-center gap-1 px-3 py-1.5 text-xs">
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
         </div>
         {pipelineStatus.length > 0 ? (
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {pipelineStatus.map((p: any) => {
-              const statusColors: Record<string,string> = { running:'text-cyan-400', passed:'text-emerald-400', failed:'text-rose-400', pending:'text-amber-400' };
-              const dotColors: Record<string,string> = { running:'bg-cyan-400 animate-pulse', passed:'bg-emerald-400', failed:'bg-rose-400', pending:'bg-amber-400' };
+              const statusColors: Record<string,string> = { running:'text-blue-500', passed:'text-green-600', failed:'text-red-500', pending:'text-amber-500' };
+              const dotColors: Record<string,string> = { running:'bg-blue-400 animate-pulse', passed:'bg-green-400', failed:'bg-red-400', pending:'bg-amber-400' };
               return (
-                <div key={p.id} className="flex items-center gap-3 bg-slate-900/50 rounded-lg px-3 py-2">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${dotColors[p.status] || 'bg-slate-500'}`} />
-                  <span className="text-xs text-slate-300 font-medium flex-1 truncate">{p.name}</span>
-                  <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">{p.stage}</span>
-                  <span className={`text-[10px] font-mono font-bold ${statusColors[p.status] || 'text-slate-400'}`}>{p.status}</span>
+                <div key={p.id} className="flex items-center gap-3 metal-surface rounded-lg px-3 py-2">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${dotColors[p.status] || 'bg-slate-400'}`} />
+                  <span className="text-xs text-slate-700 font-medium flex-1 truncate">{p.name}</span>
+                  <span className="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded">{p.stage}</span>
+                  <span className={`text-[10px] font-mono font-bold ${statusColors[p.status] || 'text-slate-500'}`}>{p.status}</span>
                   <span className="text-[9px] text-slate-600 ml-1">{new Date(p.updatedAt).toLocaleTimeString()}</span>
                 </div>
               );
@@ -351,42 +351,42 @@ export default function CICDTab() {
       </div>
 
       {/* REQ-88: Notification Config Panel */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+      <div className="glass-card p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-            <Bell className="w-4 h-4 text-violet-400" /> Slack / Webhook Notifications <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-88)</span>
+          <h3 className="panel-title text-sm flex items-center gap-2">
+            <Bell className="w-4 h-4 text-blue-500" /> Slack / Webhook Notifications <span className="text-[10px] font-mono text-slate-400 ml-1">(REQ-88)</span>
           </h3>
           <button onClick={loadNotifConfigs} disabled={notifLoading}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-700">
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 border border-slate-200">
             <RefreshCw className={`w-3 h-3 ${notifLoading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
         <div className="flex gap-2 flex-wrap">
           <input value={newNotif.label} onChange={e => setNewNotif(n => ({...n, label: e.target.value}))}
-            placeholder="Label (e.g. Slack #qa)" className="flex-1 min-w-[120px] bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-violet-500" />
+            placeholder="Label (e.g. Slack #qa)" className="input-glass flex-1 min-w-[120px] text-xs" />
           <input value={newNotif.url} onChange={e => setNewNotif(n => ({...n, url: e.target.value}))}
-            placeholder="Webhook URL https://..." className="flex-1 min-w-[180px] bg-slate-900 border border-slate-600 rounded-lg px-2.5 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500" />
+            placeholder="Webhook URL https://..." className="input-glass flex-1 min-w-[180px] text-xs font-mono" />
           <select value={newNotif.events} onChange={e => setNewNotif(n => ({...n, events: e.target.value}))}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-violet-500">
+            className="input-glass px-2 py-1.5 text-xs">
             <option value="run_complete">run_complete</option>
             <option value="run_failed">run_failed</option>
             <option value="all">all</option>
           </select>
-          <button onClick={addNotifConfig} className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs rounded-lg transition-all">
+          <button onClick={addNotifConfig} className="btn-primary flex items-center gap-1 px-3 py-1.5 text-xs">
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
         </div>
         {notifConfigs.length > 0 ? (
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {notifConfigs.map((cfg: any) => (
-              <div key={cfg.id} className="flex items-center gap-3 bg-slate-900/50 rounded-lg px-3 py-2">
+              <div key={cfg.id} className="flex items-center gap-3 metal-surface rounded-lg px-3 py-2">
                 <button onClick={() => toggleNotif(cfg.id, !cfg.enabled)} title={cfg.enabled ? 'Disable' : 'Enable'}
-                  className={`shrink-0 ${cfg.enabled ? 'text-emerald-400' : 'text-slate-600'} hover:opacity-80 transition-opacity`}>
+                  className={`shrink-0 ${cfg.enabled ? 'text-green-500' : 'text-slate-400'} hover:opacity-80 transition-opacity`}>
                   {cfg.enabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
                 </button>
-                <span className="text-xs text-slate-300 font-medium shrink-0">{cfg.label || 'Unnamed'}</span>
-                <span className="text-[10px] font-mono text-slate-500 flex-1 truncate">{cfg.url}</span>
-                <span className="text-[9px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{Array.isArray(cfg.events) ? cfg.events.join(', ') : cfg.events}</span>
+                <span className="text-xs text-slate-700 font-medium shrink-0">{cfg.label || 'Unnamed'}</span>
+                <span className="text-[10px] font-mono text-slate-400 flex-1 truncate">{cfg.url}</span>
+                <span className="text-[9px] font-mono bg-blue-50 border border-blue-200 text-blue-600 px-1.5 py-0.5 rounded">{Array.isArray(cfg.events) ? cfg.events.join(', ') : cfg.events}</span>
               </div>
             ))}
           </div>

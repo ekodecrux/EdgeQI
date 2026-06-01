@@ -6,7 +6,7 @@ import { TestCase, RequirementDoc } from '../types';
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
   draft:     { label: 'Draft',     color: 'text-slate-600',  bg: 'bg-slate-100',   border: 'border-slate-300' },
   in_review: { label: 'In Review', color: 'text-amber-700',  bg: 'bg-amber-50',    border: 'border-amber-300' },
-  approved:  { label: 'Approved',  color: 'text-emerald-700',bg: 'bg-emerald-50',  border: 'border-emerald-300' },
+  approved:  { label: 'Approved',  color: 'text-green-700', bg: 'bg-green-50',    border: 'border-green-300' },
   archived:  { label: 'Archived',  color: 'text-slate-400',  bg: 'bg-slate-50',    border: 'border-slate-200' },
 };
 
@@ -331,10 +331,10 @@ export default function RequirementsTab({
       {/* ─── DIFF MODAL (REQ-10) ──────────────────────────────────────────── */}
       {showDiffModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
+          <div className="glass-card-lg w-full max-w-2xl max-h-[80vh] overflow-auto">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <GitBranch className="w-4 h-4 text-purple-600" /> Requirement Diff Viewer
+                <GitBranch className="w-4 h-4 text-blue-500" /> Requirement Diff Viewer
               </h3>
               <button onClick={() => setShowDiffModal(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -349,7 +349,7 @@ export default function RequirementsTab({
                       <p className="text-sm text-slate-600">{diffData.message}</p>
                       <button
                         onClick={() => { handleSnapshot(showDiffModal!); setShowDiffModal(null); }}
-                        className="px-4 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700"
+                        className="btn-primary text-xs"
                       >
                         📸 Create First Snapshot
                       </button>
@@ -362,7 +362,7 @@ export default function RequirementsTab({
                           <div key={d.field} className={`grid grid-cols-3 gap-2 p-2 rounded-lg text-xs ${d.changed ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
                             <span className="font-mono font-bold text-slate-600 uppercase text-[10px]">{d.field}</span>
                             <span className={`font-mono ${d.changed ? 'text-red-600 line-through' : 'text-slate-500'}`}>{d.old}</span>
-                            <span className={`font-mono ${d.changed ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>{d.new}</span>
+                            <span className={`font-mono ${d.changed ? 'text-blue-600 font-bold' : 'text-slate-500'}`}>{d.new}</span>
                           </div>
                         ))}
                       </div>
@@ -383,7 +383,7 @@ export default function RequirementsTab({
       {/* ─── PARENT MODAL (REQ-08) ────────────────────────────────────────── */}
       {showParentModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div className="glass-card w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                 <Link className="w-4 h-4 text-blue-600" /> Link Parent Requirement
@@ -399,7 +399,7 @@ export default function RequirementsTab({
                 placeholder="Search requirements..."
                 value={parentSearch}
                 onChange={e => setParentSearch(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="input-glass w-full text-xs"
                 aria-label="Search parent requirements"
               />
               <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -413,9 +413,9 @@ export default function RequirementsTab({
                   <button
                     key={r.id}
                     onClick={() => handleSetParent(showParentModal!, r.id)}
-                    className="w-full text-left p-2 rounded-lg text-xs hover:bg-purple-50 border border-slate-100 hover:border-purple-200"
+                    className="w-full text-left p-2 rounded-lg text-xs hover:bg-blue-50 border border-slate-100 hover:border-blue-200"
                   >
-                    <span className="font-mono text-purple-700 mr-2">{r.id}</span>{r.title}
+                    <span className="font-mono text-blue-600 mr-2">{r.id}</span>{r.title}
                   </button>
                 ))}
                 {filteredParentOptions.length === 0 && <p className="text-xs text-slate-400 text-center py-2">No requirements found</p>}
@@ -429,7 +429,7 @@ export default function RequirementsTab({
       {/* ─── COMMENTS MODAL (REQ-11) ──────────────────────────────────────── */}
       {showCommentsFor && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+          <div className="glass-card w-full max-w-lg max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-blue-600" /> Annotations — {showCommentsFor}
@@ -462,7 +462,7 @@ export default function RequirementsTab({
                         onClick={() => handleResolveComment(showCommentsFor!, c.id, !c.resolved)}
                         aria-label={c.resolved ? 'Reopen comment' : 'Resolve comment'}
                         className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono border ${
-                          c.resolved ? 'border-slate-200 text-slate-400 hover:bg-slate-100' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                          c.resolved ? 'border-slate-200 text-slate-400 hover:bg-slate-100' : 'border-green-300 text-green-700 hover:bg-green-50'
                         }`}
                       >
                         <CheckSquare className="w-2.5 h-2.5" />
@@ -502,10 +502,10 @@ export default function RequirementsTab({
       {/* ─── TC VERSION MODAL (REQ-27) ────────────────────────────────────── */}
       {showTcVersions && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto">
+          <div className="glass-card w-full max-w-lg max-h-[70vh] overflow-auto">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <History className="w-4 h-4 text-purple-600" /> TC Version History — {showTcVersions}
+                <History className="w-4 h-4 text-blue-500" /> TC Version History — {showTcVersions}
               </h3>
               <button onClick={() => setShowTcVersions(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -531,11 +531,11 @@ export default function RequirementsTab({
       )}
 
       {/* 1. Requirements Input Section */}
-      <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 space-y-6 shadow-sm">
+      <div className="lg:col-span-5 glass-card p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="font-sans font-semibold text-lg text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-600" />
+              <Sparkles className="w-5 h-5 text-blue-500" />
               Requirement Parser Agent
             </h3>
             <p className="text-xs text-slate-500 mt-1">Ingest software requirements to auto-compile detailed QA test cases.</p>
@@ -575,14 +575,14 @@ export default function RequirementsTab({
                 onChange={e => { setSearchQuery(e.target.value); if (!e.target.value) { setSearchResults([]); setShowSearch(false); } }}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 aria-label="Semantic search requirements"
-                className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="input-glass w-full pl-8 pr-3 py-1.5 text-xs"
               />
             </div>
             <button
               onClick={() => { handleSearch(); setShowSearch(true); }}
               disabled={searching}
               aria-label="Run semantic search"
-              className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50"
+              className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50"
             >
               {searching ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Search'}
             </button>
@@ -596,8 +596,8 @@ export default function RequirementsTab({
               {searchResults.map((r, i) => (
                 <div key={i} className="p-1.5 bg-white rounded border border-slate-100 text-xs">
                   <div className="flex justify-between">
-                    <span className="font-mono text-purple-700 text-[10px]">{r.id || 'DOC'}</span>
-                    {r.relevanceScore && <span className="text-[9px] text-emerald-600 font-mono">score: {r.relevanceScore}</span>}
+                    <span className="font-mono text-blue-600 text-[10px]">{r.id || 'DOC'}</span>
+                    {r.relevanceScore && <span className="text-[9px] text-blue-500 font-mono">score: {r.relevanceScore}</span>}
                   </div>
                   <p className="text-slate-700 truncate">{r.title || r.filename || 'Document'}</p>
                 </div>
@@ -618,7 +618,7 @@ export default function RequirementsTab({
               aria-label={`Switch to ${mode} input mode`}
               onClick={() => { setSourceType(mode); setTitle(''); setContent(''); setUploadedFileName(''); }}
               className={`py-2 rounded-lg text-[10px] font-mono font-medium capitalize transition-all ${
-                sourceType === mode ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-800'
+                sourceType === mode ? 'btn-primary' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               {mode}
@@ -635,7 +635,7 @@ export default function RequirementsTab({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               aria-label="Requirement title"
-              className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans"
+              className="input-glass w-full text-xs font-sans"
             />
           </div>
 
@@ -648,7 +648,7 @@ export default function RequirementsTab({
                 onChange={(e) => setContent(e.target.value)}
                 rows={6}
                 aria-label="Requirement description text"
-                className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 font-sans leading-relaxed"
+                className="input-glass w-full text-xs font-sans leading-relaxed"
               />
             </div>
           )}
@@ -666,15 +666,15 @@ export default function RequirementsTab({
               <p className="text-xs text-slate-700 font-semibold">Drag & drop requirement file here</p>
               <p className="text-[10px] text-slate-500 mt-1">Accepts PDF, Word, TXT, Excel or Markdown</p>
               {uploadedFileName && (
-                <div className="mt-4 p-2 bg-purple-50 border border-purple-200 rounded text-xs text-purple-700 font-mono">Loaded: {uploadedFileName}</div>
+                <div className="mt-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-mono">Loaded: {uploadedFileName}</div>
               )}
             </div>
           )}
 
           {sourceType === 'url' && (
             <div className="space-y-4 text-left font-sans animate-fade-in">
-              <div className="bg-purple-50/60 p-3.5 rounded-xl border border-purple-150 text-[11px] text-purple-950 leading-relaxed space-y-1.5">
-                <span className="font-bold font-mono flex items-center gap-1 text-purple-705"><Globe className="w-4 h-4 text-purple-600 animate-pulse" /> Active UI Discovery Crawler</span>
+              <div className="bg-blue-50/60 p-3.5 rounded-xl border border-blue-200 text-[11px] text-blue-900 leading-relaxed space-y-1.5">
+                <span className="font-bold font-mono flex items-center gap-1 text-blue-700"><Globe className="w-4 h-4 text-blue-500 animate-pulse" /> Active UI Discovery Crawler</span>
                 <p className="leading-normal text-slate-600">No requirement documents? Enter target URL to browse & map active web views directly!</p>
               </div>
               <div>
@@ -685,27 +685,27 @@ export default function RequirementsTab({
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   aria-label="Target URL for crawling"
-                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="input-glass w-full text-xs"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">Crawl Auth Username</label>
-                  <input type="text" placeholder="sap_tester" value={username} onChange={(e) => setUsername(e.target.value)} aria-label="Crawl username" className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
+                  <input type="text" placeholder="sap_tester" value={username} onChange={(e) => setUsername(e.target.value)} aria-label="Crawl username" className="input-glass w-full text-xs font-mono" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-0.5 font-semibold">Crawl Auth Password</label>
-                  <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Crawl password" className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
+                  <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Crawl password" className="input-glass w-full text-xs font-mono" />
                 </div>
               </div>
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <span className="block text-[10px] font-mono uppercase tracking-wider text-slate-405 font-bold">COTS / ERP Adapters</span>
-                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-650">
-                  <input type="checkbox" checked={sapGuiWeb} onChange={(e) => setSapGuiWeb(e.target.checked)} aria-label="Enable SAP Web GUI adapter" className="rounded border-slate-300 text-purple-650" />
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600">
+                  <input type="checkbox" checked={sapGuiWeb} onChange={(e) => setSapGuiWeb(e.target.checked)} aria-label="Enable SAP Web GUI adapter" className="rounded border-slate-300 accent-blue-600" />
                   SAP Web GUI dynamic adapters
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-650">
-                  <input type="checkbox" checked={salesforceShadow} onChange={(e) => setSalesforceShadow(e.target.checked)} aria-label="Enable Salesforce Shadow DOM resolver" className="rounded border-slate-300 text-purple-650" />
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600">
+                  <input type="checkbox" checked={salesforceShadow} onChange={(e) => setSalesforceShadow(e.target.checked)} aria-label="Enable Salesforce Shadow DOM resolver" className="rounded border-slate-300 accent-blue-600" />
                   Salesforce LWC/ServiceNow Shadow DOM resolver
                 </label>
               </div>
@@ -714,8 +714,8 @@ export default function RequirementsTab({
 
           {sourceType === 'voice' && (
             <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-center space-y-3">
-              <div className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center transition-all ${isListening ? 'bg-red-500 animate-pulse' : 'bg-purple-100'}`}>
-                <Volume2 className={`w-6 h-6 ${isListening ? 'text-white' : 'text-purple-600'}`} aria-hidden="true" />
+              <div className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center transition-all ${isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-100'}`}>
+                <Volume2 className={`w-6 h-6 ${isListening ? 'text-white' : 'text-blue-600'}`} aria-hidden="true" />
               </div>
               <p className="text-xs text-slate-700 font-semibold" aria-live="polite">
                 {isListening ? '🔴 Listening… speak your requirement' : 'Click to start voice input'}
@@ -723,7 +723,7 @@ export default function RequirementsTab({
               <div className="flex gap-2 justify-center">
                 {!isListening ? (
                   <button type="button" onClick={startVoiceInput} aria-label="Start voice recording"
-                    className="px-4 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 flex items-center gap-2">
+                    className="btn-primary text-xs flex items-center gap-2">
                     <Volume2 className="w-3.5 h-3.5" /> Start Recording
                   </button>
                 ) : (
@@ -757,7 +757,7 @@ export default function RequirementsTab({
             disabled={isGenerating}
             aria-label="Analyze requirements and generate test cases"
             className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-mono font-bold transition-all ${
-              isGenerating ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-sm'
+              isGenerating ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'btn-primary'
             }`}
           >
             {isGenerating ? (<><RefreshCcw className="w-4 h-4 animate-spin" />Agents parsing requirements...</>) : (<>Analyze & Compile Cases<ArrowRight className="w-4 h-4" /></>)}
@@ -780,7 +780,7 @@ export default function RequirementsTab({
               return (
                 <div key={req.id} className="bg-slate-50 border border-slate-205 rounded-xl p-3 space-y-2 text-xs">
                   <div className="flex items-start gap-2">
-                    <FileText className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                    <FileText className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start gap-1">
                         <span className="font-bold text-slate-800 truncate">{req.title}</span>
@@ -809,7 +809,7 @@ export default function RequirementsTab({
                       {statusInfo.label}
                     </span>
                     {statusMsg[req.id] && (
-                      <span className="text-[9px] text-emerald-600 font-mono">{statusMsg[req.id]}</span>
+                      <span className="text-[9px] text-blue-600 font-mono">{statusMsg[req.id]}</span>
                     )}
                     {allowedNext.map(next => (
                       <button
@@ -871,14 +871,14 @@ export default function RequirementsTab({
       </div>
 
       {/* 2. Structured Test Cases Output */}
-      <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-sm">
+      <div className="lg:col-span-7 glass-card p-6 flex flex-col justify-between">
         <div>
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="font-sans font-semibold text-lg text-slate-900">Generated Test Suite</h3>
               <p className="text-xs text-slate-500 mt-1">Exhaustive testing coverage compiled via deep AI modeling</p>
             </div>
-            <span className="text-xs text-purple-700 font-mono bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+            <span className="badge badge-blue text-xs font-mono px-3 py-1">
               {testCases.length} Compiled Cases
             </span>
           </div>
@@ -894,13 +894,13 @@ export default function RequirementsTab({
                   onClick={() => setSelectedTestCase(isSelected ? null : tc)}
                   aria-expanded={isSelected}
                   className={`border rounded-xl p-3 select-none cursor-pointer transition-all ${
-                    isSelected ? 'bg-purple-50/50 border-purple-400' : 'bg-slate-50 border-slate-150 hover:border-slate-350 hover:bg-slate-100/60'
+                    isSelected ? 'bg-blue-50/40 border-blue-400' : 'bg-slate-50 border-slate-150 hover:border-blue-200 hover:bg-blue-50/20'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold text-purple-700">{tc.id}</span>
+                        <span className="text-[10px] font-mono font-bold text-blue-600">{tc.id}</span>
                         <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
                           tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border border-rose-200/50' :
                           tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border border-amber-200/50' : 'bg-slate-100 border border-slate-205 text-slate-600'
@@ -920,14 +920,14 @@ export default function RequirementsTab({
                         onClick={(e) => { e.stopPropagation(); handleLoadTcVersions(tc.id); }}
                         aria-label={`View version history for test case ${tc.id}`}
                         title="TC version history"
-                        className="text-[9px] font-mono text-slate-500 hover:text-purple-700 bg-white hover:bg-purple-50 p-1 rounded border border-slate-200 transition-all"
+                        className="text-[9px] font-mono text-slate-500 hover:text-blue-600 bg-white hover:bg-blue-50 p-1 rounded border border-slate-200 transition-all"
                       >
                         <History className="w-3 h-3" aria-hidden="true" />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); onGenerateTestCaseCode(tc.id); }}
                         aria-label={`Generate script for test case ${tc.id}`}
-                        className="text-[10px] font-mono text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-600 px-2.5 py-1 rounded-lg border border-purple-200 transition-all flex items-center gap-1 shadow-xs"
+                        className="text-[10px] font-mono text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-600 px-2.5 py-1 rounded-lg border border-blue-200 transition-all flex items-center gap-1 shadow-xs"
                       >
                         <Plus className="w-3 h-3" aria-hidden="true" /> Script
                       </button>
@@ -951,7 +951,7 @@ export default function RequirementsTab({
                           {tc.steps.map((st, i) => (
                             <li key={i} className="text-[11px] text-slate-700">
                               <span className="font-semibold text-slate-800">{st.action}</span>
-                              <p className="text-[10px] text-emerald-600 ml-4 font-mono">→ Expect: {st.expectedResult}</p>
+                              <p className="text-[10px] text-blue-500 ml-4 font-mono">→ Expect: {st.expectedResult}</p>
                             </li>
                           ))}
                         </ol>
@@ -963,7 +963,7 @@ export default function RequirementsTab({
                         </div>
                         <div>
                           <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono">Coverage Confidence</span>
-                          <span className="text-[11px] font-mono text-emerald-600 font-bold">{tc.confidenceScore}%</span>
+                          <span className="text-[11px] font-mono text-blue-600 font-bold">{tc.confidenceScore}%</span>
                         </div>
                       </div>
                     </div>

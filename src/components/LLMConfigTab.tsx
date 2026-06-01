@@ -158,9 +158,9 @@ export default function LLMConfigTab() {
   const statusIcon = (p: Provider) => {
     const result = testResult[p.id];
     if (result) return result.success
-      ? <CheckCircle className="w-4 h-4 text-emerald-400" />
+      ? <CheckCircle className="w-4 h-4 text-green-500" />
       : <XCircle className="w-4 h-4 text-red-400" />;
-    if (p.status === 'active') return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+    if (p.status === 'active') return <CheckCircle className="w-4 h-4 text-green-500" />;
     if (p.status === 'unconfigured') return <AlertCircle className="w-4 h-4 text-amber-400" />;
     return <XCircle className="w-4 h-4 text-red-400" />;
   };
@@ -188,7 +188,7 @@ export default function LLMConfigTab() {
       {/* Providers Grid */}
       <div className="grid grid-cols-1 gap-4">
         {providers.map(p => (
-          <div key={p.id} className={`bg-slate-800/50 border rounded-xl p-4 ${p.status === 'active' ? 'border-emerald-500/30' : 'border-slate-700/50'}`}>
+          <div key={p.id} className={`bg-slate-800/50 border rounded-xl p-4 ${p.status === 'active' ? 'border-green-300' : 'border-slate-700/50'}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 {statusIcon(p)}
@@ -199,7 +199,7 @@ export default function LLMConfigTab() {
                       <span className="bg-indigo-500/20 text-indigo-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/30">PRIMARY</span>
                     )}
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                      p.status === 'active' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                      p.status === 'active' ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
                     }`}>{statusLabel(p)}</span>
                   </div>
                   <p className="text-slate-400 text-xs mt-0.5 font-mono">{p.model}</p>
@@ -278,9 +278,9 @@ export default function LLMConfigTab() {
       {/* Ollama Direct Integration (REQ-96) */}
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Server className="w-4 h-4 text-emerald-400" />
+          <Server className="w-4 h-4 text-green-500" />
           <h3 className="text-white font-semibold text-sm">Ollama Local LLM (REQ-96)</h3>
-          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">Direct API</span>
+          <span className="text-[10px] bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-mono">Direct API</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
@@ -317,7 +317,7 @@ export default function LLMConfigTab() {
           <button
             onClick={testOllama}
             disabled={ollamaTesting || !ollamaUrl}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-lg transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 border border-green-300 text-emerald-400 text-xs font-medium rounded-lg transition-all disabled:opacity-50"
           >
             {ollamaTesting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
             Test Connection
@@ -481,7 +481,7 @@ export default function LLMConfigTab() {
                   </button>
                   <button onClick={() => toggleProvider(entry.provider)} disabled={chainSaving} title={entry.enabled ? 'Disable provider' : 'Enable provider'} className="p-1 rounded hover:bg-white/10 transition-all">
                     {entry.enabled
-                      ? <ToggleRight className="w-4 h-4 text-emerald-400" />
+                      ? <ToggleRight className="w-4 h-4 text-green-500" />
                       : <ToggleLeft className="w-4 h-4 text-slate-500" />}
                   </button>
                 </div>
@@ -689,15 +689,15 @@ function CompliancePanel() {
 
   const sectionTab = (id: 'audit'|'retention'|'perf', label: string, badge?: string) => (
     <button onClick={() => setActiveSection(id)}
-      className={`px-3 py-1.5 text-[10px] font-mono font-bold rounded-lg border transition-all ${activeSection === id ? 'bg-slate-900 text-white border-slate-700' : 'bg-slate-800/40 text-slate-400 border-slate-700 hover:bg-slate-800'}`}>
-      {label}{badge && <span className="ml-1 bg-slate-600 text-white text-[8px] px-1 rounded-full">{badge}</span>}
+      className={`px-3 py-1.5 text-[10px] font-mono font-bold rounded-lg border transition-all ${activeSection === id ? 'btn-primary' : 'bg-white text-slate-500 border-slate-200 hover:bg-blue-50 hover:text-blue-600'}`}>
+      {label}{badge && <span className="ml-1 bg-blue-600 text-white text-[8px] px-1 rounded-full">{badge}</span>}
     </button>
   );
 
   return (
     <div className="bg-slate-950 border border-slate-700 rounded-2xl p-5 shadow-lg mt-4">
       <div className="flex items-center gap-2 mb-4">
-        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <ShieldCheck className="w-4 h-4 text-green-500" />
         <span className="text-sm font-bold text-white">Compliance &amp; Governance</span>
         <div className="flex gap-1.5 ml-2 flex-wrap">
           <span className="text-[9px] bg-emerald-900/60 text-emerald-400 px-1.5 py-0.5 rounded font-mono border border-emerald-800">REQ-103</span>
