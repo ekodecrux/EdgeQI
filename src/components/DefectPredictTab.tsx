@@ -231,7 +231,7 @@ export default function DefectPredictTab({
                   AI Defect Hotspot Heatmap
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Visualize module risk scores compiled from historical defect patterns and time-based developer trends.
+                  Risk scores from historical defect patterns.
                 </p>
               </div>
               {/* REQ-65: Export buttons */}

@@ -77,7 +77,7 @@ export default function PerformanceTab({
             Load Generator Parameters
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            Design virtual user journeys and simulate intensive stress loops to identify bottleneck parameters.
+            Configure virtual users, duration and target endpoint.
           </p>
         </div>
 

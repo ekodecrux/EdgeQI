@@ -478,62 +478,16 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
     <div className="space-y-6">
       
       {/* Intro Header */}
-      <div className="rounded-3xl p-6 text-white shadow-md relative overflow-hidden" style={{background:'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
-          <Cpu className="w-96 h-96" />
-        </div>
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-blue-200 mb-3 font-mono font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-purple-300" />
-            Autonomous Script Transpiler & Enterprise Bridge Pro
+      {/* Page Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <RefreshCw style={{width:20,height:20,color:'#ffffff'}} />
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
-            Universal Automation Script Converter
-          </h2>
-          <p className="text-purple-100 text-xs sm:text-sm mt-2 leading-relaxed">
-            Instantly convert legacy, weak, or brittle automation protocols (Selenium, Robot, Tosca XML, UFT) into ultra-modern self-healing scripts. Pierce Salesforce Shadows, coordinate ServiceNow nested contexts, or activate SAP Enterprise Bridges seamlessly.
-          </p>
-        </div>
-      </div>
-
-      {/* Preset Selections Grid */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold block mb-3 flex items-center gap-1">
-          <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-          Load Quick Pre-Coded Enterprise Test Scenarios
-        </span>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {SCRIPT_TEMPLATES.map((tmpl, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleLoadTemplate(idx)}
-              className="group bg-white hover:bg-indigo-50/50 border border-slate-200 hover:border-indigo-300 rounded-xl p-3 text-left transition-all shadow-xs flex flex-col justify-between"
-            >
-              <div>
-                <span className="text-[11px] font-sans font-bold text-slate-900 group-hover:text-indigo-950 line-clamp-1">
-                  {tmpl.name}
-                </span>
-                <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">
-                  Transpiles elements to modern {tmpl.targetFramework}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-[9px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                  {tmpl.sourceFramework} ➔ {tmpl.targetFramework}
-                </span>
-                {tmpl.cotsAddons.sapGuiWeb && (
-                  <span className="text-[9px] font-mono bg-purple-50 text-purple-600 border border-purple-100 px-1.5 py-0.5 rounded font-semibold">
-                    SAP GUI
-                  </span>
-                )}
-                {tmpl.cotsAddons.salesforceShadow && (
-                  <span className="text-[9px] font-mono bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded font-semibold">
-                    Salesforce (Shadow)
-                  </span>
-                )}
-              </div>
-            </button>
-          ))}
+          <div>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Script Converter</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Convert and migrate test scripts across frameworks</p>
+          </div>
         </div>
       </div>
 
@@ -789,7 +743,7 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
                   {isProcessing ? (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-10 rounded-xl border border-indigo-100">
                       <RefreshCw className="w-10 h-10 text-indigo-650 animate-spin mb-4" />
-                      <h4 className="font-sans font-bold text-slate-900 text-sm">Translating Element Locators</h4>
+                      <h4 className="font-sans font-bold text-slate-900 text-sm">Converting Locators</h4>
                       <p className="text-xs text-slate-550 mt-1 max-w-xs leading-normal">
                         Wait, applying structural POM variables, parsing dynamic targets and integrating checked SAP web client adapters.
                       </p>

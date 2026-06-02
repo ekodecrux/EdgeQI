@@ -112,21 +112,16 @@ export default function AnalyticsTab() {
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="rounded-3xl p-6 text-white shadow-sm relative overflow-hidden" style={{background:'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
-          <BarChart3 className="w-96 h-96" />
-        </div>
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-violet-200 mb-3 font-mono font-bold">
-            <BarChart3 className="w-3.5 h-3.5 text-violet-300 animate-pulse" />
-            AI Analytics — REQ-99/100
+      {/* Page Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <BarChart3 style={{width:20,height:20,color:'#ffffff'}} />
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>AI Cost & Latency Analytics</h2>
-          <p className="text-slate-200 text-xs sm:text-sm mt-1 leading-relaxed">
-            Monitor AI provider usage, token consumption, estimated cost, and latency trends aggregated
-            from the audit log. Track spending by day and provider to optimize your LLM configuration.
-          </p>
+          <div>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>AI Analytics</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Token usage, cost and latency trends</p>
+          </div>
         </div>
       </div>
 

@@ -296,49 +296,42 @@ export default function DashboardMetrics({
 
   return (
     <div className="space-y-6 animate-fadeInUp">
-      {/* Persona Selector Banner */}
-      <div className="glass-card p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div>
-          <h3 className="panel-title flex items-center gap-2">
-            <Users className="w-4 h-4 text-blue-500" />
-            Unified Results Dashboard
-          </h3>
-          <p className="text-[11px] text-slate-500">Toggle metrics optimized for your stakeholder persona</p>
+      {/* Page Header + Persona Selector */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <TrendingUp style={{width:20,height:20,color:'#ffffff'}} />
+          </div>
+          <div>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>QE Dashboard</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Quality metrics and coverage overview</p>
+          </div>
         </div>
-
-        <div className="flex gap-1.5 metal-surface p-1.5 rounded-xl">
+        <div style={{display:'flex',gap:4,background:'#f2f4f8',padding:4,borderRadius:8,border:'1px solid #dbe2ea'}}>
           {(['tactical','operational','strategic'] as const).map(p => (
-            <button key={p} onClick={() => setPersona(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all ${
-                persona === p ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
-              }`}>
-              {p === 'tactical' ? 'Tactical (QA Lead)' : p === 'operational' ? 'Operational (Engineer)' : 'Strategic (Director)'}
+            <button key={p} onClick={() => setPersona(p)} style={{
+              padding:'6px 14px', borderRadius:6, fontSize:12,
+              fontFamily:'"Lato",Arial,sans-serif', fontWeight:600,
+              border:'none', cursor:'pointer',
+              background: persona === p ? '#1e96df' : 'transparent',
+              color: persona === p ? '#ffffff' : '#6b82ab',
+              transition:'all 0.15s'
+            }}>
+              {p === 'tactical' ? 'QA Lead' : p === 'operational' ? 'Engineer' : 'Director'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Connected Agentic AI Ingress Banner */}
-      <div className="rounded-2xl p-5 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden" style={{background:'linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1e40af 100%)',border:'1px solid rgba(59,130,246,0.2)'}}>
-        <div className="absolute right-0 top-0 opacity-[0.06] pointer-events-none">
-          <Cpu className="w-48 h-48" />
+      {/* Quick action strip */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 16px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Zap style={{width:16,height:16,color:'#1e96df'}} />
+          <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:14,fontWeight:600,color:'#1f3965'}}>Run full AI QA cycle</span>
+          <span style={{fontSize:12,color:'#6b82ab'}}>— requirements → tests → execution → report</span>
         </div>
-        <div className="space-y-1.5 relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-            <Zap className="w-3 h-3 text-blue-400 animate-pulse" />
-            Connected AI Cycle Standby
-          </div>
-          <h4 className="text-sm sm:text-base font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
-            Execute Multi-Module Connected Agentic AI QA Process
-          </h4>
-          <p className="text-xs text-blue-200 leading-relaxed">
-            Stitch code generation, diagnostic defect sweeps, live clustered selenium browser regressions, 
-            and real-time self-healing telemetry directly.
-          </p>
-        </div>
-        <button onClick={onNavigateToAgentic}
-          className="relative z-10 bg-white hover:bg-blue-50 text-blue-900 px-4 py-2 rounded-xl text-xs font-mono font-extrabold uppercase shrink-0 transition-all hover:scale-[1.02] shadow-md cursor-pointer flex items-center gap-1">
-          Kickstart Engine <ArrowRight className="w-4 h-4" />
+        <button onClick={onNavigateToAgentic} style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+          Run Now <ArrowRight style={{width:14,height:14}} />
         </button>
       </div>
 
@@ -353,7 +346,7 @@ export default function DashboardMetrics({
               <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-tight">
                 Top Defect Hotspot Modules
               </h4>
-              <p className="text-[11px] text-slate-500">Top 3 modules with highest active and historical failure profiles.</p>
+              <p className="text-[11px] text-slate-500">Highest failure rates by module</p>
             </div>
           </div>
           <span className="badge badge-red">Escalation Level 1</span>

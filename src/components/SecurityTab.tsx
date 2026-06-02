@@ -128,7 +128,7 @@ export default function SecurityTab({
               <Search className="w-4 h-4 text-blue-500" />
               New Security Scan
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Run AI-powered SAST / DAST / SCA / Container scans against a live URL or code snippet.</p>
+            <p className="text-xs text-slate-500 mt-0.5">Run SAST / DAST / SCA scans against a URL or code.</p>
           </div>
           {lastScanCount !== null && (
             <span className="badge badge-green whitespace-nowrap">

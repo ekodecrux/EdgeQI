@@ -420,22 +420,16 @@ export default function TestCaseGeneratorPage({
         </div>
       )}
 
-      {/* Intro Header */}
-      <div className="rounded-3xl p-6 text-white shadow-xs relative overflow-hidden" style={{background:'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
-          <TableProperties className="w-96 h-96" />
-        </div>
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-blue-200 mb-3 font-mono font-bold">
-            <Cpu className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
-            Active Workspace Scope: {getProjectBadgeStr()}
+      {/* Page Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <TableProperties style={{width:20,height:20,color:'#ffffff'}} />
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
-            QA Test Case Matrix Generator
-          </h2>
-          <p className="text-blue-100 text-xs sm:text-sm mt-1 leading-relaxed">
-            Construct, synchronize, and execute structured test matrices based on functional parameters. Edit priorities on-the-fly, declare explicit UI assertions, and run quick-checks to evaluate automated healing thresholds.
-          </p>
+          <div>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Test Cases</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Generate, review and manage your test suite · <span style={{color:'#1e96df',fontWeight:600}}>{getProjectBadgeStr()}</span></p>
+          </div>
         </div>
       </div>
 
@@ -931,8 +925,6 @@ export default function TestCaseGeneratorPage({
           </div>
         </div>
 
-      </div>
-
       {/* Edit Scenario Modal Overlay */}
       {editingTestCase && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setEditingTestCase(null)}>
@@ -1136,6 +1128,7 @@ export default function TestCaseGeneratorPage({
         </div>
       )}
 
+    </div>
     </div>
   );
 }

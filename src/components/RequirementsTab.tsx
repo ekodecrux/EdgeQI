@@ -327,6 +327,19 @@ export default function RequirementsTab({
   ).slice(0, 10);
 
   return (
+    <div className="space-y-6">
+    {/* Page Header */}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #dbe2ea'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <FileText style={{width:20,height:20,color:'#ffffff'}} />
+        </div>
+        <div>
+          <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Requirements</h1>
+          <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Parse and track requirements · auto-generate test cases</p>
+        </div>
+      </div>
+    </div>
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* ─── DIFF MODAL (REQ-10) ──────────────────────────────────────────── */}
       {showDiffModal && (
@@ -534,11 +547,8 @@ export default function RequirementsTab({
       <div className="lg:col-span-5 glass-card p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="font-sans font-semibold text-lg text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-500" />
-              Requirement Parser Agent
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">Ingest software requirements to auto-compile detailed QA test cases.</p>
+            <h3 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:15,fontWeight:700,color:'#1f3965',display:'flex',alignItems:'center',gap:8,margin:0}}><Sparkles style={{width:16,height:16,color:'#1e96df'}} />Add Requirement</h3>
+            <p className="text-xs text-slate-500 mt-1">Add requirements to auto-generate test cases.</p>
           </div>
           {/* REQ-15: Export buttons */}
           <div className="flex gap-1">
@@ -974,13 +984,8 @@ export default function RequirementsTab({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mt-4 bg-slate-50 p-2.5 rounded-xl border border-slate-205 text-[11px]">
-          <HelpCircle className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span className="text-slate-500">
-            Expand any suite card to evaluate preconditions, steps, and launch script builders. Use status buttons to advance requirements through the Draft→Review→Approved workflow.
-          </span>
-        </div>
       </div>
+    </div>
     </div>
   );
 }

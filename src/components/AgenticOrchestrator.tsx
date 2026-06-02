@@ -356,22 +356,16 @@ export default function AgenticOrchestrator({
     <div className="space-y-6">
       
       {/* Intro Header */}
-      <div className="rounded-3xl p-6 text-white shadow-md relative overflow-hidden" style={{background:'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
-          <Zap className="w-96 h-96 animate-pulse" />
-        </div>
-        <div className="max-w-3xl space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-blue-200 font-mono font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-blue-300" />
-            End-To-End Cross-Module Connected AI
+      {/* Page Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <Zap style={{width:20,height:20,color:'#ffffff'}} />
           </div>
-          <h2 className="text-xl sm:text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
-            Agentic AI QA Engine & Process Orchestrator
-          </h2>
-          <p className="text-xs sm:text-sm mt-1 leading-relaxed" style={{color:'#bfdbfe'}}>
-            Eliminate isolated validation silos. The Connected Agentic Engine bridges requirements extraction, 
-            test script synthesis, defect matrix-weighted regression sweeps, and browser execution grids into a unified, scheduled quality lifecycle automation flow.
-          </p>
+          <div>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Agentic AI Engine</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>One-click end-to-end QA automation</p>
+          </div>
         </div>
       </div>
 
@@ -381,10 +375,7 @@ export default function AgenticOrchestrator({
         {/* Step Progression Timeline */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="font-sans font-extrabold text-sm text-slate-950 uppercase tracking-tight flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-purple-600" />
-              Connected Pipeline Flow
-            </h3>
+            <h3 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965',display:'flex',alignItems:'center',gap:8,margin:0}}><Cpu style={{width:16,height:16,color:'#1e96df'}} />Pipeline</h3>
 
             <div className="space-y-4 relative pl-3 border-l border-slate-100 mt-2">
               {stepsList.map(step => {
@@ -428,15 +419,15 @@ export default function AgenticOrchestrator({
               <button
                 onClick={runAgenticEngine}
                 disabled={orchestratorState === 'running'}
-                className={`w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold uppercase flex items-center justify-center gap-2 transition-all shadow-md ${
-                  orchestratorState === 'running'
-                    ? 'bg-purple-50 text-purple-500 border border-purple-100 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-purple-700 to-indigo-700 text-white hover:from-purple-600 hover:to-indigo-600 shadow-purple-900/10 hover:translate-y-[-1px]'
-                }`}
+                className="w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold uppercase flex items-center justify-center gap-2 transition-all shadow-md"
+                style={orchestratorState === 'running'
+                  ? {background:'#f2f4f8', color:'#6b82ab', border:'1px solid #dbe2ea', cursor:'not-allowed'}
+                  : {background:'#1e96df', color:'#ffffff', border:'none', cursor:'pointer'}
+                }
               >
                 {orchestratorState === 'running' ? (
                   <>
-                    <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping" />
+                    <span className="w-2 h-2 rounded-full animate-ping" style={{background:'#1e96df'}} />
                     Running Connected Cycle ({progress}%)
                   </>
                 ) : (
@@ -447,9 +438,7 @@ export default function AgenticOrchestrator({
                 )}
               </button>
 
-              <p className="text-[9px] text-slate-400 font-mono text-center leading-normal">
-                Executing triggers automatic cascade from requirements down to cloud browser deployment.
-              </p>
+              
             </div>
           </div>
 
@@ -498,7 +487,7 @@ export default function AgenticOrchestrator({
             {/* Terminal Header */}
             <div className="bg-slate-900/60 px-4 py-3 border-b border-slate-900 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-slate-300 font-mono">
-                <Terminal className="w-4 h-4 text-purple-400" />
+                <Terminal className="w-4 h-4" style={{color:'#5bb8f5'}} />
                 <span>agentic_engine_stdout.log</span>
               </div>
               <div className="flex gap-2 items-center">
@@ -525,8 +514,8 @@ export default function AgenticOrchestrator({
                 )}
                 {orchestratorState === 'running' && (
                   <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-0.5 rounded border border-purple-900">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
-                    <span className="text-[10px] font-mono text-purple-400 uppercase font-bold text-[9px] tracking-wide">Processing Hand-offs</span>
+                    <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{background:'#1e96df'}} />
+                    <span style={{fontSize:10,fontFamily:'monospace',color:'#5bb8f5',textTransform:'uppercase',letterSpacing:'0.08em'}}>Running…</span>
                   </div>
                 )}
               </div>
@@ -537,10 +526,8 @@ export default function AgenticOrchestrator({
               {logs.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center text-slate-600 text-xs py-16 space-y-2">
                   <Cpu className="w-10 h-10 text-slate-800 animate-pulse" />
-                  <p className="font-mono font-bold">Connected AI Agent Pipeline is Standby.</p>
-                  <p className="text-[10px] font-sans text-slate-500 max-w-sm">
-                    Press "Kickstart Agentic AI Engine" button to run the complete loop automatically across all modules.
-                  </p>
+                  <p className="font-mono font-bold" style={{color:'#6b82ab'}}>Pipeline ready.</p>
+                  <p style={{fontSize:11,color:'#a6b4cd',marginTop:4}}>Click Run to start the full QA cycle.</p>
                 </div>
               ) : (
                 <div className="space-y-1">

@@ -910,22 +910,16 @@ export default function ExecutionEnginePage({
         </div>
       )}
 
-      {/* Intro Header */}
-      <div className="rounded-3xl p-6 text-white shadow-xs relative overflow-hidden" style={{background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
-          <Terminal className="w-96 h-96" />
-        </div>
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-blue-200 mb-3 font-mono font-bold">
-            <Cpu className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
-            Core Cluster Node: Live E2E Executor Grid
+      {/* Page Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <Cpu style={{width:20,height:20,color:'#ffffff'}} />
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
-            Execution Engine Command Console
-          </h2>
-          <p className="text-xs sm:text-sm mt-1 leading-relaxed" style={{color:'#bfdbfe'}}>
-            Orchestrate and monitor deep automated test runs in real-time. Command clean headless virtual browser sandbox clusters, inspect compiled wrappers, and resolve selector exceptions dynamically with self-healing feedback.
-          </p>
+          <div>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Execution Engine</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Run, monitor and heal test suites in real time</p>
+          </div>
         </div>
       </div>
 

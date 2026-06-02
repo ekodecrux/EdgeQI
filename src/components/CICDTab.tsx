@@ -145,7 +145,7 @@ export default function CICDTab() {
         </div>
         <div>
           <h2 className="panel-title">CI/CD Integration</h2>
-          <p className="text-slate-500 text-xs">Webhook receiver, config generators, pipeline triggers (REQ-38/39/62)</p>
+          <p className="text-slate-500 text-xs">Webhooks, quality gates and pipeline triggers</p>
         </div>
       </div>
 
