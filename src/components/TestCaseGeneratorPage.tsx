@@ -421,7 +421,7 @@ export default function TestCaseGeneratorPage({
       )}
 
       {/* Intro Header */}
-      <div className="rounded-3xl p-6 text-white shadow-xs relative overflow-hidden">
+      <div className="rounded-3xl p-6 text-white shadow-xs relative overflow-hidden" style={{background:'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
           <TableProperties className="w-96 h-96" />
         </div>

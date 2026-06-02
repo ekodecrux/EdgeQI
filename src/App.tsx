@@ -60,6 +60,7 @@ import TestCaseGeneratorPage from './components/TestCaseGeneratorPage';
 import ExecutionEnginePage from './components/ExecutionEnginePage';
 import AgenticOrchestrator from './components/AgenticOrchestrator';
 import AuthModal from './components/AuthModal';
+import LandingPage from './components/LandingPage';
 import LLMConfigTab from './components/LLMConfigTab';
 import CICDTab from './components/CICDTab';
 import FeedbackTemplatesTab from './components/FeedbackTemplatesTab';
@@ -446,9 +447,17 @@ export default function App() {
   });
   const [authToken, setAuthToken] = useState<string>(() => localStorage.getItem('iq_token') || '');
 
+  // Landing page state — show landing if not already authenticated
+  const [showLanding, setShowLanding] = useState<boolean>(() => {
+    try { return !localStorage.getItem('iq_token'); } catch { return true; }
+  });
+  // When user clicks any CTA on landing, dismiss landing and show auth modal
+  const handleLandingCTA = () => setShowLanding(false);
+
   const handleLogin = (user: any, token: string) => {
     setAuthUser(user);
     setAuthToken(token);
+    setShowLanding(false);
   };
 
   const handleLogout = () => {
@@ -946,6 +955,11 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
     console.log("Applied Manual override intercept on Node:", stepId);
   };
 
+  // Show landing page before auth if user hasn't logged in yet
+  if (showLanding && !authUser) {
+    return <LandingPage onGetStarted={handleLandingCTA} />;
+  }
+
   return (
     <div className="min-h-screen text-slate-800 font-sans flex">
       {/* Auth Gate — show login if not authenticated */}
@@ -1055,19 +1069,19 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
       <div className="main-content flex flex-col min-h-screen" style={{ width: 'calc(100% - 240px)' }}>
 
         {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 py-3 flex items-center justify-between shadow-sm">
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-sm font-extrabold tracking-tight text-slate-900" style={{letterSpacing:"0.06em"}}>
+              <h1 className="text-sm font-extrabold tracking-tight text-gray-900" style={{letterSpacing:"0.06em"}}>
                 EDGE <span className="text-blue-600">QI</span>
               </h1>
-              <p className="text-[10px] text-slate-400 font-mono">Edge Quality Intelligence Platform</p>
+              <p className="text-[10px] text-gray-500 font-mono">Edge Quality Intelligence Platform</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 border-r border-slate-200 pr-4">
-              <span className="text-[10px] text-slate-400 font-mono uppercase">Context:</span>
+            <div className="hidden md:flex items-center gap-2 border-r border-gray-200 pr-4">
+              <span className="text-[10px] text-gray-500 font-mono uppercase">Context:</span>
               <span className="text-[11px] font-bold text-blue-600 font-mono">Segregated Sandbox</span>
             </div>
 
