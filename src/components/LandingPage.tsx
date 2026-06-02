@@ -1,53 +1,120 @@
 import {
   Zap, ShieldCheck, GitBranch, BarChart3, Cpu, FileText,
-  Play, ChevronRight, ArrowRight, CheckCircle2, Layers,
-  Sparkles, FlaskConical, Bug, Timer, Lock, TrendingUp,
-  Bot, RefreshCw, TableProperties, Activity
+  ChevronRight, CheckCircle2, Sparkles, FlaskConical,
+  Bug, Timer, Lock, Bot, TableProperties, Activity,
+  ArrowRight, Play, Star
 } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
-/* ── tiny reusable components ──────────────────────────────────────────── */
-function NavCTA({ onGetStarted }: { onGetStarted: () => void }) {
+/* ── Teachmint Design Tokens ──────────────────────────────────────────────
+   --tm-bl-1: #1f3965  headings
+   --tm-bl-5: #1e96df  CTA blue
+   --tm-gy-1: #6b82ab  body text
+   --tm-gy-2: #dbe2ea  borders
+   --tm-gy-3: #f2f4f8  page bg
+   Font: Lato  |  Heading: 600 weight, 110% lh  |  Body: 400, 150% lh
+   ─────────────────────────────────────────────────────────────────────── */
+
+const TM = {
+  heading: '#1f3965',
+  body:    '#6b82ab',
+  cta:     '#1e96df',
+  ctaHov:  '#1782c4',
+  accent:  '#1da1f2',
+  navy:    '#093158',
+  navyDk:  '#072745',
+  pageBg:  '#f2f4f8',
+  border:  '#dbe2ea',
+  cardBg:  '#ffffff',
+  faint:   '#a6b4cd',
+  green:   '#36b37e',
+  greenBg: '#ebf7f2',
+  orange:  '#ea8804',
+  red:     '#ff5e5e',
+};
+
+/* ── Nav ──────────────────────────────────────────────────────────────── */
+function Nav({ onGetStarted }: { onGetStarted: () => void }) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
+    <header style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+      background: '#ffffff',
+      borderBottom: `1px solid ${TM.border}`,
+      boxShadow: '0 1px 3px rgba(31,57,101,0.06)'
+    }}>
+      <div style={{
+        maxWidth: 1200, margin: '0 auto',
+        padding: '0 32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: 60
+      }}>
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow shadow-blue-200">
-            <Zap className="w-4 h-4 text-white" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: `linear-gradient(135deg, ${TM.navy} 0%, ${TM.cta} 100%)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Zap style={{ width: 18, height: 18, color: '#fff' }} />
           </div>
           <div>
-            <span className="text-base font-black text-gray-900 tracking-widest" style={{ letterSpacing: '0.15em' }}>
-              EDGE<span className="text-blue-600 ml-1">QI</span>
-            </span>
-            <p className="text-[9px] text-gray-400 font-mono uppercase tracking-widest leading-none -mt-0.5">
+            <div style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontWeight: 900, fontSize: 17,
+              color: TM.heading, letterSpacing: '0.12em'
+            }}>
+              EDGE<span style={{ color: TM.cta }}>QI</span>
+            </div>
+            <div style={{
+              fontFamily: 'monospace', fontSize: 9,
+              color: TM.faint, letterSpacing: '0.1em',
+              textTransform: 'uppercase', marginTop: -2
+            }}>
               Edge Quality Intelligence
-            </p>
+            </div>
           </div>
         </div>
 
         {/* Nav links */}
-        <nav className="hidden md:flex items-center gap-8">
-          {['Features', 'Modules', 'Integrations', 'Security'].map(item => (
-            <a key={item} href={`#${item.toLowerCase()}`}
-              className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          {['Features', 'Modules', 'Integrations', 'Pricing'].map(item => (
+            <a key={item} href={`#${item.toLowerCase()}`} style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 14, fontWeight: 600,
+              color: TM.body, textDecoration: 'none',
+              transition: 'color 0.15s'
+            }}
+              onMouseEnter={e => (e.currentTarget.style.color = TM.cta)}
+              onMouseLeave={e => (e.currentTarget.style.color = TM.body)}>
               {item}
             </a>
           ))}
         </nav>
 
         {/* CTAs */}
-        <div className="flex items-center gap-3">
-          <button onClick={onGetStarted}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors px-2">
-            Sign In
-          </button>
-          <button onClick={onGetStarted}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all shadow shadow-blue-200">
-            Get Started <ChevronRight className="w-4 h-4" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onGetStarted} style={{
+            fontFamily: 'Lato, Arial, sans-serif',
+            fontSize: 14, fontWeight: 600,
+            color: TM.heading, background: 'none',
+            border: 'none', cursor: 'pointer', padding: '0 8px'
+          }}>Sign In</button>
+          <button onClick={onGetStarted} style={{
+            fontFamily: 'Lato, Arial, sans-serif',
+            fontSize: 14, fontWeight: 700,
+            color: '#ffffff', background: TM.cta,
+            border: 'none', borderRadius: 8,
+            padding: '9px 20px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 2px 8px rgba(30,150,223,0.3)',
+            transition: 'background 0.15s'
+          }}
+            onMouseEnter={e => (e.currentTarget.style.background = TM.ctaHov)}
+            onMouseLeave={e => (e.currentTarget.style.background = TM.cta)}>
+            Get Started <ChevronRight style={{ width: 16, height: 16 }} />
           </button>
         </div>
       </div>
@@ -55,96 +122,47 @@ function NavCTA({ onGetStarted }: { onGetStarted: () => void }) {
   );
 }
 
-function SectionLabel({ text }: { text: string }) {
+/* ── Section pill label ──────────────────────────────────────────────── */
+function SectionPill({ text }: { text: string }) {
   return (
-    <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-100 rounded-full mb-4">
-      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-      <span className="text-xs font-bold text-blue-600 uppercase tracking-widest font-mono">{text}</span>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        background: '#eaf5fd', border: `1px solid #b0d9f5`,
+        borderRadius: 99, padding: '4px 14px'
+      }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: TM.cta, display: 'inline-block'
+        }} />
+        <span style={{
+          fontFamily: 'monospace', fontSize: 11,
+          fontWeight: 700, color: TM.cta,
+          letterSpacing: '0.12em', textTransform: 'uppercase'
+        }}>{text}</span>
+      </div>
     </div>
   );
 }
 
-function FeatureChip({ text }: { text: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-full font-medium">
-      <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-      {text}
-    </span>
-  );
-}
-
-/* ── main modules data ─────────────────────────────────────────────────── */
+/* ── Modules data ────────────────────────────────────────────────────── */
 const MODULES = [
-  {
-    icon: Bot,
-    color: 'bg-blue-600',
-    title: 'Agentic AI Engine',
-    desc: 'Autonomous end-to-end QA orchestration. One click runs requirements → test cases → execution → report.',
-    chips: ['Zero-touch pipeline', 'Multi-LLM routing', 'Self-healing'],
-  },
-  {
-    icon: FileText,
-    color: 'bg-indigo-600',
-    title: 'Requirements Intelligence',
-    desc: 'Parse PRDs and user stories into structured, traceable requirements with AI gap detection.',
-    chips: ['Auto-parse PRDs', 'Gap analysis', 'REQ traceability'],
-  },
-  {
-    icon: TableProperties,
-    color: 'bg-violet-600',
-    title: 'Test Case Generator',
-    desc: 'Generate comprehensive test matrices from requirements. Edit priorities, add steps, bulk approve.',
-    chips: ['AI generation', 'Bulk operations', 'Step editor'],
-  },
-  {
-    icon: Cpu,
-    color: 'bg-sky-600',
-    title: 'Execution Engine',
-    desc: 'Run suites across browsers in parallel. AI heals broken locators automatically during runs.',
-    chips: ['Parallel runs', 'AI healing', 'Live telemetry'],
-  },
-  {
-    icon: BarChart3,
-    color: 'bg-cyan-600',
-    title: 'Analytics & KPI',
-    desc: 'Real-time dashboards with pass/fail trends, SLA thresholds, and historical regression ledgers.',
-    chips: ['KPI thresholds', 'SLA tracking', 'CSV/JSON export'],
-  },
-  {
-    icon: Bug,
-    color: 'bg-rose-600',
-    title: 'Defect Prediction',
-    desc: 'ML-powered hotspot detection predicts where defects will emerge before they reach production.',
-    chips: ['Risk scoring', 'Impact analysis', 'Module heatmap'],
-  },
-  {
-    icon: Timer,
-    color: 'bg-amber-600',
-    title: 'Performance Testing',
-    desc: 'Load testing with configurable users and duration. Real-time p95/p99 latency and throughput graphs.',
-    chips: ['Load profiles', 'Latency metrics', 'Flamegraph'],
-  },
-  {
-    icon: Lock,
-    color: 'bg-red-600',
-    title: 'Security Testing',
-    desc: 'OWASP-mapped vulnerability scanner with severity scoring and auto-generated remediation guides.',
-    chips: ['OWASP mapped', 'CVE scoring', 'Remediation'],
-  },
-  {
-    icon: GitBranch,
-    color: 'bg-green-600',
-    title: 'CI/CD Integration',
-    desc: 'Native hooks for GitHub Actions, Jenkins, and GitLab. Quality gates block bad builds automatically.',
-    chips: ['GitHub Actions', 'Quality gates', 'Webhooks'],
-  },
+  { icon: Bot,            color: TM.cta,      title: 'Agentic AI Engine',        desc: 'Autonomous end-to-end QA orchestration. One click runs requirements → test cases → execution → report.', chips: ['Zero-touch pipeline', 'Multi-LLM routing', 'Self-healing'] },
+  { icon: FileText,       color: TM.navy,     title: 'Requirements Intelligence', desc: 'Parse PRDs and user stories into structured, traceable requirements with AI gap detection.',              chips: ['Auto-parse PRDs', 'Gap analysis', 'REQ traceability'] },
+  { icon: TableProperties,color: '#5a6fcf',   title: 'Test Case Generator',       desc: 'Generate comprehensive test matrices from requirements. Edit priorities, add steps, bulk approve.',          chips: ['AI generation', 'Bulk operations', 'Step editor'] },
+  { icon: Cpu,            color: '#1da1f2',   title: 'Execution Engine',          desc: 'Run suites across browsers in parallel. AI heals broken locators automatically during runs.',               chips: ['Parallel runs', 'AI healing', 'Live telemetry'] },
+  { icon: BarChart3,      color: '#0891b2',   title: 'Analytics & KPI',           desc: 'Real-time dashboards with pass/fail trends, SLA thresholds, and historical regression ledgers.',            chips: ['KPI thresholds', 'SLA tracking', 'CSV/JSON export'] },
+  { icon: Bug,            color: '#e02424',   title: 'Defect Prediction',         desc: 'ML-powered hotspot detection predicts where defects will emerge before they reach production.',             chips: ['Risk scoring', 'Impact analysis', 'Module heatmap'] },
+  { icon: Timer,          color: TM.orange,   title: 'Performance Testing',       desc: 'Load testing with configurable users and duration. Real-time p95/p99 latency and throughput graphs.',       chips: ['Load profiles', 'Latency metrics', 'Flamegraph'] },
+  { icon: Lock,           color: '#dc2626',   title: 'Security Testing',          desc: 'OWASP-mapped vulnerability scanner with severity scoring and auto-generated remediation guides.',           chips: ['OWASP mapped', 'CVE scoring', 'Remediation'] },
+  { icon: GitBranch,      color: TM.green,    title: 'CI/CD Integration',         desc: 'Native hooks for GitHub Actions, Jenkins, and GitLab. Quality gates block bad builds automatically.',      chips: ['GitHub Actions', 'Quality gates', 'Webhooks'] },
 ];
 
 const STATS = [
-  { value: '10×', label: 'Faster test generation vs manual' },
-  { value: '94%', label: 'Defect prediction accuracy' },
-  { value: '60%', label: 'Reduction in flaky test failures' },
-  { value: '∞', label: 'Parallel browser execution' },
+  { value: '10×',  label: 'Faster test generation vs manual' },
+  { value: '94%',  label: 'Defect prediction accuracy' },
+  { value: '60%',  label: 'Reduction in flaky test failures' },
+  { value: '3min', label: 'From requirement to running test' },
 ];
 
 const INTEGRATIONS = [
@@ -152,306 +170,540 @@ const INTEGRATIONS = [
   'Cypress', 'TestRail', 'Slack', 'PagerDuty', 'Azure DevOps', 'Bitbucket',
 ];
 
+const HOW_IT_WORKS = [
+  { num: '01', title: 'Connect Requirements', desc: 'Upload PRDs, user stories, or Jira epics. AI structures and links them instantly.' },
+  { num: '02', title: 'Generate Test Cases',  desc: 'AI builds full test matrices — edge cases, negative scenarios, regression suites included.' },
+  { num: '03', title: 'Execute & Heal',       desc: 'Run across browsers in parallel. AI heals broken locators automatically.' },
+  { num: '04', title: 'Ship with Confidence', desc: 'Quality gate blocks bad builds. Detailed reports and KPI dashboards track progress.' },
+];
+
+/* ── Main export ─────────────────────────────────────────────────────── */
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
   return (
-    <div className="min-h-screen bg-white font-sans">
-      <NavCTA onGetStarted={onGetStarted} />
+    <div style={{ fontFamily: 'Lato, Arial, sans-serif', background: TM.pageBg, minHeight: '100vh' }}>
+      <Nav onGetStarted={onGetStarted} />
 
-      {/* ── HERO ──────────────────────────────────────────────────────── */}
-      <section className="pt-28 pb-20 px-6 text-center relative overflow-hidden"
-        style={{ background: 'linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%)' }}>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          HERO SECTION
+          Background: white → f2f4f8 gradient
+          Heading: #1f3965, 600 weight, 110% lh
+          Body: #6b82ab, 400 weight
+          CTA button: #1e96df
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{
+        paddingTop: 120, paddingBottom: 80,
+        background: `linear-gradient(180deg, #ffffff 0%, ${TM.pageBg} 100%)`,
+        textAlign: 'center',
+        position: 'relative', overflow: 'hidden'
+      }}>
+        {/* Subtle dot grid */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.04, pointerEvents: 'none',
+          backgroundImage: `radial-gradient(${TM.cta} 1px, transparent 1px)`,
+          backgroundSize: '32px 32px'
+        }} />
 
-        {/* Decorative grid */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage: 'linear-gradient(#1d6ae5 1px, transparent 1px), linear-gradient(90deg, #1d6ae5 1px, transparent 1px)',
-            backgroundSize: '48px 48px'
-          }} />
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 32px', position: 'relative' }}>
+          <SectionPill text="AI-Powered QA Platform" />
 
-        <div className="relative max-w-4xl mx-auto">
-          {/* Pill badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 border border-blue-200 rounded-full mb-6">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-widest">AI-Powered QA Platform</span>
-          </div>
-
-          <h1 className="text-5xl md:text-6xl font-black text-gray-900 leading-tight tracking-tight mb-6">
+          <h1 style={{
+            fontFamily: 'Lato, Arial, sans-serif',
+            fontSize: 52, fontWeight: 700,
+            color: TM.heading, lineHeight: '1.1',
+            marginBottom: 20, letterSpacing: '-0.5px'
+          }}>
             Quality Engineering,<br />
-            <span className="text-blue-600">Fully Automated.</span>
+            <span style={{ color: TM.cta }}>Automated End-to-End</span>
           </h1>
 
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-            EDGE QI orchestrates your entire QA lifecycle — from requirements to release —
-            using AI agents that generate, execute, heal, and report automatically.
+          <p style={{
+            fontFamily: 'Lato, Arial, sans-serif',
+            fontSize: 18, fontWeight: 400,
+            color: TM.body, lineHeight: '1.6',
+            marginBottom: 40, maxWidth: 560, margin: '0 auto 40px'
+          }}>
+            EDGE QI turns requirements into running tests in minutes.
+            AI orchestrates your entire QA pipeline — from PRD to production confidence.
           </p>
 
-          {/* Hero CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
-            <button onClick={onGetStarted}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3.5 rounded-xl text-base transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-0.5">
-              <Play className="w-4 h-4" /> Start Free — No Setup
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 56 }}>
+            <button onClick={onGetStarted} style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 16, fontWeight: 700,
+              color: '#ffffff', background: TM.cta,
+              border: 'none', borderRadius: 10,
+              padding: '14px 32px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8,
+              boxShadow: '0 4px 16px rgba(30,150,223,0.35)'
+            }}>
+              Get Started Free <ChevronRight style={{ width: 18, height: 18 }} />
             </button>
-            <button onClick={onGetStarted}
-              className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold px-8 py-3.5 rounded-xl text-base border border-gray-200 transition-all hover:-translate-y-0.5">
-              Sign In to Workspace <ArrowRight className="w-4 h-4" />
+            <button onClick={onGetStarted} style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 16, fontWeight: 600,
+              color: TM.heading, background: '#ffffff',
+              border: `1px solid ${TM.border}`, borderRadius: 10,
+              padding: '14px 28px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8
+            }}>
+              <Play style={{ width: 16, height: 16, color: TM.cta }} />
+              Watch Demo
             </button>
           </div>
 
-          {/* Hero stat bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
-            {STATS.map(s => (
-              <div key={s.value} className="text-center">
-                <div className="text-3xl font-black text-blue-600 leading-none mb-1">{s.value}</div>
-                <div className="text-xs text-gray-500 font-medium leading-tight">{s.label}</div>
-              </div>
+          {/* Trust bar */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 24, color: TM.faint, fontSize: 13
+          }}>
+            {['No credit card required', '14-day free trial', 'SOC2 Type II certified'].map(t => (
+              <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 style={{ width: 14, height: 14, color: TM.green }} />
+                {t}
+              </span>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-gray-950 text-white" id="features">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-900/40 border border-blue-700/40 rounded-full mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-widest font-mono">How It Works</span>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          STATS STRIP
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{
+        background: TM.navyDk,
+        padding: '40px 32px'
+      }}>
+        <div style={{
+          maxWidth: 1100, margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 32, textAlign: 'center'
+        }}>
+          {STATS.map(s => (
+            <div key={s.label}>
+              <div style={{
+                fontFamily: 'Lato, Arial, sans-serif',
+                fontSize: 40, fontWeight: 700,
+                color: TM.accent, lineHeight: 1.1, marginBottom: 8
+              }}>{s.value}</div>
+              <div style={{
+                fontFamily: 'Lato, Arial, sans-serif',
+                fontSize: 13, color: '#90aed4', lineHeight: '1.5'
+              }}>{s.label}</div>
             </div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
-              One pipeline. Zero manual work.
-            </h2>
-            <p className="text-gray-400 text-base max-w-xl mx-auto">
-              Paste your requirements. The AI does the rest.
-            </p>
-          </div>
-
-          {/* Pipeline steps */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-0 relative">
-            {/* connector line */}
-            <div className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-600 opacity-30" />
-
-            {[
-              { step: '01', icon: FileText, label: 'Paste Requirements', desc: 'Upload PRD or paste user stories' },
-              { step: '02', icon: Sparkles, label: 'AI Generates Tests', desc: 'Hundreds of test cases in seconds' },
-              { step: '03', icon: Cpu, label: 'Execute Automatically', desc: 'Parallel runs across browsers' },
-              { step: '04', icon: TrendingUp, label: 'Get Full Report', desc: 'KPIs, defects, heal logs' },
-            ].map((s, i) => (
-              <div key={i} className="flex flex-col items-center text-center px-4 relative z-10">
-                <div className="w-20 h-20 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center mb-4 relative">
-                  <s.icon className="w-8 h-8 text-blue-400" />
-                  <span className="absolute -top-2 -right-2 text-[10px] font-black text-blue-400 bg-gray-900 border border-blue-600/30 px-1.5 rounded-full font-mono">
-                    {s.step}
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-white mb-1">{s.label}</h3>
-                <p className="text-sm text-gray-500">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Mid CTA */}
-          <div className="text-center mt-14">
-            <button onClick={onGetStarted}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-xl text-sm transition-all shadow-lg shadow-blue-900/40">
-              <Zap className="w-4 h-4" /> Launch the AI Engine
-            </button>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* ── MODULES GRID ──────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-white" id="modules">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <SectionLabel text="Full Module Suite" />
-            <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-4">
-              Everything QA needs, in one platform.
-            </h2>
-            <p className="text-gray-500 text-base max-w-xl mx-auto">
-              Nine specialized modules — all wired together, all AI-assisted.
-            </p>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          HOW IT WORKS
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="features" style={{
+        background: '#ffffff',
+        padding: '80px 32px'
+      }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <SectionPill text="How It Works" />
+            <h2 style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 36, fontWeight: 600,
+              color: TM.heading, lineHeight: '1.1'
+            }}>From requirement to production<br />in 4 steps</h2>
+            <p style={{
+              fontSize: 16, color: TM.body,
+              marginTop: 16, lineHeight: '1.6'
+            }}>EDGE QI eliminates the 80% of QA work that is manual and repetitive.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {MODULES.map((m, i) => (
-              <div key={i}
-                className="group p-5 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50 transition-all duration-200 cursor-pointer"
-                onClick={onGetStarted}>
-                <div className={`w-10 h-10 rounded-xl ${m.color} flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}>
-                  <m.icon className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1.5">{m.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed mb-3">{m.desc}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {m.chips.map(c => <FeatureChip key={c} text={c} />)}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24
+          }}>
+            {HOW_IT_WORKS.map((step, i) => (
+              <div key={step.num} style={{ position: 'relative' }}>
+                {/* Connector line */}
+                {i < 3 && (
+                  <div style={{
+                    position: 'absolute', top: 28, left: '60%', right: '-10%',
+                    height: 1, background: TM.border, zIndex: 0
+                  }} />
+                )}
+                <div style={{
+                  background: TM.pageBg, border: `1px solid ${TM.border}`,
+                  borderRadius: 12, padding: '24px 20px', position: 'relative', zIndex: 1
+                }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: '50%',
+                    background: TM.cta, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'Lato, Arial, sans-serif', fontSize: 14, fontWeight: 700,
+                    color: '#fff', marginBottom: 16
+                  }}>{step.num}</div>
+                  <h3 style={{
+                    fontFamily: 'Lato, Arial, sans-serif',
+                    fontSize: 15, fontWeight: 600, color: TM.heading,
+                    marginBottom: 8, lineHeight: '1.2'
+                  }}>{step.title}</h3>
+                  <p style={{
+                    fontSize: 13, color: TM.body, lineHeight: '1.5'
+                  }}>{step.desc}</p>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* CTA after modules */}
-          <div className="mt-12 text-center">
-            <button onClick={onGetStarted}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-all shadow-md shadow-blue-200">
-              Explore All Modules <ArrowRight className="w-4 h-4" />
-            </button>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MODULES GRID
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="modules" style={{
+        background: TM.pageBg,
+        padding: '80px 32px'
+      }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <SectionPill text="Platform Modules" />
+            <h2 style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 36, fontWeight: 600,
+              color: TM.heading, lineHeight: '1.1'
+            }}>Everything QA needs,<br />in one unified platform</h2>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 20
+          }}>
+            {MODULES.map(m => {
+              const Icon = m.icon;
+              return (
+                <div key={m.title} style={{
+                  background: '#ffffff',
+                  border: `1px solid ${TM.border}`,
+                  borderRadius: 12, padding: '24px',
+                  transition: 'box-shadow 0.2s, border-color 0.2s',
+                  cursor: 'default'
+                }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(30,150,223,0.12)';
+                    (e.currentTarget as HTMLElement).style.borderColor = '#90c4e8';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    (e.currentTarget as HTMLElement).style.borderColor = TM.border;
+                  }}>
+                  {/* Icon */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 10,
+                    background: m.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 16
+                  }}>
+                    <Icon style={{ width: 22, height: 22, color: '#ffffff' }} />
+                  </div>
+
+                  <h3 style={{
+                    fontFamily: 'Lato, Arial, sans-serif',
+                    fontSize: 15, fontWeight: 600,
+                    color: TM.heading, marginBottom: 8, lineHeight: '1.2'
+                  }}>{m.title}</h3>
+
+                  <p style={{
+                    fontSize: 13, color: TM.body,
+                    lineHeight: '1.5', marginBottom: 16
+                  }}>{m.desc}</p>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {m.chips.map(c => (
+                      <span key={c} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        fontFamily: 'monospace', fontSize: 11, fontWeight: 600,
+                        color: TM.cta, background: '#eaf5fd',
+                        border: `1px solid #b0d9f5`,
+                        borderRadius: 6, padding: '2px 8px'
+                      }}>
+                        <CheckCircle2 style={{ width: 10, height: 10 }} />
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* ── AI HEALING FEATURE HIGHLIGHT ──────────────────────────────── */}
-      <section className="py-20 px-6" style={{ background: 'linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%)' }}>
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          AI SELF-HEALING HIGHLIGHT
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{
+        background: '#ffffff',
+        padding: '80px 32px'
+      }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr',
+            gap: 64, alignItems: 'center'
+          }}>
             {/* Left text */}
             <div>
-              <SectionLabel text="AI Self-Healing" />
-              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-5 leading-tight">
-                Tests that fix themselves. <span className="text-blue-600">Automatically.</span>
+              <SectionPill text="AI Self-Healing" />
+              <h2 style={{
+                fontFamily: 'Lato, Arial, sans-serif',
+                fontSize: 34, fontWeight: 600,
+                color: TM.heading, lineHeight: '1.15', marginBottom: 20
+              }}>
+                Tests that fix themselves —<br />
+                <span style={{ color: TM.cta }}>automatically</span>
               </h2>
-              <p className="text-gray-500 text-base leading-relaxed mb-6">
-                When UI changes break your locators, EDGE QI detects the failure in real-time,
-                analyses the DOM delta, and generates a healed selector — no human intervention needed.
+              <p style={{
+                fontSize: 15, color: TM.body, lineHeight: '1.6', marginBottom: 28
+              }}>
+                When a UI change breaks a locator, EDGE QI's AI engine detects the failure,
+                analyses the DOM, finds the correct element, and updates the selector — all
+                before the next test run.
               </p>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Real-time DOM snapshot comparison',
-                  'Multi-fallback XPath/CSS generation',
-                  'Healing audit trail per test run',
-                  'Confidence score on every heal',
-                ].map(item => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-gray-700">
-                    <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={onGetStarted}
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow shadow-blue-200">
-                <RefreshCw className="w-4 h-4" /> See It In Action
+              {[
+                'Detects broken XPath / CSS selectors in real time',
+                'AI proposes and applies the correct fix automatically',
+                'Reduces flaky test maintenance by up to 60%',
+                'Full audit trail of every self-healing action taken',
+              ].map(t => (
+                <div key={t} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12
+                }}>
+                  <CheckCircle2 style={{ width: 18, height: 18, color: TM.green, flexShrink: 0, marginTop: 1 }} />
+                  <span style={{ fontSize: 14, color: TM.body, lineHeight: '1.5' }}>{t}</span>
+                </div>
+              ))}
+              <button onClick={onGetStarted} style={{
+                marginTop: 16,
+                fontFamily: 'Lato, Arial, sans-serif',
+                fontSize: 14, fontWeight: 700,
+                color: '#ffffff', background: TM.cta,
+                border: 'none', borderRadius: 8,
+                padding: '11px 24px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 8px rgba(30,150,223,0.3)'
+              }}>
+                See It In Action <ArrowRight style={{ width: 16, height: 16 }} />
               </button>
             </div>
 
-            {/* Right: fake terminal card */}
-            <div className="bg-gray-950 rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
-                <span className="w-3 h-3 rounded-full bg-red-500" />
-                <span className="w-3 h-3 rounded-full bg-amber-400" />
-                <span className="w-3 h-3 rounded-full bg-green-400" />
-                <span className="ml-3 text-xs text-gray-500 font-mono">ai_healing_pipeline.log</span>
+            {/* Right terminal mockup */}
+            <div style={{
+              background: TM.navyDk, borderRadius: 14,
+              padding: '24px', fontFamily: 'monospace', fontSize: 12,
+              boxShadow: '0 8px 40px rgba(7,39,69,0.35)'
+            }}>
+              {/* Traffic lights */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+                {['#ff5f57','#febc2e','#28c840'].map(c => (
+                  <div key={c} style={{ width: 12, height: 12, borderRadius: '50%', background: c }} />
+                ))}
               </div>
-              <div className="p-4 font-mono text-xs space-y-2 leading-relaxed">
-                <p><span className="text-gray-500">[09:14:02]</span> <span className="text-amber-400">⚠ LOCATOR_FAIL</span> <span className="text-gray-300">checkout_btn → xpath stale</span></p>
-                <p><span className="text-gray-500">[09:14:02]</span> <span className="text-blue-400">→ SNAPSHOT</span> <span className="text-gray-300">DOM delta captured (3 nodes)</span></p>
-                <p><span className="text-gray-500">[09:14:03]</span> <span className="text-blue-400">→ LLM</span> <span className="text-gray-300">Generating fallback selectors...</span></p>
-                <p><span className="text-gray-500">[09:14:04]</span> <span className="text-green-400">✓ HEALED</span> <span className="text-gray-300">css=[data-testid="btn-checkout"]</span></p>
-                <p><span className="text-gray-500">[09:14:04]</span> <span className="text-green-400">✓ VERIFIED</span> <span className="text-gray-300">confidence 97% — playbook saved</span></p>
-                <p><span className="text-gray-500">[09:14:04]</span> <span className="text-blue-300">↺ RETRY</span> <span className="text-gray-300">test_checkout_flow → PASS ✓</span></p>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800">
-                  <Activity className="w-3 h-3 text-green-400 animate-pulse" />
-                  <span className="text-green-400 text-[10px]">Pipeline live — 0 broken tests</span>
+              {[
+                { t: 'EDGE QI Execution Engine v3.1', c: '#a6b4cd' },
+                { t: '> Running suite: checkout-flow (18 tests)', c: '#dbe2ea' },
+                { t: '', c: '' },
+                { t: '✓ TC-001  Login flow                [PASS]', c: '#36b37e' },
+                { t: '✓ TC-002  Add to cart               [PASS]', c: '#36b37e' },
+                { t: '⚠ TC-007  Payment form              [HEALING]', c: '#ea8804' },
+                { t: '  Locator stale: #pay-btn → .payment-submit', c: '#a6b4cd' },
+                { t: '  AI fix applied in 340ms ✓', c: '#1da1f2' },
+                { t: '✓ TC-007  Payment form              [PASS]', c: '#36b37e' },
+                { t: '', c: '' },
+                { t: '✓ TC-018  Order confirmation        [PASS]', c: '#36b37e' },
+                { t: '', c: '' },
+                { t: '18/18 passed  •  1 self-healed  •  12.4s', c: '#dbe2ea' },
+              ].map((line, i) => (
+                <div key={i} style={{ color: line.c, marginBottom: 3, lineHeight: '1.5' }}>
+                  {line.t}
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── INTEGRATIONS ──────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-white" id="integrations">
-        <div className="max-w-5xl mx-auto text-center">
-          <SectionLabel text="Integrations" />
-          <h2 className="text-3xl font-black text-gray-900 mb-4">
-            Plugs into your existing stack.
-          </h2>
-          <p className="text-gray-500 text-base mb-10 max-w-xl mx-auto">
-            Native connectors to your CI/CD, test management, and alerting tools. No config hell.
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          INTEGRATIONS
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="integrations" style={{
+        background: TM.pageBg,
+        padding: '72px 32px', textAlign: 'center'
+      }}>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <SectionPill text="Integrations" />
+          <h2 style={{
+            fontFamily: 'Lato, Arial, sans-serif',
+            fontSize: 32, fontWeight: 600,
+            color: TM.heading, lineHeight: '1.1', marginBottom: 12
+          }}>Plugs into your existing stack</h2>
+          <p style={{ fontSize: 15, color: TM.body, marginBottom: 44 }}>
+            Native integrations with every major DevOps and QA tool — zero configuration.
           </p>
 
-          <div className="flex flex-wrap justify-center gap-3 mb-10">
-            {INTEGRATIONS.map(tool => (
-              <div key={tool}
-                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-full text-sm font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-all cursor-pointer"
-                onClick={onGetStarted}>
-                {tool}
-              </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center' }}>
+            {INTEGRATIONS.map(name => (
+              <div key={name} style={{
+                background: '#ffffff', border: `1px solid ${TM.border}`,
+                borderRadius: 10, padding: '10px 20px',
+                fontFamily: 'Lato, Arial, sans-serif',
+                fontSize: 14, fontWeight: 600, color: TM.heading
+              }}>{name}</div>
             ))}
           </div>
-
-          <button onClick={onGetStarted}
-            className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-800 font-bold px-7 py-3 rounded-xl text-sm border border-gray-200 transition-all shadow-sm">
-            <Layers className="w-4 h-4 text-blue-500" /> View All Integrations
-          </button>
         </div>
       </section>
 
-      {/* ── SECURITY STRIP ────────────────────────────────────────────── */}
-      <section className="py-16 px-6 bg-gray-950" id="security">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          SECURITY STRIP
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{
+        background: '#ffffff',
+        padding: '56px 32px', textAlign: 'center',
+        borderTop: `1px solid ${TM.border}`
+      }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <p style={{
+            fontFamily: 'monospace', fontSize: 11,
+            fontWeight: 700, color: TM.faint,
+            letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 32
+          }}>ENTERPRISE-GRADE SECURITY</p>
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 40, justifyContent: 'center'
+          }}>
             {[
-              { icon: ShieldCheck, title: 'OWASP Coverage', desc: 'All Top 10 vulnerability categories scanned automatically on every run.' },
-              { icon: Lock, title: 'Secure by Default', desc: 'All credentials stored as encrypted secrets. No plaintext tokens anywhere.' },
-              { icon: FlaskConical, title: 'Isolated Sandboxes', desc: 'Every execution runs in a clean sandboxed environment. Zero cross-contamination.' },
-            ].map(f => (
-              <div key={f.title} className="flex gap-4 p-5 rounded-2xl border border-gray-800 bg-gray-900">
-                <div className="w-10 h-10 rounded-xl bg-blue-600/15 border border-blue-500/20 flex items-center justify-center shrink-0">
-                  <f.icon className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white mb-1">{f.title}</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">{f.desc}</p>
-                </div>
+              { icon: ShieldCheck, label: 'SOC 2 Type II' },
+              { icon: Lock,        label: 'AES-256 Encryption' },
+              { icon: Activity,    label: '99.99% Uptime SLA' },
+              { icon: ShieldCheck, label: 'GDPR Compliant' },
+              { icon: GitBranch,   label: 'On-premise Option' },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} style={{
+                display: 'flex', alignItems: 'center', gap: 8
+              }}>
+                <Icon style={{ width: 18, height: 18, color: TM.cta }} />
+                <span style={{
+                  fontFamily: 'Lato, Arial, sans-serif',
+                  fontSize: 14, fontWeight: 600, color: TM.heading
+                }}>{label}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── FINAL CTA BANNER ──────────────────────────────────────────── */}
-      <section className="py-24 px-6 text-center"
-        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 55%, #1d4ed8 100%)' }}>
-        <div className="max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 border border-white/20 rounded-full mb-6">
-            <Sparkles className="w-3.5 h-3.5 text-blue-300" />
-            <span className="text-xs font-bold text-blue-200 uppercase tracking-widest">Ready to ship quality faster?</span>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          FINAL CTA
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section style={{
+        background: `linear-gradient(135deg, ${TM.navyDk} 0%, ${TM.navy} 60%, #0d4d8a 100%)`,
+        padding: '88px 32px', textAlign: 'center'
+      }}>
+        <div style={{ maxWidth: 680, margin: '0 auto' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'rgba(30,150,223,0.2)', border: `1px solid rgba(30,150,223,0.4)`,
+            borderRadius: 99, padding: '5px 16px', marginBottom: 24
+          }}>
+            <Sparkles style={{ width: 14, height: 14, color: TM.accent }} />
+            <span style={{
+              fontFamily: 'monospace', fontSize: 11, fontWeight: 700,
+              color: TM.accent, letterSpacing: '0.12em', textTransform: 'uppercase'
+            }}>Ready to automate QA?</span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
-            Start automating your QA today.
-          </h2>
-          <p className="text-blue-200 text-base mb-10 max-w-xl mx-auto leading-relaxed">
-            No infrastructure to set up. No agents to install. Just sign in and let EDGE QI handle your entire quality pipeline.
+
+          <h2 style={{
+            fontFamily: 'Lato, Arial, sans-serif',
+            fontSize: 40, fontWeight: 700,
+            color: '#ffffff', lineHeight: '1.1', marginBottom: 20
+          }}>Start testing smarter today</h2>
+
+          <p style={{
+            fontSize: 16, color: '#90aed4',
+            lineHeight: '1.6', marginBottom: 40
+          }}>
+            Join hundreds of QA teams shipping faster and with more confidence.
+            Set up in minutes — no DevOps expertise required.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button onClick={onGetStarted}
-              className="flex items-center gap-2 bg-white hover:bg-gray-100 text-blue-700 font-black px-9 py-4 rounded-xl text-base transition-all shadow-xl hover:-translate-y-0.5">
-              <Zap className="w-5 h-5" /> Get Started Free
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+            <button onClick={onGetStarted} style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 16, fontWeight: 700,
+              color: '#ffffff', background: TM.cta,
+              border: 'none', borderRadius: 10,
+              padding: '15px 36px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8,
+              boxShadow: '0 4px 20px rgba(30,150,223,0.5)'
+            }}>
+              Get Started Free <ChevronRight style={{ width: 18, height: 18 }} />
             </button>
-            <button onClick={onGetStarted}
-              className="flex items-center gap-2 bg-blue-700/40 hover:bg-blue-700/60 border border-blue-400/40 text-white font-bold px-9 py-4 rounded-xl text-base transition-all hover:-translate-y-0.5">
-              Sign In to Dashboard <ArrowRight className="w-5 h-5" />
+            <button onClick={onGetStarted} style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontSize: 16, fontWeight: 600,
+              color: '#ffffff', background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 10, padding: '15px 28px', cursor: 'pointer'
+            }}>
+              Sign In
             </button>
           </div>
+
+          <p style={{
+            marginTop: 24, fontSize: 13, color: '#6b82ab'
+          }}>
+            No credit card required · 14-day free trial · Cancel anytime
+          </p>
         </div>
       </section>
 
-      {/* ── FOOTER ────────────────────────────────────────────────────── */}
-      <footer className="bg-gray-950 border-t border-gray-800 py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-white" />
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          FOOTER
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <footer style={{
+        background: TM.navyDk,
+        borderTop: '1px solid rgba(219,226,234,0.08)',
+        padding: '40px 32px'
+      }}>
+        <div style={{
+          maxWidth: 1100, margin: '0 auto',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 16
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: `linear-gradient(135deg, ${TM.navy} 0%, ${TM.cta} 100%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Zap style={{ width: 14, height: 14, color: '#fff' }} />
             </div>
-            <span className="text-sm font-black text-white tracking-widest" style={{ letterSpacing: '0.15em' }}>
-              EDGE<span className="text-blue-400 ml-1">QI</span>
+            <span style={{
+              fontFamily: 'Lato, Arial, sans-serif',
+              fontWeight: 700, fontSize: 14,
+              color: '#ffffff', letterSpacing: '0.1em'
+            }}>
+              EDGE<span style={{ color: TM.accent }}>QI</span>
             </span>
           </div>
-          <p className="text-xs text-gray-600 font-mono">© 2026 EDGE QI · Edge Quality Intelligence Platform · All pipelines active</p>
-          <button onClick={onGetStarted}
-            className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
-            Sign In <ChevronRight className="w-3 h-3" />
-          </button>
+
+          <p style={{ fontSize: 13, color: '#6b82ab' }}>
+            © 2026 EDGE QI — Edge Quality Intelligence
+          </p>
+
+          <div style={{ display: 'flex', gap: 24 }}>
+            {['Privacy', 'Terms', 'Security', 'Status'].map(l => (
+              <a key={l} href="#" style={{
+                fontFamily: 'Lato, Arial, sans-serif',
+                fontSize: 13, color: '#6b82ab',
+                textDecoration: 'none'
+              }}>{l}</a>
+            ))}
+          </div>
         </div>
       </footer>
     </div>

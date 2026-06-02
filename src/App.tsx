@@ -961,7 +961,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
   }
 
   return (
-    <div className="min-h-screen text-slate-800 font-sans flex">
+    <div className="min-h-screen flex" style={{ fontFamily: '"Lato", Arial, sans-serif', color: '#1f3965' }}>
       {/* Auth Gate — show login if not authenticated */}
       {!authUser && <AuthModal onLogin={handleLogin} />}
 
@@ -1043,24 +1043,35 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         </div>
 
         {/* User footer */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-white/[0.06] p-3">
+        <div className="absolute bottom-0 left-0 right-0 p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          {/* Back to Home / Landing page link */}
+          <button
+            onClick={() => { setShowLanding(true); }}
+            className="flex items-center gap-2 px-1 mb-2 w-full"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            title="View EDGE QI Landing Page"
+          >
+            <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(166,180,205,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>← Home Page</span>
+          </button>
           {authUser && (
             <div className="flex items-center gap-2 px-1 mb-2">
-              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#1e96df' }}>
                 <span className="text-[9px] font-bold text-white">{authUser.name.charAt(0)}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-slate-300 truncate">{authUser.name}</p>
-                <p className="text-[9px] text-slate-500 truncate">{authUser.role.replace('_', ' ')}</p>
+                <p className="truncate" style={{ fontSize: 11, fontWeight: 600, color: '#dbe2ea' }}>{authUser.name}</p>
+                <p className="truncate" style={{ fontSize: 9, color: '#6b82ab' }}>{authUser.role.replace('_', ' ')}</p>
               </div>
-              <button onClick={handleLogout} title="Sign out" className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
+              <button onClick={handleLogout} title="Sign out" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#6b82ab' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#ff5e5e')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#6b82ab')}>
                 <LogOut className="w-3 h-3" />
               </button>
             </div>
           )}
-          <div className="flex items-center justify-between text-[9px] font-mono text-slate-600 px-1">
+          <div className="flex items-center justify-between px-1" style={{ fontSize: 9, fontFamily: 'monospace', color: '#6b82ab' }}>
             <span>PORT 3000</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />LIVE</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#36b37e' }} />LIVE</span>
           </div>
         </div>
       </aside>
@@ -1068,21 +1079,22 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
       {/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
       <div className="main-content flex flex-col min-h-screen" style={{ width: 'calc(100% - 240px)' }}>
 
-        {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm">
+        {/* Top Header Bar — Teachmint exact tokens */}
+        <header className="sticky top-0 z-30 px-6 py-3 flex items-center justify-between"
+          style={{ background: '#ffffff', borderBottom: '1px solid #dbe2ea', boxShadow: '0 1px 3px rgba(31,57,101,0.06)' }}>
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-sm font-extrabold tracking-tight text-gray-900" style={{letterSpacing:"0.06em"}}>
-                EDGE <span className="text-blue-600">QI</span>
+              <h1 style={{ fontFamily: '"Lato",Arial,sans-serif', fontSize: 15, fontWeight: 800, color: '#1f3965', letterSpacing: '0.1em', lineHeight: 1 }}>
+                EDGE <span style={{ color: '#1e96df' }}>QI</span>
               </h1>
-              <p className="text-[10px] text-gray-500 font-mono">Edge Quality Intelligence Platform</p>
+              <p style={{ fontFamily: 'monospace', fontSize: 10, color: '#a6b4cd', letterSpacing: '0.06em', marginTop: 1 }}>Edge Quality Intelligence Platform</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 border-r border-gray-200 pr-4">
-              <span className="text-[10px] text-gray-500 font-mono uppercase">Context:</span>
-              <span className="text-[11px] font-bold text-blue-600 font-mono">Segregated Sandbox</span>
+            <div className="hidden md:flex items-center gap-2" style={{ borderRight: '1px solid #dbe2ea', paddingRight: 16 }}>
+              <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#a6b4cd', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Context:</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#1e96df' }}>Segregated Sandbox</span>
             </div>
 
             <select

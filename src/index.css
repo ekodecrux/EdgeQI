@@ -1,154 +1,221 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;550;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Lato", Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-/* ── DESIGN SYSTEM: Teachmint-inspired Clean Professional Blue/White ──────── */
-/* Palette reference: teachmint.com
-   - Page BG:       #f5f7ff (very faint blue-white — clean, not washed)
-   - Cards:         #ffffff solid white (no glass blur that kills contrast)
-   - Primary Blue:  #1d6ae5  (vivid blue — all CTAs, accents)
-   - Text Dark:     #111827  (near-black — headings)
-   - Text Body:     #374151  (dark grey — body copy)
-   - Text Muted:    #6b7280  (medium grey — labels, captions)
-   - Sidebar:       #0f1629  (deep navy)
-   - Borders:       #e5e7eb  (light grey)
-   - Banner BG:     #0f172a → #1e3a5f → #1d4ed8 (dark gradient — white text legible)
-*/
+/* ═══════════════════════════════════════════════════════════════════════════
+   EDGE QI — Design System built on exact Teachmint CSS tokens
+   Source: storage.googleapis.com/tm-assets/styles/tm-styles/tm-style-v2.css
+   ═══════════════════════════════════════════════════════════════════════════
+   --tm-color-bl-1: #1f3965  headings (navy)
+   --tm-color-bl-2: #1da1f2  bright blue accent
+   --tm-color-bl-3: #093158  deep navy
+   --tm-color-bl-5: #1e96df  CTA blue (primary button)
+   --tm-color-bl-6: #072745  darkest navy
+   --tm-color-gy-1: #6b82ab  body / muted text
+   --tm-color-gy-2: #dbe2ea  borders
+   --tm-color-gy-3: #f2f4f8  page background
+   --tm-color-gy-4: #f6f6f6  subtle bg
+   --tm-color-gy-5: #a6b4cd  placeholder / faint
+   --tm-color-gr-1: #36b37e  success
+   --tm-color-gr-2: #ebf7f2  success bg
+   --tm-color-rd-1: #ff5e5e  error
+   --tm-color-rd-2: #ffefef  error bg
+   --tm-color-og-1: #ea8804  warning
+   --tm-color-og-2: #fff2e9  warning bg
+   Font: "Lato", Arial, Sans-Serif  (NOT Inter)
+   Heading: weight 600, line-height 110%
+   Paragraph: weight 400, line-height 150%
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --blue-primary:   #1d6ae5;
-  --blue-mid:       #2563eb;
-  --blue-light:     #3b82f6;
-  --blue-pale:      #dbeafe;
-  --blue-ghost:     #eff6ff;
-  --text-dark:      #111827;
-  --text-body:      #374151;
-  --text-muted:     #6b7280;
-  --text-faint:     #9ca3af;
+  /* ── Teachmint Blue palette ───────────────────────────────────────────── */
+  --tm-bl-1: #1f3965;   /* ALL headings — dark navy */
+  --tm-bl-2: #1da1f2;   /* bright accent */
+  --tm-bl-3: #093158;   /* deep navy */
+  --tm-bl-5: #1e96df;   /* CTA / primary button */
+  --tm-bl-6: #072745;   /* darkest navy */
+
+  /* ── Teachmint Grey palette ───────────────────────────────────────────── */
+  --tm-gy-1: #6b82ab;   /* body text / muted */
+  --tm-gy-2: #dbe2ea;   /* borders */
+  --tm-gy-3: #f2f4f8;   /* page background */
+  --tm-gy-4: #f6f6f6;   /* subtle alt bg */
+  --tm-gy-5: #a6b4cd;   /* placeholder / faint */
+
+  /* ── Teachmint Status ─────────────────────────────────────────────────── */
+  --tm-gr-1: #36b37e;
+  --tm-gr-2: #ebf7f2;
+  --tm-rd-1: #ff5e5e;
+  --tm-rd-2: #ffefef;
+  --tm-og-1: #ea8804;
+  --tm-og-2: #fff2e9;
+
+  /* ── Mapped aliases for component use ────────────────────────────────── */
+  --blue-primary:   #1e96df;   /* = tm-bl-5 */
+  --blue-mid:       #1da1f2;   /* = tm-bl-2 */
+  --blue-light:     #5bb8f5;
+  --blue-pale:      #d0ebfa;
+  --blue-ghost:     #eaf5fd;
+  --text-dark:      #1f3965;   /* = tm-bl-1 headings */
+  --text-body:      #6b82ab;   /* = tm-gy-1 */
+  --text-muted:     #a6b4cd;   /* = tm-gy-5 */
+  --text-faint:     #c5cedb;
   --surface-white:  #ffffff;
   --surface-card:   #ffffff;
-  --surface-subtle: #f9fafb;
-  --border-light:   #e5e7eb;
-  --border-mid:     #d1d5db;
-  --glass-shadow:   0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(17,24,39,0.06);
-  --glass-shadow-lg:0 4px 24px rgba(17,24,39,0.10), 0 1px 6px rgba(0,0,0,0.06);
-  --metal-gradient: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-  --sidebar-bg:     linear-gradient(180deg, #0f1629 0%, #1a2540 60%, #0f1629 100%);
+  --surface-subtle: #f6f6f6;   /* = tm-gy-4 */
+  --border-light:   #dbe2ea;   /* = tm-gy-2 */
+  --border-mid:     #c9d4e0;
+  --glass-shadow:   0 1px 3px rgba(31,57,101,0.06), 0 4px 16px rgba(31,57,101,0.08);
+  --glass-shadow-lg:0 4px 24px rgba(31,57,101,0.10), 0 1px 6px rgba(0,0,0,0.05);
+  --metal-gradient: linear-gradient(135deg, #f2f4f8 0%, #e8ecf2 100%);
+  --sidebar-bg:     linear-gradient(180deg, #072745 0%, #093158 40%, #0d3d6b 100%);
   --sidebar-w:      240px;
 }
 
-/* Base */
+/* ── BASE ────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: var(--font-sans);
-  /* Clean Teachmint-style page background — faint blue-white, NO washed gradients */
-  background: #f5f7ff;
-  color: var(--text-dark);
+  font-family: "Lato", Arial, sans-serif;
+  background: #f2f4f8;   /* tm-gy-3 — exact Teachmint page background */
+  color: #6b82ab;        /* tm-gy-1 — body text */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;      /* 150% for paragraphs */
 }
 
-/* ── GLASS CARD — solid white, clean border, no opacity tricks ──────────── */
-/* KEY FIX: was rgba(255,255,255,0.72) — translucency caused text washout    */
+/* ── HEADINGS — Teachmint exact: #1f3965, weight 600, 110% line-height ───── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lato", Arial, sans-serif;
+  color: #1f3965;
+  font-weight: 600;
+  line-height: 1.1;      /* 110% */
+  margin: 0;
+}
+
+p {
+  color: #6b82ab;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── GLASS CARD — solid white + tm-gy-2 border ───────────────────────────── */
 .glass-card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-light);
-  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
   box-shadow: var(--glass-shadow);
 }
 
 .glass-card-lg {
-  background: var(--surface-card);
-  border: 1px solid var(--border-light);
-  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #dbe2ea;
+  border-radius: 16px;
   box-shadow: var(--glass-shadow-lg);
 }
 
-/* ── METALLIC SURFACE — solid light grey ────────────────────────────────── */
+/* force heading colours inside cards */
+.glass-card h1,
+.glass-card h2,
+.glass-card h3,
+.glass-card h4 { color: #1f3965; }
+
+.glass-card p,
+.glass-card .text-slate-400,
+.glass-card .text-slate-300 { color: #6b82ab; }
+
+/* ── METALLIC SURFACE ────────────────────────────────────────────────────── */
 .metal-surface {
   background: var(--metal-gradient);
-  border: 1px solid var(--border-light);
+  border: 1px solid #dbe2ea;
 }
 
-/* ── BLUE BUTTON ─────────────────────────────────────────────────────────── */
+/* ── PRIMARY BUTTON — CTA blue #1e96df ───────────────────────────────────── */
 .btn-primary {
-  background: var(--blue-primary);
+  background: #1e96df;
   color: #ffffff;
-  border: 1px solid #1558c0;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  padding: 6px 14px;
+  border: 1px solid #1782c4;
+  border-radius: 8px;
+  font-family: "Lato", Arial, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 16px;
   transition: all 0.15s ease;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(29,106,229,0.25);
+  box-shadow: 0 1px 4px rgba(30,150,223,0.25);
+  line-height: 1.4;
 }
 .btn-primary:hover {
-  background: #1558c0;
-  box-shadow: 0 3px 10px rgba(29,106,229,0.35);
+  background: #1782c4;
+  box-shadow: 0 3px 10px rgba(30,150,223,0.35);
   transform: translateY(-1px);
 }
 .btn-primary:active { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+/* ── GHOST BUTTON ────────────────────────────────────────────────────────── */
 .btn-ghost {
   background: #ffffff;
-  color: var(--text-body);
-  border: 1px solid var(--border-mid);
-  border-radius: 10px;
-  font-weight: 500;
-  font-size: 0.75rem;
-  padding: 6px 14px;
+  color: #1f3965;
+  border: 1px solid #dbe2ea;
+  border-radius: 8px;
+  font-family: "Lato", Arial, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 16px;
   transition: all 0.15s ease;
+  cursor: pointer;
+  line-height: 1.4;
 }
 .btn-ghost:hover {
-  border-color: var(--blue-light);
-  color: var(--blue-primary);
-  background: #f0f5ff;
+  border-color: #1e96df;
+  color: #1e96df;
+  background: #eaf5fd;
 }
 
 /* ── INPUT FIELDS ────────────────────────────────────────────────────────── */
 .input-glass {
   background: #ffffff;
-  border: 1px solid var(--border-mid);
-  border-radius: 10px;
-  padding: 7px 12px;
-  font-size: 0.8125rem;
-  color: var(--text-dark);
+  border: 1px solid #dbe2ea;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: "Lato", Arial, sans-serif;
+  font-size: 13px;
+  color: #1f3965;
   transition: all 0.15s ease;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
 }
+.input-glass::placeholder { color: #a6b4cd; }
 .input-glass:focus {
   outline: none;
-  border-color: var(--blue-light);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+  border-color: #1e96df;
+  box-shadow: 0 0 0 3px rgba(30,150,223,0.12);
 }
 
-/* ── STATUS / PRIORITY BADGES ───────────────────────────────────────────── */
+/* ── BADGES ──────────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-family: var(--font-mono);
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 6px;
   border: 1px solid;
 }
-.badge-blue  { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-.badge-green { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
-.badge-red   { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-.badge-amber { background: #fffbeb; color: #b45309; border-color: #fde68a; }
-.badge-slate { background: #f8fafc; color: #475569; border-color: #e2e8f0; }
+.badge-blue  { background: #eaf5fd; color: #1e96df; border-color: #b0d9f5; }
+.badge-green { background: #ebf7f2; color: #36b37e; border-color: #a8e3c9; }
+.badge-red   { background: #ffefef; color: #ff5e5e; border-color: #ffbebe; }
+.badge-amber { background: #fff2e9; color: #ea8804; border-color: #ffd49a; }
+.badge-slate { background: #f2f4f8; color: #6b82ab; border-color: #dbe2ea; }
 
-/* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
+/* ── SIDEBAR — deep Teachmint navy ──────────────────────────────────────── */
 .sidebar {
   background: var(--sidebar-bg);
   width: var(--sidebar-w);
@@ -156,7 +223,7 @@ body {
   position: fixed;
   left: 0; top: 0; bottom: 0;
   border-right: 1px solid rgba(255,255,255,0.05);
-  box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+  box-shadow: 4px 0 24px rgba(7,39,69,0.4);
   z-index: 40;
   overflow-y: auto;
   scrollbar-width: none;
@@ -168,34 +235,35 @@ body {
   align-items: center;
   gap: 10px;
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   margin: 1px 8px;
-  font-size: 0.8rem;
+  font-family: "Lato", Arial, sans-serif;
+  font-size: 13px;
   font-weight: 500;
-  color: #94a3b8;
+  color: #a6b4cd;
   cursor: pointer;
   transition: all 0.15s ease;
   border: 1px solid transparent;
 }
 .sidebar-item:hover {
   background: rgba(255,255,255,0.07);
-  color: #e2e8f0;
+  color: #dbe2ea;
 }
 .sidebar-item.active {
-  background: rgba(29,106,229,0.2);
-  color: #93c5fd;
-  border-color: rgba(59,130,246,0.3);
+  background: rgba(30,150,223,0.18);
+  color: #5bb8f5;
+  border-color: rgba(30,150,223,0.3);
 }
-.sidebar-item.active .sidebar-icon { color: #60a5fa; }
+.sidebar-item.active .sidebar-icon { color: #5bb8f5; }
 
 .sidebar-section-label {
-  font-size: 0.625rem;
+  font-size: 10px;
   font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(100,116,139,0.8);
-  padding: 12px 22px 4px;
+  color: rgba(166,180,205,0.6);
+  padding: 14px 22px 4px;
 }
 
 /* ── MAIN CONTENT ────────────────────────────────────────────────────────── */
@@ -203,6 +271,7 @@ body {
   margin-left: var(--sidebar-w);
   min-height: 100vh;
   padding: 28px 32px;
+  background: #f2f4f8;
 }
 
 /* ── PANEL HEADER ────────────────────────────────────────────────────────── */
@@ -213,18 +282,18 @@ body {
   margin-bottom: 20px;
 }
 .panel-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-dark);
-  letter-spacing: -0.02em;
+  font-family: "Lato", Arial, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f3965;
+  line-height: 1.1;
 }
 
-/* ── COMPONENT BANNER HEADERS ────────────────────────────────────────────── */
-/* Dark gradient banners: text must be white/light — enforced here          */
+/* ── BANNER HEADERS — dark gradient, white text ──────────────────────────── */
 .banner-dark {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #072745 0%, #093158 50%, #0d4d8a 100%);
   color: #ffffff;
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 20px 24px;
 }
 .banner-dark h1,
@@ -232,71 +301,77 @@ body {
 .banner-dark h3,
 .banner-dark p,
 .banner-dark span { color: #ffffff; }
-.banner-dark .banner-sub { color: #bfdbfe; }
+.banner-dark .banner-sub { color: #90c4e8; }
 
 /* ── TABLE ───────────────────────────────────────────────────────────────── */
 .table-glass {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.8125rem;
+  font-size: 13px;
+  font-family: "Lato", Arial, sans-serif;
 }
 .table-glass th {
-  background: #f8fafc;
-  color: #4b5563;
-  font-size: 0.6875rem;
+  background: #f2f4f8;
+  color: #1f3965;
+  font-size: 11px;
   font-family: var(--font-mono);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid #dbe2ea;
 }
 .table-glass td {
   padding: 10px 14px;
-  border-bottom: 1px solid #f3f4f6;
-  color: var(--text-body);
+  border-bottom: 1px solid #f2f4f8;
+  color: #6b82ab;
   vertical-align: middle;
 }
 .table-glass tr:last-child td { border-bottom: none; }
-.table-glass tr:hover td { background: #f5f8ff; }
+.table-glass tr:hover td { background: #eaf5fd; }
 
 /* ── STAT CARDS ──────────────────────────────────────────────────────────── */
 .stat-card {
   background: #ffffff;
-  border: 1px solid var(--border-light);
-  border-radius: 14px;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
   padding: 16px 20px;
   box-shadow: var(--glass-shadow);
   transition: all 0.2s ease;
 }
 .stat-card:hover {
   box-shadow: var(--glass-shadow-lg);
-  border-color: #bfdbfe;
+  border-color: #90c4e8;
   transform: translateY(-1px);
 }
 .stat-value {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--blue-primary);
-  letter-spacing: -0.04em;
-  line-height: 1;
+  font-family: "Lato", Arial, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e96df;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 .stat-label {
-  font-size: 0.6875rem;
+  font-size: 11px;
   font-family: var(--font-mono);
   font-weight: 600;
-  color: var(--text-muted);
+  color: #a6b4cd;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-top: 4px;
 }
 
-/* ── CUSTOM SCROLLBARS ───────────────────────────────────────────────────── */
+/* ── SCROLLBARS ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--blue-light); }
+::-webkit-scrollbar-track { background: #f2f4f8; }
+::-webkit-scrollbar-thumb { background: #dbe2ea; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a6b4cd; }
+
+.scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: #f2f4f8; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #dbe2ea; border-radius: 4px; }
 
 /* ── ANIMATIONS ──────────────────────────────────────────────────────────── */
 @keyframes fadeInUp {
@@ -310,15 +385,15 @@ body {
   100% { background-position: 200% center; }
 }
 .shimmer {
-  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background: linear-gradient(90deg, #f2f4f8 25%, #dbe2ea 50%, #f2f4f8 75%);
   background-size: 200% auto;
   animation: shimmer 1.4s linear infinite;
 }
 
-/* ── GLASS MODAL OVERLAY ─────────────────────────────────────────────────── */
+/* ── MODAL OVERLAY ───────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(15,23,42,0.50);
+  background: rgba(7,39,69,0.55);
   backdrop-filter: blur(4px);
   z-index: 50;
   display: flex;
@@ -328,69 +403,52 @@ body {
 
 /* ── PROGRESS BAR ────────────────────────────────────────────────────────── */
 .progress-bar-track {
-  background: #dbeafe;
+  background: #d0ebfa;
   border-radius: 99px;
   height: 6px;
   overflow: hidden;
 }
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--blue-light), var(--blue-primary));
+  background: linear-gradient(90deg, #5bb8f5, #1e96df);
   border-radius: 99px;
   transition: width 0.4s ease;
 }
 
 /* ── CODE BLOCK ──────────────────────────────────────────────────────────── */
 .code-block {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #072745;
+  color: #dbe2ea;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 12px;
   border-radius: 10px;
   padding: 14px 16px;
   overflow-x: auto;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(219,226,234,0.12);
 }
 
 /* ── DIVIDER ─────────────────────────────────────────────────────────────── */
 .divider {
   height: 1px;
-  background: var(--border-light);
+  background: #dbe2ea;
   margin: 16px 0;
 }
 
 /* ── CHIP / TAG ──────────────────────────────────────────────────────────── */
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 0.6875rem; font-family: var(--font-mono); font-weight: 600;
+  font-size: 11px; font-family: var(--font-mono); font-weight: 600;
   padding: 2px 8px; border-radius: 6px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: #eaf5fd;
+  color: #1e96df;
+  border: 1px solid #b0d9f5;
 }
 
-/* ── GLOW EFFECT ─────────────────────────────────────────────────────────── */
+/* ── GLOW ────────────────────────────────────────────────────────────────── */
 .glow-blue {
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.15), 0 2px 8px rgba(29,106,229,0.2);
+  box-shadow: 0 0 0 3px rgba(30,150,223,0.15), 0 2px 8px rgba(30,150,223,0.2);
 }
 
-/* scrollbar-thin utility */
-.scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #bfdbfe; border-radius: 4px; }
-
-/* ── CONTRAST OVERRIDES: ensure text on white cards is always readable ───── */
-.glass-card .text-slate-400 { color: #6b7280; }
-.glass-card .text-slate-300 { color: #6b7280; }
-.glass-card h1,
-.glass-card h2,
-.glass-card h3,
-.glass-card h4 { color: var(--text-dark); }
-
-/* Header bar */
-header { background: #ffffff !important; }
-
-/* ── TOP HEADER BAR forced white bg ─────────────────────────────────────── */
-.sticky.top-0 {
-  background: #ffffff;
-}
+/* ── TOP HEADER BAR ──────────────────────────────────────────────────────── */
+header { background: #ffffff; }
+.sticky.top-0 { background: #ffffff; }
