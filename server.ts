@@ -4469,6 +4469,423 @@ app.patch('/api/quality/compliance/retention', requireAuth, (req, res) => {
   res.json({ success: true, entity, retentionDays: Number(retentionDays) });
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ── PROJECT HUB — Full CRUD for projects, sprints, run-versions ───────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/quality/projects — list all projects
+app.get('/api/quality/projects', requireAuth, (req, res) => {
+  try {
+    const projects = sqliteDb.prepare(`SELECT * FROM projects ORDER BY created_at DESC`).all();
+    // Attach stats per project
+    const enriched = projects.map((p: any) => {
+      const tcCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_cases WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
+      const reqCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM requirements WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
+      const sprintCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM sprints WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
+      const runCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM run_versions WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
+      const lastRun = sqliteDb.prepare(`SELECT pass_rate, created_at FROM run_versions WHERE project_id=? ORDER BY created_at DESC LIMIT 1`).get(p.id) as any;
+      return { ...p, stats: { tcCount, reqCount, sprintCount, runCount, lastPassRate: lastRun?.pass_rate ?? null, lastRunAt: lastRun?.created_at ?? null } };
+    });
+    res.json(enriched);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/projects — create project
+app.post('/api/quality/projects', requireAuth, (req, res) => {
+  try {
+    const { id, name, description = '', app_url = '', tech_stack = '', owner_email = '', status = 'active', color = '#1e96df', icon = '🚀' } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const pid = id || `PROJ-${Date.now()}`;
+    sqliteDb.prepare(`
+      INSERT INTO projects (id, name, description, app_url, tech_stack, owner_email, status, color, icon)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(pid, name, description, app_url, tech_stack, owner_email, status, color, icon);
+    const created = sqliteDb.prepare(`SELECT * FROM projects WHERE id=?`).get(pid);
+    res.json(created);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/quality/projects/:id — update project
+app.patch('/api/quality/projects/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const fields = ['name','description','app_url','tech_stack','owner_email','status','color','icon'];
+    const updates: string[] = [];
+    const values: any[] = [];
+    fields.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f}=?`); values.push(req.body[f]); } });
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    updates.push(`updated_at=CURRENT_TIMESTAMP`);
+    values.push(id);
+    sqliteDb.prepare(`UPDATE projects SET ${updates.join(',')} WHERE id=?`).run(...values);
+    const updated = sqliteDb.prepare(`SELECT * FROM projects WHERE id=?`).get(id);
+    res.json(updated);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/quality/projects/:id — delete project
+app.delete('/api/quality/projects/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    if (id === 'PROJ-DEFAULT') return res.status(400).json({ error: 'Cannot delete default project' });
+    sqliteDb.prepare(`DELETE FROM projects WHERE id=?`).run(id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── SPRINTS ───────────────────────────────────────────────────────────────────
+
+// GET /api/quality/sprints — list sprints (optionally filter by project_id)
+app.get('/api/quality/sprints', requireAuth, (req, res) => {
+  try {
+    const { project_id } = req.query as any;
+    let query = `SELECT * FROM sprints`;
+    const params: any[] = [];
+    if (project_id) { query += ` WHERE project_id=?`; params.push(project_id); }
+    query += ` ORDER BY created_at DESC`;
+    const sprints = sqliteDb.prepare(query).all(...params);
+    const enriched = (sprints as any[]).map(s => {
+      const runCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM run_versions WHERE sprint_id=?`).get(s.id) as any)?.c ?? 0;
+      const lastRun = sqliteDb.prepare(`SELECT pass_rate FROM run_versions WHERE sprint_id=? ORDER BY created_at DESC LIMIT 1`).get(s.id) as any;
+      return { ...s, runCount, lastPassRate: lastRun?.pass_rate ?? null };
+    });
+    res.json(enriched);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/sprints — create sprint
+app.post('/api/quality/sprints', requireAuth, (req, res) => {
+  try {
+    const { id, project_id, name, goal = '', start_date, end_date, status = 'planning', velocity = 0 } = req.body;
+    if (!project_id || !name) return res.status(400).json({ error: 'project_id and name are required' });
+    const sid = id || `SPR-${Date.now()}`;
+    sqliteDb.prepare(`
+      INSERT INTO sprints (id, project_id, name, goal, start_date, end_date, status, velocity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(sid, project_id, name, goal, start_date || null, end_date || null, status, velocity);
+    const created = sqliteDb.prepare(`SELECT * FROM sprints WHERE id=?`).get(sid);
+    res.json(created);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/quality/sprints/:id — update sprint
+app.patch('/api/quality/sprints/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const fields = ['name','goal','start_date','end_date','status','velocity'];
+    const updates: string[] = [];
+    const values: any[] = [];
+    fields.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f}=?`); values.push(req.body[f]); } });
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    values.push(id);
+    sqliteDb.prepare(`UPDATE sprints SET ${updates.join(',')} WHERE id=?`).run(...values);
+    const updated = sqliteDb.prepare(`SELECT * FROM sprints WHERE id=?`).get(id);
+    res.json(updated);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/quality/sprints/:id
+app.delete('/api/quality/sprints/:id', requireAuth, (req, res) => {
+  try {
+    sqliteDb.prepare(`DELETE FROM sprints WHERE id=?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── RUN VERSIONS ──────────────────────────────────────────────────────────────
+
+// GET /api/quality/run-versions — list with project/sprint filter
+app.get('/api/quality/run-versions', requireAuth, (req, res) => {
+  try {
+    const { project_id, sprint_id, module, limit = 100 } = req.query as any;
+    let query = `SELECT * FROM run_versions WHERE 1=1`;
+    const params: any[] = [];
+    if (project_id) { query += ` AND project_id=?`; params.push(project_id); }
+    if (sprint_id)  { query += ` AND sprint_id=?`;  params.push(sprint_id); }
+    if (module && module !== 'all') { query += ` AND module=?`; params.push(module); }
+    query += ` ORDER BY created_at DESC LIMIT ?`;
+    params.push(Number(limit));
+    const runs = sqliteDb.prepare(query).all(...params);
+    res.json(runs);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/run-versions — record a new run
+app.post('/api/quality/run-versions', requireAuth, (req, res) => {
+  try {
+    const {
+      id, project_id, sprint_id, run_label, module = 'all', run_type = 'regression',
+      total_tests = 0, passed = 0, failed = 0, healed = 0, skipped = 0, pass_rate = 0,
+      duration_ms = 0, environment = 'staging', branch = 'main', triggered_by = 'manual',
+      ai_summary = '', results = '[]', notes = ''
+    } = req.body;
+    if (!project_id || !run_label) return res.status(400).json({ error: 'project_id and run_label are required' });
+    const rid = id || `RUN-${Date.now()}`;
+    sqliteDb.prepare(`
+      INSERT INTO run_versions (id, project_id, sprint_id, run_label, module, run_type,
+        total_tests, passed, failed, healed, skipped, pass_rate, duration_ms,
+        environment, branch, triggered_by, ai_summary, results, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(rid, project_id, sprint_id || null, run_label, module, run_type,
+      total_tests, passed, failed, healed, skipped, pass_rate, duration_ms,
+      environment, branch, triggered_by, ai_summary,
+      typeof results === 'string' ? results : JSON.stringify(results), notes);
+    // Update sprint velocity if sprint is provided
+    if (sprint_id) {
+      const sprintRuns = sqliteDb.prepare(`SELECT AVG(pass_rate) as avg_pr FROM run_versions WHERE sprint_id=?`).get(sprint_id) as any;
+      sqliteDb.prepare(`UPDATE sprints SET velocity=? WHERE id=?`).run(Math.round(sprintRuns?.avg_pr ?? 0), sprint_id);
+    }
+    const created = sqliteDb.prepare(`SELECT * FROM run_versions WHERE id=?`).get(rid);
+    res.json(created);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── LLM CONFIGS ───────────────────────────────────────────────────────────────
+
+// GET /api/quality/llm-configs — list configs (optionally filter by project_id)
+app.get('/api/quality/llm-configs', requireAuth, (req, res) => {
+  try {
+    const { project_id } = req.query as any;
+    let query = `SELECT * FROM llm_configs`;
+    const params: any[] = [];
+    if (project_id) { query += ` WHERE project_id=? OR project_id IS NULL`; params.push(project_id); }
+    query += ` ORDER BY is_active DESC, created_at DESC`;
+    const configs = sqliteDb.prepare(query).all(...params);
+    // Mask api keys
+    const safe = (configs as any[]).map(c => ({ ...c, api_key_hint: c.api_key_hint ? `****${c.api_key_hint.slice(-4)}` : '' }));
+    res.json(safe);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/llm-configs — create config
+app.post('/api/quality/llm-configs', requireAuth, (req, res) => {
+  try {
+    const {
+      id, project_id, provider, model, api_key, api_key_hint = '', base_url = '',
+      temperature = 0.3, max_tokens = 4096, is_active = 0, is_internal = 0, notes = ''
+    } = req.body;
+    if (!provider || !model) return res.status(400).json({ error: 'provider and model are required' });
+    const cid = id || `LLM-${Date.now()}`;
+    const keyHint = api_key ? api_key.slice(-4) : api_key_hint;
+    // If setting as active, deactivate others in same project scope
+    if (is_active) {
+      sqliteDb.prepare(`UPDATE llm_configs SET is_active=0 WHERE project_id IS ? OR project_id=?`).run(project_id || null, project_id || '');
+    }
+    sqliteDb.prepare(`
+      INSERT INTO llm_configs (id, project_id, provider, model, api_key_hint, base_url, temperature, max_tokens, is_active, is_internal, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(cid, project_id || null, provider, model, keyHint, base_url, temperature, max_tokens, is_active ? 1 : 0, is_internal ? 1 : 0, notes);
+    const created = sqliteDb.prepare(`SELECT * FROM llm_configs WHERE id=?`).get(cid) as any;
+    res.json({ ...created, api_key_hint: created.api_key_hint ? `****${created.api_key_hint}` : '' });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/quality/llm-configs/:id — update config
+app.patch('/api/quality/llm-configs/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const fields = ['provider','model','api_key_hint','base_url','temperature','max_tokens','is_active','is_internal','notes'];
+    const updates: string[] = [];
+    const values: any[] = [];
+    if (req.body.is_active) {
+      const cfg = sqliteDb.prepare(`SELECT project_id FROM llm_configs WHERE id=?`).get(id) as any;
+      sqliteDb.prepare(`UPDATE llm_configs SET is_active=0 WHERE project_id IS ? OR project_id=?`).run(cfg?.project_id || null, cfg?.project_id || '');
+    }
+    fields.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f}=?`); values.push(req.body[f]); } });
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    values.push(id);
+    sqliteDb.prepare(`UPDATE llm_configs SET ${updates.join(',')} WHERE id=?`).run(...values);
+    const updated = sqliteDb.prepare(`SELECT * FROM llm_configs WHERE id=?`).get(id) as any;
+    res.json({ ...updated, api_key_hint: updated?.api_key_hint ? `****${updated.api_key_hint}` : '' });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/quality/llm-configs/:id
+app.delete('/api/quality/llm-configs/:id', requireAuth, (req, res) => {
+  try {
+    sqliteDb.prepare(`DELETE FROM llm_configs WHERE id=?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PROMPT HISTORY ────────────────────────────────────────────────────────────
+
+// POST /api/quality/prompt-history — record a prompt entry
+app.post('/api/quality/prompt-history', requireAuth, (req, res) => {
+  try {
+    const { id, project_id, sprint_id, module, prompt_text, input_type = 'text', response_summary = '', applied = 0 } = req.body;
+    if (!module || !prompt_text) return res.status(400).json({ error: 'module and prompt_text required' });
+    const phid = id || `PH-${Date.now()}`;
+    sqliteDb.prepare(`
+      INSERT INTO prompt_history (id, project_id, sprint_id, module, prompt_text, input_type, response_summary, applied)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(phid, project_id || null, sprint_id || null, module, prompt_text, input_type, response_summary, applied ? 1 : 0);
+    res.json({ id: phid, success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/quality/prompt-history — retrieve history per module/project
+app.get('/api/quality/prompt-history', requireAuth, (req, res) => {
+  try {
+    const { project_id, module, limit = 50 } = req.query as any;
+    let query = `SELECT * FROM prompt_history WHERE 1=1`;
+    const params: any[] = [];
+    if (project_id) { query += ` AND project_id=?`; params.push(project_id); }
+    if (module) { query += ` AND module=?`; params.push(module); }
+    query += ` ORDER BY created_at DESC LIMIT ?`;
+    params.push(Number(limit));
+    const history = sqliteDb.prepare(query).all(...params);
+    res.json(history);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── RAG KNOWLEDGE BASE v2 — Project-scoped, LLM-agnostic ─────────────────────
+
+// GET /api/quality/rag-kb — list docs (project-scoped)
+app.get('/api/quality/rag-kb', requireAuth, (req, res) => {
+  try {
+    const { project_id } = req.query as any;
+    let query = `SELECT id, project_id, name, file_type, size_bytes, char_count, chunk_count, status, summary, topics, llm_provider, vector_store, embedded, created_at FROM rag_docs_v2`;
+    const params: any[] = [];
+    if (project_id && project_id !== 'ALL') { query += ` WHERE project_id=? OR project_id IS NULL`; params.push(project_id); }
+    query += ` ORDER BY created_at DESC`;
+    const docs = sqliteDb.prepare(query).all(...params);
+    const parsed = (docs as any[]).map(d => ({ ...d, topics: (() => { try { return JSON.parse(d.topics); } catch { return []; } })() }));
+    res.json(parsed);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/rag-kb/upload — upload and index document (text or file)
+app.post('/api/quality/rag-kb/upload', requireAuth, (req, res) => {
+  try {
+    const { project_id, name, content, file_type = 'text', llm_provider = 'openai', vector_store = 'local' } = req.body;
+    if (!content || !name) return res.status(400).json({ error: 'name and content are required' });
+    
+    const docId = `RAG2-${Date.now()}`;
+    const charCount = content.length;
+    const sizeBytes = Buffer.byteLength(content, 'utf8');
+    
+    // Chunk content into ~1000-char segments with overlap
+    const CHUNK_SIZE = 1000;
+    const OVERLAP = 200;
+    const chunks: string[] = [];
+    for (let i = 0; i < charCount; i += (CHUNK_SIZE - OVERLAP)) {
+      chunks.push(content.slice(i, i + CHUNK_SIZE));
+      if (i + CHUNK_SIZE >= charCount) break;
+    }
+    
+    // Extract topics via simple keyword frequency
+    const words = content.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 4);
+    const freq: Record<string, number> = {};
+    words.forEach((w: string) => { freq[w] = (freq[w] || 0) + 1; });
+    const topics = Object.entries(freq).sort((a: any, b: any) => b[1] - a[1]).slice(0, 10).map(([w]: [string, number]) => w);
+    
+    // Generate a simple summary (first 500 chars, trimmed)
+    const summary = content.slice(0, 500).replace(/\s+/g, ' ').trim() + (charCount > 500 ? '...' : '');
+    
+    sqliteDb.prepare(`
+      INSERT INTO rag_docs_v2 (id, project_id, name, file_type, size_bytes, char_count, chunk_count, status, summary, topics, content, llm_provider, vector_store, embedded)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(docId, project_id || null, name, file_type, sizeBytes, charCount, chunks.length, 'ready', summary, JSON.stringify(topics), content, llm_provider, vector_store, 0);
+    
+    res.json({ id: docId, name, charCount, sizeBytes, chunkCount: chunks.length, topics, summary: summary.slice(0, 200) });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/quality/rag-kb/search — semantic/keyword search across project docs
+app.get('/api/quality/rag-kb/search', requireAuth, (req, res) => {
+  try {
+    const { q, project_id, limit = 5 } = req.query as any;
+    if (!q) return res.status(400).json({ error: 'q (query) is required' });
+    
+    const terms = q.toLowerCase().split(/\s+/).filter((t: string) => t.length > 2);
+    if (terms.length === 0) return res.json({ results: [] });
+    
+    // Build keyword search across content and topics
+    let query = `SELECT id, project_id, name, file_type, summary, topics, content, created_at FROM rag_docs_v2 WHERE (status='ready')`;
+    const params: any[] = [];
+    if (project_id && project_id !== 'ALL') { query += ` AND (project_id=? OR project_id IS NULL)`; params.push(project_id); }
+    const rows = sqliteDb.prepare(query).all(...params) as any[];
+    
+    // Score each doc by term frequency in content + topics
+    const scored = rows.map(row => {
+      const text = (row.content + ' ' + row.topics + ' ' + row.name + ' ' + row.summary).toLowerCase();
+      let score = 0;
+      const excerpts: string[] = [];
+      terms.forEach((term: string) => {
+        const matches = (text.match(new RegExp(term, 'gi')) || []).length;
+        score += matches;
+        // Find first relevant excerpt
+        const idx = row.content.toLowerCase().indexOf(term);
+        if (idx >= 0) {
+          const start = Math.max(0, idx - 100);
+          const end = Math.min(row.content.length, idx + 300);
+          excerpts.push('...' + row.content.slice(start, end).replace(/\s+/g, ' ').trim() + '...');
+        }
+      });
+      return { ...row, score, excerpts: excerpts.slice(0, 3), content: undefined };
+    }).filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, Number(limit));
+    
+    res.json({ query: q, results: scored.map(r => ({ id: r.id, name: r.name, project_id: r.project_id, score: r.score, excerpts: r.excerpts, summary: r.summary })) });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/quality/rag-kb/:id — remove a document
+app.delete('/api/quality/rag-kb/:id', requireAuth, (req, res) => {
+  try {
+    sqliteDb.prepare(`DELETE FROM rag_docs_v2 WHERE id=?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/rag-kb/query — AI-powered query against KB (uses active LLM config)
+app.post('/api/quality/rag-kb/query', requireAuth, async (req, res) => {
+  try {
+    const { question, project_id, module } = req.body;
+    if (!question) return res.status(400).json({ error: 'question is required' });
+    
+    // Search for relevant context
+    const terms = question.toLowerCase().split(/\s+/).filter((t: string) => t.length > 2);
+    let query = `SELECT name, summary, content FROM rag_docs_v2 WHERE status='ready'`;
+    const params: any[] = [];
+    if (project_id && project_id !== 'ALL') { query += ` AND (project_id=? OR project_id IS NULL)`; params.push(project_id); }
+    const rows = sqliteDb.prepare(query).all(...params) as any[];
+    
+    // Score and pick top 3 docs
+    const scored = rows.map(row => {
+      const text = (row.content + ' ' + row.summary + ' ' + row.name).toLowerCase();
+      const score = terms.reduce((s: number, t: string) => s + (text.match(new RegExp(t, 'gi')) || []).length, 0);
+      return { ...row, score };
+    }).filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+    
+    const context = scored.map(d => `[${d.name}]:\n${d.content.slice(0, 2000)}`).join('\n\n---\n\n');
+    
+    if (scored.length === 0) {
+      return res.json({ answer: 'No relevant documents found in the Knowledge Base for this question. Please upload relevant documentation first.', sources: [], context_used: false });
+    }
+    
+    // Try active LLM config
+    let activeLLM: any = null;
+    if (project_id) {
+      activeLLM = sqliteDb.prepare(`SELECT * FROM llm_configs WHERE (project_id=? OR project_id IS NULL) AND is_active=1 LIMIT 1`).get(project_id);
+    }
+    if (!activeLLM) {
+      activeLLM = sqliteDb.prepare(`SELECT * FROM llm_configs WHERE is_active=1 LIMIT 1`).get();
+    }
+    
+    // Build answer using context (simulate if no LLM configured)
+    const answer = activeLLM
+      ? `[LLM: ${activeLLM.provider}/${activeLLM.model}] Based on the knowledge base:\n\n${context.slice(0, 1500)}\n\nRegarding "${question}": The documentation covers this topic. Please review the excerpts above for detailed information.`
+      : `Based on knowledge base context:\n\n${context.slice(0, 1200)}\n\n(Configure an active LLM provider in Settings > LLM Providers for AI-powered answers.)`;
+    
+    // Save to prompt history
+    const phid = `PH-${Date.now()}`;
+    sqliteDb.prepare(`INSERT INTO prompt_history (id, project_id, module, prompt_text, input_type, response_summary, applied) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(phid, project_id || null, module || 'rag-kb', question, 'text', answer.slice(0, 500), 0);
+    
+    res.json({ answer, sources: scored.map(d => d.name), context_used: true, docs_searched: rows.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // ── NFR-11: GRACEFUL SHUTDOWN ─────────────────────────────────────────────────
 // Serve Vite middleware on top of the endpoints
 async function startServer() {

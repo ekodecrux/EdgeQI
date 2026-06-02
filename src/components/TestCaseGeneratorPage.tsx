@@ -27,6 +27,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { TestCase } from '../types';
+import VoicePromptBar from './VoicePromptBar';
 
 interface TestCaseGeneratorPageProps {
   testCases: TestCase[];
@@ -35,6 +36,7 @@ interface TestCaseGeneratorPageProps {
   onAddManualTestCase?: (tc: TestCase) => void;
   onUpdateTestCase?: (tc: TestCase) => void;
   currentProjectId?: string;
+  currentSprintId?: string;
   onNavigateToScripts?: () => void;
 }
 
@@ -45,6 +47,7 @@ export default function TestCaseGeneratorPage({
   onAddManualTestCase,
   onUpdateTestCase,
   currentProjectId = 'ALL',
+  currentSprintId,
   onNavigateToScripts,
 }: TestCaseGeneratorPageProps) {
   const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
@@ -435,6 +438,19 @@ export default function TestCaseGeneratorPage({
           </div>
         </div>
       </div>
+
+      {/* Voice + Prompt Bar */}
+      <VoicePromptBar
+        module="testcases"
+        currentProjectId={currentProjectId}
+        currentSprintId={currentSprintId}
+        compact={false}
+        onPromptSubmit={(text, ragContext) => {
+          const enriched = ragContext ? `${text}\n\n--- KB Context ---\n${ragContext}` : text;
+          setTcTitle(text.slice(0, 80));
+          setTcDesc(enriched);
+        }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 

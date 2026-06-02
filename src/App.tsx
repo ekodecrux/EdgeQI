@@ -30,7 +30,9 @@ import {
   Plus,
   X,
   Edit2,
-  Play
+  Play,
+  FolderOpen,
+  Brain
 } from 'lucide-react';
 
 import { 
@@ -67,6 +69,9 @@ import FeedbackTemplatesTab from './components/FeedbackTemplatesTab';
 import IntegrationsTab from './components/IntegrationsTab';
 import SchedulerTab from './components/SchedulerTab';
 import AnalyticsTab from './components/AnalyticsTab';
+import ProjectHub from './components/ProjectHub';
+import RAGKnowledgeBase from './components/RAGKnowledgeBase';
+import VoicePromptBar from './components/VoicePromptBar';
 
 // ── REQ-30: TEST PLAN CRUD ────────────────────────────────────────────────────
 function TestPlansTab() {
@@ -437,8 +442,13 @@ export default function App() {
     'scheduler' |
     'analytics' |
     'test-plans' |
-    'manual-execution'
+    'manual-execution' |
+    'projects' |
+    'rag-kb'
   >('agentic');
+  
+  // Sprint context — active sprint for current project
+  const [currentSprintId, setCurrentSprintId] = useState<string>('');
 
   // Auth state
   const [authUser, setAuthUser] = useState<{ id: number; email: string; name: string; role: string } | null>(() => {
@@ -476,11 +486,38 @@ export default function App() {
   const [vulnerabilities, setVulnerabilities] = useState<SecurityVulnerability[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
-  // Project Partitioning — dynamically build project list from actual data
+  // Project Partitioning — load from DB
   const [currentProjectId, setCurrentProjectId] = useState<string>('ALL');
+  const [dbProjects, setDbProjects] = useState<{ id: string; name: string; icon: string; color: string }[]>([]);
+  const [dbSprints, setDbSprints] = useState<{ id: string; project_id: string; name: string; status: string }[]>([]);
 
-  // Collect all unique project IDs from existing data
+  // Load projects from DB on mount and when switching projects
+  useEffect(() => {
+    const token = localStorage.getItem('iq_token') || '';
+    fetch('/api/quality/projects', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any[]) => setDbProjects(data.map(p => ({ id: p.id, name: p.name, icon: p.icon, color: p.color }))))
+      .catch(() => {});
+  }, []);
+
+  // Load sprints when project changes
+  useEffect(() => {
+    if (currentProjectId === 'ALL') { setDbSprints([]); setCurrentSprintId(''); return; }
+    const token = localStorage.getItem('iq_token') || '';
+    fetch(`/api/quality/sprints?project_id=${currentProjectId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        setDbSprints(data);
+        // Auto-select active sprint
+        const active = data.find((s: any) => s.status === 'active');
+        setCurrentSprintId(active?.id || data[0]?.id || '');
+      })
+      .catch(() => {});
+  }, [currentProjectId]);
+
+  // Collect all unique project IDs from existing data + DB projects
   const allProjectIds = Array.from(new Set([
+    ...dbProjects.map(p => p.id),
     ...requirements.map(r => r.projectId),
     ...testCases.map(tc => tc.projectId),
   ].filter(Boolean))) as string[];
@@ -999,7 +1036,28 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
 
         {/* Primary Nav — pb-32 reserves space for the absolute footer so items don't overlap */}
         <div className="px-2 pt-3 pb-32">
-          <span className="sidebar-section-label">Core Modules</span>
+          <span className="sidebar-section-label">Project</span>
+          <nav className="flex flex-col mt-1">
+            {[
+              { id: 'projects', label: 'Project Hub',      icon: FolderOpen },
+              { id: 'rag-kb',   label: 'Knowledge Base',   icon: Brain },
+            ].map((page) => {
+              const Icon = page.icon;
+              const isSelected = activeTab === page.id;
+              return (
+                <button
+                  key={page.id}
+                  onClick={() => setActiveTab(page.id as any)}
+                  className={`sidebar-item${isSelected ? ' active' : ''}`}
+                >
+                  <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-500'}`} />
+                  <span>{page.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <span className="sidebar-section-label mt-3">Core Modules</span>
           <nav className="flex flex-col mt-1">
             {[
               { id: 'agentic',          label: 'Auto Pipeline',        icon: Zap },
@@ -1107,22 +1165,51 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2" style={{ borderRight: '1px solid #dbe2ea', paddingRight: 16 }}>
-              <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#a6b4cd', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Context:</span>
-              <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#1e96df' }}>Segregated Sandbox</span>
+          <div className="flex items-center gap-2">
+            {/* Project Selector — populated from DB */}
+            <div className="flex items-center gap-1.5">
+              <FolderOpen className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
+              <select
+                value={currentProjectId}
+                onChange={(e) => { setCurrentProjectId(e.target.value); }}
+                className="input-glass text-xs"
+                style={{ maxWidth: 160 }}
+              >
+                <option value="ALL">🗂 All Projects</option>
+                {dbProjects.map(p => (
+                  <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                ))}
+                {allProjectIds.filter(id => !dbProjects.find(p => p.id === id)).map(pid => (
+                  <option key={pid} value={pid}>📁 {pid}</option>
+                ))}
+              </select>
             </div>
 
-            <select
-              value={currentProjectId}
-              onChange={(e) => setCurrentProjectId(e.target.value)}
-              className="input-glass text-xs"
-            >
-              <option value="ALL">🗂 All Projects</option>
-              {allProjectIds.map(pid => (
-                <option key={pid} value={pid}>📁 {pid}</option>
-              ))}
-            </select>
+            {/* Sprint Selector — shows only when a project is selected */}
+            {currentProjectId !== 'ALL' && dbSprints.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
+                <select
+                  value={currentSprintId}
+                  onChange={e => setCurrentSprintId(e.target.value)}
+                  className="input-glass text-xs"
+                  style={{ maxWidth: 140 }}
+                >
+                  <option value="">No Sprint</option>
+                  {dbSprints.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.status === 'active' ? '🟢' : s.status === 'planning' ? '📋' : s.status === 'completed' ? '✅' : '⏸'} {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Quick link to Project Hub */}
+            <button onClick={() => setActiveTab('projects')} title="Open Project Hub"
+              className="p-1.5 hover:bg-slate-100 rounded-lg border border-slate-200 hidden md:flex items-center">
+              <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
+            </button>
 
             <button
               onClick={() => setChatbotOpen(!chatbotOpen)}
@@ -1177,6 +1264,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               onTriggerRun={handleExecuteAutonomousCycle}
               onOverrideConfirm={handleManualOverrideConfig}
               onNavigateToDashboard={() => setActiveTab('dashboard')}
+              currentProjectId={currentProjectId}
+              currentSprintId={currentSprintId}
             />
           )}
 
@@ -1188,6 +1277,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               isGenerating={isGeneratingRequirements}
               onGenerateTestCaseCode={(tcId) => handleGenerateScript(tcId, 'Playwright', 'TypeScript')}
               onNavigateToTestCases={() => setActiveTab('testcases')}
+              currentProjectId={currentProjectId}
+              currentSprintId={currentSprintId}
             />
           )}
 
@@ -1199,6 +1290,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               onAddManualTestCase={(newCase) => setTestCases(prev => [{ ...newCase, projectId: currentProjectId }, ...prev])}
               onUpdateTestCase={handleUpdateTestCase}
               currentProjectId={currentProjectId}
+              currentSprintId={currentSprintId}
               onNavigateToScripts={() => setActiveTab('scripts')}
             />
           )}
@@ -1230,6 +1322,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               onGenerateScript={handleGenerateScript}
               isGeneratingScript={isGeneratingRequirements || isGeneratingScript}
               currentProjectId={currentProjectId}
+              currentSprintId={currentSprintId}
               onNavigateToExecution={() => setActiveTab('execution')}
             />
           )}
@@ -1274,6 +1367,21 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {activeTab === 'feedback' && <FeedbackTemplatesTab />}
           {activeTab === 'scheduler' && <SchedulerTab />}
           {activeTab === 'analytics' && <AnalyticsTab />}
+          
+          {activeTab === 'projects' && (
+            <ProjectHub
+              currentProjectId={currentProjectId}
+              onSelectProject={(id) => { setCurrentProjectId(id); }}
+              onNavigateTo={(tab) => setActiveTab(tab as any)}
+            />
+          )}
+          
+          {activeTab === 'rag-kb' && (
+            <RAGKnowledgeBase
+              currentProjectId={currentProjectId}
+              onNavigateTo={(tab) => setActiveTab(tab as any)}
+            />
+          )}
 
           {activeTab === 'audit' && (
             <div className="glass-card p-6 space-y-4 animate-fadeInUp">

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
+import VoicePromptBar from './VoicePromptBar';
 
 // REQ-12: Status workflow
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -36,6 +37,8 @@ interface RequirementsProps {
   isGenerating: boolean;
   onGenerateTestCaseCode: (testCaseId: string) => void;
   onNavigateToTestCases?: () => void;
+  currentProjectId?: string;
+  currentSprintId?: string;
 }
 
 export default function RequirementsTab({
@@ -45,6 +48,8 @@ export default function RequirementsTab({
   isGenerating,
   onGenerateTestCaseCode,
   onNavigateToTestCases,
+  currentProjectId,
+  currentSprintId,
 }: RequirementsProps) {
   const [sourceType, setSourceType] = useState<'file' | 'text' | 'url' | 'voice'>('text');
   const [title, setTitle] = useState('');
@@ -342,6 +347,21 @@ export default function RequirementsTab({
         </div>
       </div>
     </div>
+    {/* Voice + Prompt Bar */}
+    <VoicePromptBar
+      module="requirements"
+      currentProjectId={currentProjectId}
+      currentSprintId={currentSprintId}
+      compact={false}
+      onPromptSubmit={(text, ragContext) => {
+        // Inject prompt text as content for a new requirement
+        const enriched = ragContext ? `${text}\n\n--- KB Context ---\n${ragContext}` : text;
+        setContent(enriched);
+        setTitle(text.slice(0, 80));
+        setSourceType('text');
+      }}
+    />
+
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* ─── DIFF MODAL (REQ-10) ──────────────────────────────────────────── */}
       {showDiffModal && (

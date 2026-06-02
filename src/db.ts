@@ -210,6 +210,141 @@ sqliteDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_vulns_severity ON security_vulnerabilities(severity);
 `);
 
+// ─── EXTENDED SCHEMA (additive migrations — safe to re-run) ──────────────────
+sqliteDb.exec(`
+  -- Projects table — top-level containers for all STLC artifacts
+  CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    app_url TEXT DEFAULT '',
+    tech_stack TEXT DEFAULT '',
+    owner_email TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    color TEXT DEFAULT '#1e96df',
+    icon TEXT DEFAULT '🚀',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Sprints — time-boxed iterations within a project
+  CREATE TABLE IF NOT EXISTS sprints (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    goal TEXT DEFAULT '',
+    start_date TEXT,
+    end_date TEXT,
+    status TEXT DEFAULT 'planning',
+    velocity INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+  );
+
+  -- Execution run versions — per-project, per-sprint, per-module history
+  CREATE TABLE IF NOT EXISTS run_versions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    sprint_id TEXT,
+    run_label TEXT NOT NULL,
+    module TEXT DEFAULT 'all',
+    run_type TEXT DEFAULT 'regression',
+    total_tests INTEGER DEFAULT 0,
+    passed INTEGER DEFAULT 0,
+    failed INTEGER DEFAULT 0,
+    healed INTEGER DEFAULT 0,
+    skipped INTEGER DEFAULT 0,
+    pass_rate REAL DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    environment TEXT DEFAULT 'staging',
+    branch TEXT DEFAULT 'main',
+    triggered_by TEXT DEFAULT 'manual',
+    ai_summary TEXT,
+    results TEXT DEFAULT '[]',
+    notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+  );
+
+  -- RAG documents with project scoping
+  CREATE TABLE IF NOT EXISTS rag_docs_v2 (
+    id TEXT PRIMARY KEY,
+    project_id TEXT,
+    name TEXT NOT NULL,
+    file_type TEXT DEFAULT 'text',
+    size_bytes INTEGER DEFAULT 0,
+    char_count INTEGER DEFAULT 0,
+    chunk_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'processing',
+    summary TEXT DEFAULT '',
+    topics TEXT DEFAULT '[]',
+    content TEXT DEFAULT '',
+    llm_provider TEXT DEFAULT 'openai',
+    vector_store TEXT DEFAULT 'local',
+    embedded INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- LLM configurations per project
+  CREATE TABLE IF NOT EXISTS llm_configs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    api_key_hint TEXT DEFAULT '',
+    base_url TEXT DEFAULT '',
+    temperature REAL DEFAULT 0.3,
+    max_tokens INTEGER DEFAULT 4096,
+    is_active INTEGER DEFAULT 0,
+    is_internal INTEGER DEFAULT 0,
+    notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Project prompt history (all voice + text prompts per module)
+  CREATE TABLE IF NOT EXISTS prompt_history (
+    id TEXT PRIMARY KEY,
+    project_id TEXT,
+    sprint_id TEXT,
+    module TEXT NOT NULL,
+    prompt_text TEXT NOT NULL,
+    input_type TEXT DEFAULT 'text',
+    response_summary TEXT,
+    applied INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Add project_id column to execution_runs if not exists
+  ALTER TABLE execution_runs ADD COLUMN project_id TEXT DEFAULT 'DEFAULT';
+  ALTER TABLE execution_runs ADD COLUMN sprint_id TEXT;
+  ALTER TABLE execution_runs ADD COLUMN run_label TEXT;
+  ALTER TABLE execution_runs ADD COLUMN module TEXT DEFAULT 'all';
+  ALTER TABLE execution_runs ADD COLUMN notes TEXT DEFAULT '';
+
+  -- Indexes
+  CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+  CREATE INDEX IF NOT EXISTS idx_sprints_project ON sprints(project_id);
+  CREATE INDEX IF NOT EXISTS idx_run_ver_project ON run_versions(project_id);
+  CREATE INDEX IF NOT EXISTS idx_run_ver_sprint ON run_versions(sprint_id);
+  CREATE INDEX IF NOT EXISTS idx_rag_v2_project ON rag_docs_v2(project_id);
+  CREATE INDEX IF NOT EXISTS idx_prompt_hist_project ON prompt_history(project_id);
+  CREATE INDEX IF NOT EXISTS idx_prompt_hist_module ON prompt_history(module);
+`);
+
+// Ignore column-already-exists errors from ALTER TABLE (SQLite quirk)
+try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN project_id TEXT DEFAULT 'DEFAULT'`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN sprint_id TEXT`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN run_label TEXT`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN module TEXT DEFAULT 'all'`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN notes TEXT DEFAULT ''`); } catch {}
+
+// Seed default project if none exists
+const projCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM projects").get() as any).c;
+if (projCount === 0) {
+  sqliteDb.prepare(`INSERT INTO projects (id, name, description, app_url, tech_stack, owner_email, color, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run('PROJ-DEFAULT', 'My First Application', 'Default project — rename to your application name', '', 'React / Node.js / REST API', 'team@company.com', '#1e96df', '🚀');
+}
+
 // ─── SEED DEFAULT PROMPT TEMPLATES ─────────────────────────────────────────
 const templateCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM prompt_templates").get() as any).c;
 if (templateCount === 0) {

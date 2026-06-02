@@ -18,6 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { TestCase, ScriptFile } from '../types';
+import VoicePromptBar from './VoicePromptBar';
 
 interface ScriptProps {
   testCases: TestCase[];
@@ -25,6 +26,7 @@ interface ScriptProps {
   onGenerateScript: (testCaseId: string, framework: 'Playwright' | 'Selenium' | 'Cypress' | 'Robot', language: 'TypeScript' | 'Java' | 'Python' | 'JavaScript') => Promise<void>;
   isGeneratingScript: boolean;
   currentProjectId?: string;
+  currentSprintId?: string;
   onNavigateToExecution?: () => void;
 }
 
@@ -34,6 +36,7 @@ export default function ScriptTab({
   onGenerateScript,
   isGeneratingScript,
   currentProjectId = 'ALL',
+  currentSprintId,
   onNavigateToExecution,
 }: ScriptProps) {
   const [selectedTestCaseIds, setSelectedTestCaseIds] = useState<Set<string>>(new Set());
@@ -209,6 +212,18 @@ export default function ScriptTab({
 
   return (
     <div className="space-y-6">
+
+      {/* Voice + Prompt Bar */}
+      <VoicePromptBar
+        module="scripts"
+        currentProjectId={currentProjectId}
+        currentSprintId={currentSprintId}
+        compact={false}
+        onPromptSubmit={(text) => {
+          // Prompt text shown as notification — user can describe what to automate
+          console.log('[ScriptTab] Prompt:', text);
+        }}
+      />
       
       {/* Grid containing select panel & analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

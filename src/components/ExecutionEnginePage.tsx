@@ -55,6 +55,8 @@ interface ExecutionEnginePageProps {
   onTriggerRun: () => void;
   onOverrideConfirm: (stepId: string) => void;
   onNavigateToDashboard?: () => void;
+  currentProjectId?: string;
+  currentSprintId?: string;
 }
 
 interface VisualSnapshot {
@@ -187,7 +189,9 @@ export default function ExecutionEnginePage({
   isRunning,
   onTriggerRun,
   onOverrideConfirm,
-  onNavigateToDashboard
+  onNavigateToDashboard,
+  currentProjectId = 'ALL',
+  currentSprintId,
 }: ExecutionEnginePageProps) {
   
   // Find currently active step or execution logs
@@ -450,6 +454,32 @@ export default function ExecutionEnginePage({
                 return [newRecord, ...filtered];
               });
               setSelectedRunId(newRecord.runId);
+
+              // ── Auto-record to run_versions table ────────────────────────
+              if (currentProjectId && currentProjectId !== 'ALL') {
+                const passRate = newRecord.totalTests > 0 ? Math.round((newRecord.passed / newRecord.totalTests) * 100) : 0;
+                fetch('/api/quality/run-versions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('iq_token') || ''}` },
+                  body: JSON.stringify({
+                    project_id: currentProjectId,
+                    sprint_id: currentSprintId || null,
+                    run_label: newRecord.runId,
+                    module: 'execution',
+                    run_type: 'regression',
+                    total_tests: newRecord.totalTests,
+                    passed: newRecord.passed,
+                    failed: newRecord.failed,
+                    healed: newRecord.healed,
+                    skipped: 0,
+                    pass_rate: passRate,
+                    duration_ms: newRecord.durationMs,
+                    environment: 'staging',
+                    triggered_by: 'auto-pipeline',
+                    notes: newRecord.notes || '',
+                  })
+                }).catch(() => {});
+              }
             } else {
               // Fallback: build from snapshot state
               const healedCount = snapshots.filter(s => s.status === 'healed').length;
