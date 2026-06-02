@@ -811,6 +811,24 @@ LATEST QE DASHBOARD RESULTS:
     }
   };
 
+  // BULK IMPORT: requirements from TMS
+  const handleImportRequirementsFromTMS = (reqs: RequirementDoc[]) => {
+    setRequirements(prev => {
+      const existingIds = new Set(prev.map(r => r.id));
+      const newReqs = reqs.filter(r => !existingIds.has(r.id));
+      return [...newReqs, ...prev];
+    });
+  };
+
+  // BULK IMPORT: test cases from TMS
+  const handleImportTestCasesFromTMS = (tcs: TestCase[]) => {
+    setTestCases(prev => {
+      const existingIds = new Set(prev.map(tc => tc.id));
+      const newTcs = tcs.filter(tc => !existingIds.has(tc.id)).map(tc => ({ ...tc, projectId: currentProjectId }));
+      return [...newTcs, ...prev];
+    });
+  };
+
   // TRIGGER RE-RUN FOR TEST CASES (simulation UI feedbacks)
   const handleRerunMockTestCase = (testId: string) => {
     // Simulated live rerun, changes logs and outputs
@@ -1244,7 +1262,15 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {activeTab === 'manual-execution' && <ManualExecutionTab />}
           {activeTab === 'llm-config' && <LLMConfigTab />}
           {activeTab === 'cicd' && <CICDTab />}
-          {activeTab === 'integrations' && <IntegrationsTab />}
+          {activeTab === 'integrations' && (
+            <IntegrationsTab
+              requirements={filteredRequirements}
+              testCases={filteredTestCases}
+              defectHotspots={filteredDefectHotspots}
+              onAddRequirement={handleImportRequirementsFromTMS}
+              onAddTestCases={handleImportTestCasesFromTMS}
+            />
+          )}
           {activeTab === 'feedback' && <FeedbackTemplatesTab />}
           {activeTab === 'scheduler' && <SchedulerTab />}
           {activeTab === 'analytics' && <AnalyticsTab />}

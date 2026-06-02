@@ -1,335 +1,573 @@
 import React, { useState } from 'react';
-import { Link, RefreshCw, CheckCircle, XCircle, ExternalLink, Settings, Database, Upload } from 'lucide-react';
+import {
+  Link, RefreshCw, CheckCircle, XCircle, ArrowDown, ArrowUp, ArrowRight,
+  Settings, Database, Download, Upload, Clock, AlertTriangle, ExternalLink,
+  Layers, ShieldAlert, FileText, ClipboardList
+} from 'lucide-react';
+import { TestCase, RequirementDoc, DefectHotspot } from '../types';
 
-interface SyncResult { jiraKey?: string; testrailId?: number; summary?: string; status?: string; priority?: string; mappedTcId?: string; title?: string; tcId?: string; }
+// ── Types ────────────────────────────────────────────────────────────────────
+type TmsTool = 'jira' | 'testrail' | 'azuredevops' | 'qtest' | 'hpalm';
+type SyncOp = 'pull-reqs' | 'pull-tcs' | 'push-tcs' | 'push-defects';
 
-export default function IntegrationsTab() {
-  const [activeInt, setActiveInt] = useState<'jira' | 'testrail' | 'azuredevops'>('jira');
-  const [jiraUrl, setJiraUrl] = useState('');
-  const [jiraEmail, setJiraEmail] = useState('');
-  const [jiraToken, setJiraToken] = useState('');
-  const [jiraProject, setJiraProject] = useState('');
-  const [trUrl, setTrUrl] = useState('');
-  const [trEmail, setTrEmail] = useState('');
-  const [trToken, setTrToken] = useState('');
-  const [trProject, setTrProject] = useState('1');
-  // REQ-95: Azure DevOps state
-  const [azureOrgUrl, setAzureOrgUrl] = useState('');
-  const [azureProject, setAzureProject] = useState('');
-  const [azurePat, setAzurePat] = useState('');
-  const [azureSyncing, setAzureSyncing] = useState(false);
-  const [azureResults, setAzureResults] = useState<any[]>([]);
-  const [azureError, setAzureError] = useState('');
+interface SyncRecord {
+  op: SyncOp;
+  tool: TmsTool;
+  count: number;
+  source: string;
+  timestamp: string;
+}
+
+interface IntegrationsProps {
+  requirements?: RequirementDoc[];
+  testCases?: TestCase[];
+  defectHotspots?: DefectHotspot[];
+  onAddRequirement?: (reqs: RequirementDoc[]) => void;
+  onAddTestCases?: (tcs: TestCase[]) => void;
+}
+
+// ── Tool Config ───────────────────────────────────────────────────────────────
+const TOOLS: { id: TmsTool; label: string; logo: string; color: string; demo: boolean; ops: SyncOp[] }[] = [
+  { id: 'jira',        label: 'Jira',         logo: '🟦', color: '#0052cc', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-defects'] },
+  { id: 'testrail',    label: 'TestRail',      logo: '🟧', color: '#e07b39', demo: true,  ops: ['pull-tcs', 'push-tcs'] },
+  { id: 'azuredevops', label: 'Azure DevOps',  logo: '🟪', color: '#0078d4', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-defects'] },
+  { id: 'qtest',       label: 'qTest',         logo: '🟩', color: '#00963f', demo: true,  ops: ['pull-tcs'] },
+  { id: 'hpalm',       label: 'HP ALM',        logo: '🟥', color: '#cf2124', demo: true,  ops: ['pull-tcs'] },
+];
+
+const OP_META: Record<SyncOp, { label: string; icon: React.FC<any>; dir: 'in' | 'out'; desc: string; color: string }> = {
+  'pull-reqs':    { label: 'Pull Requirements', icon: ArrowDown,    dir: 'in',  desc: 'Import Stories/Epics → EDGE QI Requirements', color: '#0ea5e9' },
+  'pull-tcs':     { label: 'Pull Test Cases',   icon: ArrowDown,    dir: 'in',  desc: 'Import test cases from TMS → EDGE QI',         color: '#6366f1' },
+  'push-tcs':     { label: 'Push Test Cases',   icon: ArrowUp,      dir: 'out', desc: 'Export EDGE QI test cases → TMS',              color: '#10b981' },
+  'push-defects': { label: 'Push Defects',      icon: ArrowUp,      dir: 'out', desc: 'Export defect hotspots → TMS as Bug items',    color: '#f59e0b' },
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function IntegrationsTab({
+  requirements = [],
+  testCases = [],
+  defectHotspots = [],
+  onAddRequirement,
+  onAddTestCases,
+}: IntegrationsProps) {
+  const [activeTool, setActiveTool] = useState<TmsTool>('jira');
+  const [activeOp, setActiveOp] = useState<SyncOp>('pull-reqs');
+
+  // Credentials state per tool
+  const [creds, setCreds] = useState<Record<TmsTool, Record<string, string>>>({
+    jira:        { url: '', email: '', token: '', projectKey: '' },
+    testrail:    { url: '', email: '', token: '', projectId: '1' },
+    azuredevops: { orgUrl: '', project: '', pat: '' },
+    qtest:       { url: '', token: '', projectId: '' },
+    hpalm:       { url: '', username: '', password: '', domain: '', projectId: '' },
+  });
+
   const [syncing, setSyncing] = useState(false);
-  const [results, setResults] = useState<SyncResult[]>([]);
-  const [syncSource, setSyncSource] = useState('');
+  const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState('');
+  const [syncMode, setSyncMode] = useState('');
+  const [syncHistory, setSyncHistory] = useState<SyncRecord[]>([]);
+  const [importedCount, setImportedCount] = useState<{ reqs: number; tcs: number }>({ reqs: 0, tcs: 0 });
 
-  const syncJira = async () => {
-    if (!jiraProject) { setError('Project key is required'); return; }
+  const tool = TOOLS.find(t => t.id === activeTool)!;
+  const opMeta = OP_META[activeOp];
+  const c = creds[activeTool];
+
+  const setCred = (key: string, val: string) =>
+    setCreds(prev => ({ ...prev, [activeTool]: { ...prev[activeTool], [key]: val } }));
+
+  // ── Execute Sync ────────────────────────────────────────────────────────────
+  const runSync = async () => {
     setSyncing(true); setError(''); setResults([]);
+
     try {
-      const res = await fetch('/api/quality/integrations/jira/sync', {
+      let endpoint = '';
+      let body: Record<string, any> = {};
+
+      if (activeTool === 'jira') {
+        const base = { jiraUrl: c.url, email: c.email, token: c.token, projectKey: c.projectKey };
+        if (activeOp === 'pull-reqs')    { endpoint = '/api/quality/integrations/jira/pull-requirements'; body = base; }
+        if (activeOp === 'pull-tcs')     { endpoint = '/api/quality/integrations/jira/sync';               body = base; }
+        if (activeOp === 'push-tcs')     { endpoint = '/api/quality/integrations/jira/push-testcases';     body = { ...base, testCases }; }
+        if (activeOp === 'push-defects') { endpoint = '/api/quality/integrations/jira/push-defects';       body = { ...base, defects: defectHotspots }; }
+      } else if (activeTool === 'testrail') {
+        const base = { testrailUrl: c.url, email: c.email, token: c.token, projectId: c.projectId };
+        if (activeOp === 'pull-tcs')  { endpoint = '/api/quality/integrations/testrail/pull-testcases'; body = base; }
+        if (activeOp === 'push-tcs')  { endpoint = '/api/quality/integrations/testrail/push-testcases'; body = { ...base, testCases }; }
+      } else if (activeTool === 'azuredevops') {
+        const base = { orgUrl: c.orgUrl, project: c.project, pat: c.pat };
+        if (activeOp === 'pull-reqs')    { endpoint = '/api/quality/integrations/azure/pull-requirements'; body = base; }
+        if (activeOp === 'pull-tcs')     { endpoint = '/api/quality/integrations/azure/sync';               body = base; }
+        if (activeOp === 'push-tcs')     { endpoint = '/api/quality/integrations/azure/sync';               body = { ...base, testCaseIds: testCases.map(tc => tc.id) }; }
+        if (activeOp === 'push-defects') { endpoint = '/api/quality/integrations/azure/push-defects';       body = { ...base, defects: defectHotspots }; }
+      } else if (activeTool === 'qtest') {
+        endpoint = '/api/quality/integrations/qtest/pull-testcases';
+        body = { qtestUrl: c.url, token: c.token, projectId: c.projectId };
+      } else if (activeTool === 'hpalm') {
+        endpoint = '/api/quality/integrations/hpalm/pull-testcases';
+        body = { almUrl: c.url, username: c.username, password: c.password, domain: c.domain, projectId: c.projectId };
+      }
+
+      if (!endpoint) { setError('Operation not supported for this tool'); setSyncing(false); return; }
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jiraUrl: jiraUrl || 'https://demo.atlassian.net', email: jiraEmail, token: jiraToken, projectKey: jiraProject }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setResults(data.results || []);
-      setSyncSource(data.source || '');
-    } catch (e: any) { setError(e.message); } finally { setSyncing(false); }
+      if (!res.ok) throw new Error(data.error || 'Sync failed');
+
+      setSyncMode(data.source || 'demo');
+
+      // Handle results and import into shared state
+      if (activeOp === 'pull-reqs' && data.requirements) {
+        setResults(data.requirements);
+        if (onAddRequirement && data.requirements.length > 0) {
+          onAddRequirement(data.requirements);
+          setImportedCount(prev => ({ ...prev, reqs: prev.reqs + data.requirements.length }));
+        }
+      } else if (activeOp === 'pull-tcs' && (data.testCases || data.cases)) {
+        const tcs = data.testCases || data.cases || [];
+        setResults(tcs);
+        if (onAddTestCases && tcs.length > 0) {
+          onAddTestCases(tcs);
+          setImportedCount(prev => ({ ...prev, tcs: prev.tcs + tcs.length }));
+        }
+      } else {
+        setResults(data.results || data.items || []);
+      }
+
+      // Record history
+      const count = data.count || data.pushed || data.synced || data.requirements?.length || data.testCases?.length || data.cases?.length || data.results?.length || 0;
+      setSyncHistory(prev => [{
+        op: activeOp, tool: activeTool, count, source: data.source || 'demo',
+        timestamp: new Date().toLocaleTimeString(),
+      }, ...prev.slice(0, 9)]);
+
+    } catch (e: any) {
+      setError(e.message || 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
   };
 
-  const syncTestRail = async () => {
-    setSyncing(true); setError(''); setResults([]);
-    try {
-      const res = await fetch('/api/quality/integrations/testrail/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testrailUrl: trUrl || 'https://demo.testrail.io', email: trEmail, token: trToken, projectId: trProject }),
-      });
+  // ── Defect Dump Download ────────────────────────────────────────────────────
+  const downloadDefectDump = async (format: 'json' | 'csv' | 'jira-bulk') => {
+    const url = `/api/quality/integrations/defects/dump?format=${format}`;
+    if (format === 'csv') {
+      const a = document.createElement('a');
+      a.href = url; a.download = 'defect-dump.csv'; a.click();
+    } else {
+      const res = await fetch(url);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setResults(data.cases || []);
-      setSyncSource(data.source || '');
-    } catch (e: any) { setError(e.message); } finally { setSyncing(false); }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `defect-dump-${format}.json`; a.click();
+    }
   };
 
-  const integrations = [
-    { id: 'jira', label: 'Jira', logo: '🟦', desc: 'Xray / Zephyr · Sync test cases to Jira issues' },
-    { id: 'testrail', label: 'TestRail', logo: '🟧', desc: 'Two-way sync with TestRail test cases' },
-    { id: 'azuredevops', label: 'Azure DevOps', logo: '🟪', desc: 'Azure Test Plans · Work item sync' },
-  ];
-
-  const tmsFeatures = ['Jira (Xray/Zephyr)', 'TestRail', 'QTest', 'Azure DevOps', 'PractiTest', 'HP ALM'];
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center">
-          <Link className="w-5 h-5 text-sky-400" />
-        </div>
-        <div>
-          <h2 className="text-white font-bold text-lg">TMS Integrations</h2>
-          <p className="text-slate-400 text-xs">Two-way sync with test management systems (REQ-08)</p>
-        </div>
+  // ── Credential Form ─────────────────────────────────────────────────────────
+  const renderCredForm = () => {
+    const inp = (label: string, key: string, ph: string, type = 'text') => (
+      <div key={key}>
+        <label style={{ display: 'block', fontSize: 11, color: '#6b82ab', marginBottom: 4, fontWeight: 600 }}>{label}</label>
+        <input
+          type={type}
+          value={c[key] || ''}
+          onChange={e => setCred(key, e.target.value)}
+          placeholder={ph}
+          style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: 7, padding: '7px 10px', color: '#e2e8f0', fontSize: 12, boxSizing: 'border-box' }}
+        />
       </div>
+    );
 
-      {/* Platform Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {integrations.map(i => (
-          <button key={i.id} onClick={() => { setActiveInt(i.id as any); setResults([]); setError(''); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${activeInt === i.id ? 'bg-sky-600/20 border-sky-500/50 text-sky-300' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'}`}>
-            <span>{i.logo}</span> {i.label}
-          </button>
-        ))}
+    if (activeTool === 'jira') return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {inp('Jira Instance URL', 'url', 'https://yourcompany.atlassian.net')}
+        {inp('Project Key *', 'projectKey', 'PROJ')}
+        {inp('Email', 'email', 'you@company.com')}
+        {inp('API Token', 'token', 'Atlassian API token', 'password')}
       </div>
+    );
 
-      {/* Jira Form */}
-      {activeInt === 'jira' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">🟦</span>
-            <h3 className="text-white font-semibold">Jira Integration</h3>
-            <span className="text-xs bg-sky-500/15 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded-full">Live or Demo</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Jira Instance URL</label>
-              <input value={jiraUrl} onChange={e => setJiraUrl(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="https://yourcompany.atlassian.net" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Project Key <span className="text-red-400">*</span></label>
-              <input value={jiraProject} onChange={e => setJiraProject(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="PROJ" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Email</label>
-              <input type="email" value={jiraEmail} onChange={e => setJiraEmail(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="you@company.com" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">API Token</label>
-              <input type="password" value={jiraToken} onChange={e => setJiraToken(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="Atlassian API token" />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={syncJira} disabled={syncing || !jiraProject}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-all">
-              {syncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Sync with Jira
-            </button>
-            <p className="text-xs text-slate-500">Leave URL/credentials empty to run in demo mode</p>
-          </div>
-        </div>
-      )}
+    if (activeTool === 'testrail') return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {inp('TestRail URL', 'url', 'https://yourcompany.testrail.io')}
+        {inp('Project ID', 'projectId', '1')}
+        {inp('Email', 'email', 'you@company.com')}
+        {inp('API Key / Password', 'token', 'TestRail API key', 'password')}
+      </div>
+    );
 
-      {/* TestRail Form */}
-      {activeInt === 'testrail' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">🟧</span>
-            <h3 className="text-white font-semibold">TestRail Integration</h3>
-            <span className="text-xs bg-sky-500/15 text-sky-400 border border-sky-500/30 px-2 py-0.5 rounded-full">Live or Demo</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">TestRail URL</label>
-              <input value={trUrl} onChange={e => setTrUrl(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="https://yourcompany.testrail.io" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Project ID</label>
-              <input value={trProject} onChange={e => setTrProject(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="1" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Email</label>
-              <input value={trEmail} onChange={e => setTrEmail(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="you@company.com" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">API Key / Password</label>
-              <input type="password" value={trToken} onChange={e => setTrToken(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500"
-                placeholder="TestRail API key" />
-            </div>
-          </div>
-          <button onClick={syncTestRail} disabled={syncing}
-            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-all">
-            {syncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Sync with TestRail
-          </button>
-        </div>
-      )}
+    if (activeTool === 'azuredevops') return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {inp('Organization URL', 'orgUrl', 'https://dev.azure.com/your-org')}
+        {inp('Project Name', 'project', 'MyProject')}
+        {inp('Personal Access Token (PAT)', 'pat', 'PAT token...', 'password')}
+      </div>
+    );
 
-      {/* Azure DevOps — REQ-95: Full live + demo sync */}
-      {activeInt === 'azuredevops' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🟪</span>
-            <div>
-              <h3 className="text-white font-semibold">Azure DevOps Integration</h3>
-              <p className="text-xs text-slate-400">Sync test cases as Work Items to Azure Test Plans</p>
-            </div>
-          </div>
+    if (activeTool === 'qtest') return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {inp('qTest Manager URL', 'url', 'https://yourcompany.qtestnet.com')}
+        {inp('Project ID', 'projectId', '12345')}
+        {inp('API Token', 'token', 'Bearer token...', 'password')}
+      </div>
+    );
 
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">Organization URL</label>
-              <input type="text" placeholder="https://dev.azure.com/your-org" value={azureOrgUrl}
-                onChange={e => setAzureOrgUrl(e.target.value)} aria-label="Azure DevOps organization URL"
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">Project Name</label>
-                <input type="text" placeholder="MyProject" value={azureProject}
-                  onChange={e => setAzureProject(e.target.value)} aria-label="Azure DevOps project name"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">Personal Access Token (PAT)</label>
-                <input type="password" placeholder="PAT token..." value={azurePat}
-                  onChange={e => setAzurePat(e.target.value)} aria-label="Azure DevOps PAT"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono" />
-              </div>
-            </div>
-          </div>
+    if (activeTool === 'hpalm') return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {inp('ALM Server URL', 'url', 'http://alm-server:8080/qcbin')}
+        {inp('Domain', 'domain', 'DEFAULT')}
+        {inp('Project', 'projectId', 'MyProject')}
+        {inp('Username', 'username', 'admin')}
+        {inp('Password', 'password', '••••••••', 'password')}
+      </div>
+    );
 
-          <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-700/40 rounded-lg p-3">
-            <Settings className="w-3.5 h-3.5 text-blue-400" />
-            Leave URL and PAT empty to run in <span className="text-amber-400 font-mono">Demo Mode</span> with generated test items.
-          </div>
+    return null;
+  };
 
-          {azureError && <div role="alert" className="bg-red-500/10 border border-red-500/30 rounded p-2 text-red-400 text-xs">{azureError}</div>}
+  // ── Results Table ───────────────────────────────────────────────────────────
+  const renderResultsTable = () => {
+    if (results.length === 0) return null;
+    const isIn = OP_META[activeOp].dir === 'in';
+    const isPushDefects = activeOp === 'push-defects';
+    const isPullReqs = activeOp === 'pull-reqs';
 
-          <button
-            onClick={async () => {
-              setAzureSyncing(true); setAzureError(''); setAzureResults([]);
-              try {
-                const res = await fetch('/api/quality/integrations/azure/sync', {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ orgUrl: azureOrgUrl, project: azureProject, pat: azurePat }),
-                });
-                const data = await res.json();
-                if (!res.ok) { setAzureError(data.error || 'Sync failed'); }
-                else { setAzureResults(data.items || []); }
-              } catch (e: any) { setAzureError(e.message); }
-              finally { setAzureSyncing(false); }
-            }}
-            disabled={azureSyncing}
-            aria-label="Sync test cases to Azure DevOps"
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white transition-all disabled:opacity-50"
-          >
-            {azureSyncing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Syncing to Azure DevOps...</> : <>🟪 Sync Test Cases to Azure DevOps</>}
-          </button>
-
-          {azureResults.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-white font-semibold flex items-center gap-2">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> {azureResults.length} Items Synced
-                </span>
-                <span className="text-[9px] font-mono text-amber-400">{azureResults[0]?.url?.includes('dev.azure.com') ? '✅ Live' : '🎭 Demo'}</span>
-              </div>
-              <div className="overflow-x-auto max-h-48 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="text-slate-500 border-b border-slate-700">
-                    <th className="text-left py-1 pr-3">Azure ID</th>
-                    <th className="text-left py-1 pr-3">Title</th>
-                    <th className="text-left py-1 pr-3">State</th>
-                    <th className="text-left py-1">iQ TC</th>
-                  </tr></thead>
-                  <tbody>{azureResults.map((r, i) => (
-                    <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/30">
-                      <td className="py-1.5 pr-3 font-mono text-blue-400">#{r.id}</td>
-                      <td className="py-1.5 pr-3 text-slate-300">{(r.title || '').slice(0, 50)}</td>
-                      <td className="py-1.5 pr-3"><span className="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded text-[9px]">{r.state || 'Active'}</span></td>
-                      <td className="py-1.5 font-mono text-purple-400 text-[10px]">{r.iqStudioId}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-2 space-y-1 text-xs text-slate-400 border-t border-slate-700 pt-3">
-            <p className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Azure Pipelines CI/CD config generator → CI/CD tab</p>
-            <p className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Azure DevOps webhook receiver → CI/CD tab</p>
-            <p className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Azure Test Plans Work Item sync ← this panel</p>
-          </div>
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-red-400 text-sm">
-          <XCircle className="w-4 h-4 shrink-0" /> {error}
-        </div>
-      )}
-
-      {/* Results */}
-      {results.length > 0 && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-400" /> Sync Results ({results.length} items)
-            </h3>
-            <span className={`text-xs px-2 py-1 rounded-full ${syncSource === 'demo' ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
-              {syncSource === 'demo' ? '🎭 Demo Mode' : '✅ Live Sync'}
+    return (
+      <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CheckCircle style={{ width: 15, height: 15, color: '#10b981' }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>
+              {results.length} {activeOp === 'pull-reqs' ? 'Requirements' : activeOp === 'pull-tcs' ? 'Test Cases' : activeOp === 'push-tcs' ? 'TCs Pushed' : 'Defects Pushed'}
             </span>
+            {isIn && onAddRequirement && activeOp === 'pull-reqs' && (
+              <span style={{ fontSize: 11, color: '#10b981', background: '#10b98120', border: '1px solid #10b98140', borderRadius: 20, padding: '2px 8px' }}>✓ Added to Requirements</span>
+            )}
+            {isIn && onAddTestCases && activeOp === 'pull-tcs' && (
+              <span style={{ fontSize: 11, color: '#6366f1', background: '#6366f120', border: '1px solid #6366f140', borderRadius: 20, padding: '2px 8px' }}>✓ Added to Test Cases</span>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-slate-500 border-b border-slate-700">
-                  <th className="text-left py-2 pr-4">{activeInt === 'jira' ? 'Jira Key' : 'TestRail ID'}</th>
-                  <th className="text-left py-2 pr-4">Title / Summary</th>
-                  <th className="text-left py-2 pr-4">Status</th>
-                  <th className="text-left py-2">Mapped TC</th>
+          <span style={{ fontSize: 11, color: syncMode === 'demo' ? '#f59e0b' : '#10b981', background: syncMode === 'demo' ? '#f59e0b15' : '#10b98115', border: `1px solid ${syncMode === 'demo' ? '#f59e0b40' : '#10b98140'}`, borderRadius: 20, padding: '2px 8px' }}>
+            {syncMode === 'demo' ? '🎭 Demo Mode' : '✅ Live Sync'}
+          </span>
+        </div>
+        <div style={{ overflowX: 'auto', maxHeight: 280, overflowY: 'auto' }}>
+          <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ color: '#64748b', borderBottom: '1px solid #1e293b' }}>
+                {isPullReqs && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>ID / Key</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Title</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Type</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Status</th></>}
+                {activeOp === 'pull-tcs' && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>ID</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Title</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Priority</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Automation</th></>}
+                {activeOp === 'push-tcs' && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>EDGE QI ID</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>TMS Key/ID</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Title</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Status</th></>}
+                {isPushDefects && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Module</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>TMS Issue</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Risk Score</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Status</th></>}
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #0f172a' }}>
+                  {isPullReqs && (
+                    <>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.jiraKey || r.azureId || r.id?.split('-').slice(-1)[0] || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{(r.title || '').slice(0, 55)}{r.title?.length > 55 ? '…' : ''}</td>
+                      <td style={{ padding: '7px 10px 7px 0' }}><span style={{ fontSize: 10, color: '#a78bfa', background: '#a78bfa15', borderRadius: 4, padding: '2px 6px' }}>{r.issueType || r.workItemType || 'Story'}</span></td>
+                      <td style={{ padding: '7px 0', color: '#94a3b8' }}>{r.status || 'To Do'}</td>
+                    </>
+                  )}
+                  {activeOp === 'pull-tcs' && (
+                    <>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.trId || r.jiraKey || r.id?.split('-').slice(-1)[0] || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{(r.title || '').slice(0, 55)}{r.title?.length > 55 ? '…' : ''}</td>
+                      <td style={{ padding: '7px 10px 7px 0' }}><span style={{ fontSize: 10, background: r.priority === 'P0' ? '#ef444420' : r.priority === 'P1' ? '#f59e0b20' : '#64748b20', color: r.priority === 'P0' ? '#ef4444' : r.priority === 'P1' ? '#f59e0b' : '#94a3b8', borderRadius: 4, padding: '2px 6px' }}>{r.priority || 'P2'}</span></td>
+                      <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: '#10b981', background: '#10b98115', borderRadius: 4, padding: '2px 6px' }}>{r.automationStatus || 'Automatable'}</span></td>
+                    </>
+                  )}
+                  {activeOp === 'push-tcs' && (
+                    <>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#94a3b8', fontFamily: 'monospace', fontSize: 10 }}>{r.tcId || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.jiraKey || r.trId || r.azureId || r.iqStudioId || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{(r.title || '').slice(0, 45)}{(r.title || '').length > 45 ? '…' : ''}</td>
+                      <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: r.status === 'created' ? '#10b981' : '#ef4444', background: r.status === 'created' ? '#10b98115' : '#ef444415', borderRadius: 4, padding: '2px 6px' }}>{r.status === 'created' ? '✓ Created' : '✗ Failed'}</span></td>
+                    </>
+                  )}
+                  {isPushDefects && (
+                    <>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{r.module || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.jiraKey || `#${r.azureId}` || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0' }}>{r.riskScore != null ? <span style={{ fontSize: 10, color: r.riskScore >= 80 ? '#ef4444' : r.riskScore >= 60 ? '#f59e0b' : '#94a3b8' }}>{r.riskScore}%</span> : '—'}</td>
+                      <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: r.status === 'created' ? '#10b981' : '#ef4444', background: r.status === 'created' ? '#10b98115' : '#ef444415', borderRadius: 4, padding: '2px 6px' }}>{r.status === 'created' ? '✓ Created' : '✗ Failed'}</span></td>
+                    </>
+                  )}
                 </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i} className="border-b border-slate-800 hover:bg-slate-800/30">
-                    <td className="py-2 pr-4 font-mono text-sky-400">{r.jiraKey || r.testrailId}</td>
-                    <td className="py-2 pr-4 text-slate-300">{(r.summary || r.title || '—').slice(0, 60)}</td>
-                    <td className="py-2 pr-4">
-                      <span className="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">{r.status || 'active'}</span>
-                    </td>
-                    <td className="py-2 font-mono text-indigo-400">{r.mappedTcId || r.tcId || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ padding: '24px', maxWidth: 1100, margin: '0 auto' }}>
+
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid #1e293b', marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg,#0052cc 0%,#00b4d8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Link style={{ width: 20, height: 20, color: '#fff' }} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>TMS Integrations</h1>
+            <p style={{ fontSize: 12, color: '#6b82ab', margin: 0 }}>Bidirectional sync with Jira, TestRail, Azure DevOps, qTest, HP ALM</p>
           </div>
         </div>
-      )}
-
-      {/* Supported TMS list */}
-      <div className="bg-slate-800/30 border border-dashed border-slate-700 rounded-xl p-5">
-        <h3 className="text-slate-300 font-semibold text-sm mb-3 flex items-center gap-2">
-          <Database className="w-4 h-4 text-slate-400" /> Supported Test Management Systems (REQ-08)
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {tmsFeatures.map(t => (
-            <div key={t} className="flex items-center gap-1.5 text-xs text-slate-400">
-              <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" /> {t}
+        {/* Live stats */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {[
+            { label: 'Requirements', count: requirements.length, icon: FileText, color: '#0ea5e9' },
+            { label: 'Test Cases', count: testCases.length, icon: ClipboardList, color: '#6366f1' },
+            { label: 'Defect Hotspots', count: defectHotspots.length, icon: ShieldAlert, color: '#f59e0b' },
+          ].map(s => (
+            <div key={s.label} style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 90 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.count}</div>
+              <div style={{ fontSize: 10, color: '#64748b' }}>{s.label}</div>
             </div>
           ))}
         </div>
       </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
+
+        {/* Left: Tool Selector */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 4px 0' }}>Select Tool</p>
+          {TOOLS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setActiveTool(t.id); setResults([]); setError(''); setActiveOp(t.ops[0]); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                borderRadius: 10, border: `1px solid ${activeTool === t.id ? t.color + '80' : '#1e293b'}`,
+                background: activeTool === t.id ? t.color + '18' : '#0f172a',
+                cursor: 'pointer', width: '100%', textAlign: 'left', transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{t.logo}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: activeTool === t.id ? '#f1f5f9' : '#94a3b8' }}>{t.label}</div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>
+                  {t.ops.length} operation{t.ops.length !== 1 ? 's' : ''} · {t.demo ? 'Demo ✓' : 'Live only'}
+                </div>
+              </div>
+              {activeTool === t.id && <ArrowRight style={{ width: 14, height: 14, color: t.color }} />}
+            </button>
+          ))}
+
+          {/* Sync History */}
+          {syncHistory.length > 0 && (
+            <div style={{ marginTop: 16, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 12 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#64748b', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock style={{ width: 11, height: 11 }} /> Recent Syncs
+              </p>
+              {syncHistory.map((h, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: i < syncHistory.length - 1 ? '1px solid #1e293b' : 'none' }}>
+                  {OP_META[h.op].dir === 'in'
+                    ? <ArrowDown style={{ width: 10, height: 10, color: '#0ea5e9', flexShrink: 0 }} />
+                    : <ArrowUp style={{ width: 10, height: 10, color: '#10b981', flexShrink: 0 }} />}
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <div style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{TOOLS.find(t => t.id === h.tool)?.label} · {h.count} items</div>
+                    <div style={{ fontSize: 9, color: '#475569' }}>{h.timestamp} · {h.source === 'demo' ? '🎭' : '✅'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Main Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Operation Tabs */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {tool.ops.map(op => {
+              const meta = OP_META[op];
+              const active = activeOp === op;
+              return (
+                <button
+                  key={op}
+                  onClick={() => { setActiveOp(op); setResults([]); setError(''); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px',
+                    borderRadius: 8, border: `1px solid ${active ? (meta.dir === 'in' ? '#0ea5e9' : '#10b981') + '80' : '#1e293b'}`,
+                    background: active ? (meta.dir === 'in' ? '#0ea5e9' : '#10b981') + '18' : '#0f172a',
+                    cursor: 'pointer', fontSize: 12, fontWeight: active ? 700 : 500,
+                    color: active ? '#f1f5f9' : '#64748b', transition: 'all 0.15s',
+                  }}
+                >
+                  {meta.dir === 'in'
+                    ? <ArrowDown style={{ width: 13, height: 13, color: active ? '#0ea5e9' : '#475569' }} />
+                    : <ArrowUp style={{ width: 13, height: 13, color: active ? '#10b981' : '#475569' }} />}
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Op Description */}
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: opMeta.dir === 'in' ? '#0ea5e920' : '#10b98120', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {opMeta.dir === 'in'
+                ? <ArrowDown style={{ width: 18, height: 18, color: '#0ea5e9' }} />
+                : <ArrowUp style={{ width: 18, height: 18, color: '#10b981' }} />}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>{opMeta.label}</div>
+              <div style={{ fontSize: 12, color: '#6b82ab' }}>{opMeta.desc}</div>
+            </div>
+            {/* Context counts for push operations */}
+            {activeOp === 'push-tcs' && (
+              <div style={{ fontSize: 11, color: '#6366f1', background: '#6366f115', border: '1px solid #6366f130', borderRadius: 6, padding: '4px 10px', textAlign: 'center' }}>
+                <div style={{ fontWeight: 700 }}>{testCases.length}</div>
+                <div style={{ color: '#64748b' }}>TCs ready</div>
+              </div>
+            )}
+            {activeOp === 'push-defects' && (
+              <div style={{ fontSize: 11, color: '#f59e0b', background: '#f59e0b15', border: '1px solid #f59e0b30', borderRadius: 6, padding: '4px 10px', textAlign: 'center' }}>
+                <div style={{ fontWeight: 700 }}>{defectHotspots.length}</div>
+                <div style={{ color: '#64748b' }}>Defects ready</div>
+              </div>
+            )}
+          </div>
+
+          {/* Credentials */}
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 12, padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 22 }}>{tool.logo}</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>{tool.label} Credentials</div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>Leave empty to use Demo Mode with sample data</div>
+              </div>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#f59e0b', background: '#f59e0b15', border: '1px solid #f59e0b30', borderRadius: 20, padding: '3px 10px' }}>Live or Demo</span>
+            </div>
+
+            {renderCredForm()}
+
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={runSync}
+                disabled={syncing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 20px',
+                  borderRadius: 9, border: 'none', cursor: syncing ? 'not-allowed' : 'pointer',
+                  background: opMeta.dir === 'in' ? 'linear-gradient(135deg,#0369a1,#0ea5e9)' : 'linear-gradient(135deg,#047857,#10b981)',
+                  color: '#fff', fontSize: 13, fontWeight: 700, opacity: syncing ? 0.7 : 1, transition: 'opacity 0.15s',
+                }}
+              >
+                {syncing
+                  ? <><RefreshCw style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Syncing…</>
+                  : <><>{opMeta.dir === 'in' ? <ArrowDown style={{ width: 14, height: 14 }} /> : <ArrowUp style={{ width: 14, height: 14 }} />}</> {opMeta.label} ({tool.label})</>
+                }
+              </button>
+              <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>Leave credentials empty for demo mode</p>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ background: '#ef444415', border: '1px solid #ef444440', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, color: '#ef4444', fontSize: 12 }}>
+              <XCircle style={{ width: 15, height: 15, flexShrink: 0 }} /> {error}
+            </div>
+          )}
+
+          {/* Results */}
+          {renderResultsTable()}
+
+          {/* Import summary banner */}
+          {(importedCount.reqs > 0 || importedCount.tcs > 0) && (
+            <div style={{ background: '#10b98115', border: '1px solid #10b98140', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <CheckCircle style={{ width: 18, height: 18, color: '#10b981', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>Data imported into EDGE QI</div>
+                <div style={{ fontSize: 11, color: '#6b82ab', marginTop: 2 }}>
+                  {importedCount.reqs > 0 && `${importedCount.reqs} requirement${importedCount.reqs !== 1 ? 's' : ''} added to Requirements tab`}
+                  {importedCount.reqs > 0 && importedCount.tcs > 0 && ' · '}
+                  {importedCount.tcs > 0 && `${importedCount.tcs} test case${importedCount.tcs !== 1 ? 's' : ''} added to Test Cases tab`}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Defect Dump Section */}
+      <div style={{ marginTop: 28, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 14, padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f59e0b18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Download style={{ width: 18, height: 18, color: '#f59e0b' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9' }}>Defect Dump Export</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>Export all defect hotspots in TMS-ready formats for bulk import</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>{defectHotspots.length || '—'} hotspots</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {[
+            { format: 'json' as const,       label: 'JSON Export',      icon: '{ }',  desc: 'Full structured export for custom integrations', color: '#6366f1' },
+            { format: 'csv' as const,        label: 'CSV Download',     icon: '📊',  desc: 'Spreadsheet-ready defect dump for all TMS tools',  color: '#0ea5e9' },
+            { format: 'jira-bulk' as const,  label: 'Jira Bulk JSON',   icon: '🟦',  desc: 'Jira bulk-create format — ready to import',       color: '#0052cc' },
+          ].map(opt => (
+            <button
+              key={opt.format}
+              onClick={() => downloadDefectDump(opt.format)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+                padding: '14px 16px', borderRadius: 10, border: `1px solid ${opt.color}30`,
+                background: opt.color + '0f', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>{opt.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>{opt.label}</span>
+              </div>
+              <p style={{ fontSize: 11, color: '#64748b', margin: 0, lineHeight: 1.4 }}>{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Supported Platforms */}
+      <div style={{ marginTop: 20, background: '#0f172a', border: '1px dashed #1e293b', borderRadius: 12, padding: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <Database style={{ width: 15, height: 15, color: '#475569' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Integration Coverage</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+          {TOOLS.map(t => (
+            <div key={t.id} style={{ background: '#0a0f1a', border: `1px solid ${t.color}30`, borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
+              <div style={{ fontSize: 24, marginBottom: 4 }}>{t.logo}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{t.label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {t.ops.map(op => (
+                  <div key={op} style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
+                    <CheckCircle style={{ width: 10, height: 10, color: OP_META[op].dir === 'in' ? '#0ea5e9' : '#10b981', flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: '#94a3b8' }}>{OP_META[op].label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
