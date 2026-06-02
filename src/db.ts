@@ -314,13 +314,6 @@ sqliteDb.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  -- Add project_id column to execution_runs if not exists
-  ALTER TABLE execution_runs ADD COLUMN project_id TEXT DEFAULT 'DEFAULT';
-  ALTER TABLE execution_runs ADD COLUMN sprint_id TEXT;
-  ALTER TABLE execution_runs ADD COLUMN run_label TEXT;
-  ALTER TABLE execution_runs ADD COLUMN module TEXT DEFAULT 'all';
-  ALTER TABLE execution_runs ADD COLUMN notes TEXT DEFAULT '';
-
   -- Indexes
   CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
   CREATE INDEX IF NOT EXISTS idx_sprints_project ON sprints(project_id);
@@ -337,6 +330,31 @@ try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN sprint_id TEXT`); } c
 try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN run_label TEXT`); } catch {}
 try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN module TEXT DEFAULT 'all'`); } catch {}
 try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN notes TEXT DEFAULT ''`); } catch {}
+
+// Fix defect_hotspots — if the table was created with module NOT NULL and no default,
+// rows inserted without a module field fail. Recreate with a default to make it safe.
+try {
+  const colInfo = sqliteDb.prepare("PRAGMA table_info(defect_hotspots)").all() as any[];
+  const moduleCol = colInfo.find(c => c.name === 'module');
+  if (moduleCol && moduleCol.notnull && (moduleCol.dflt_value === null || moduleCol.dflt_value === undefined)) {
+    // Migrate: rename old table, create new with DEFAULT, copy data, drop old
+    sqliteDb.exec(`
+      ALTER TABLE defect_hotspots RENAME TO defect_hotspots_old;
+      CREATE TABLE defect_hotspots (
+        id TEXT PRIMARY KEY,
+        module TEXT NOT NULL DEFAULT 'unknown',
+        risk_score INTEGER DEFAULT 50,
+        defect_count INTEGER DEFAULT 0,
+        predicted_defects INTEGER DEFAULT 0,
+        root_causes TEXT,
+        last_analyzed DATETIME DEFAULT CURRENT_TIMESTAMP,
+        raw_json TEXT
+      );
+      INSERT INTO defect_hotspots SELECT id, COALESCE(module,'unknown'), risk_score, defect_count, predicted_defects, root_causes, last_analyzed, raw_json FROM defect_hotspots_old;
+      DROP TABLE defect_hotspots_old;
+    `);
+  }
+} catch (e: any) { console.warn('[DB] defect_hotspots migration note:', e.message); }
 
 // Seed default project if none exists
 const projCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM projects").get() as any).c;

@@ -453,33 +453,43 @@ app.post("/api/quality/requirements/upload-file", upload.single("file"), async (
 
   // AI-powered generation from actual document content
   try {
-    const aiPrompt = `You are a senior QA automation engineer. A requirements document has been uploaded: "${originalname}" (${fileSizeKb} KB).
+    const aiPrompt = `You are a senior QA engineer with 10+ years of enterprise testing experience.
 
-Here is the EXTRACTED TEXT from the document:
+A requirements document has been uploaded: "${originalname}" (${fileSizeKb} KB).
+
+EXTRACTED DOCUMENT CONTENT:
 ${truncated}
 
-Based on the ACTUAL requirements in this document, generate 5 detailed, specific test cases that cover the key requirements described.
+Generate COMPREHENSIVE test cases covering every requirement, feature, and scenario in this document.
 
-For each requirement or feature mentioned in the document, create targeted test cases. Include:
-- Functional test cases for specific features
-- Negative/validation test cases  
-- Edge cases based on actual requirements
+MANDATORY RULES:
+1. Generate at least 10 test cases.
+2. Distribution: minimum 3 Positive, 3 Negative, 2 Edge/Boundary, 2 additional.
+3. NEGATIVE test cases MUST cover: empty required fields, invalid data formats, unauthorized access, duplicate records, boundary overflow, SQL injection attempt, XSS input.
+4. Each step must be DETAILED with exact field names, button labels, and URLs found in the document.
+5. Test data must be SPECIFIC and REALISTIC for each scenario type.
 
-Return ONLY a valid JSON array with no markdown fences:
+STANDARD TEST CASE FORMAT — return ONLY a valid JSON array, no markdown:
 [
   {
     "id": "TC-XXXX",
     "projectId": "${projectId}",
     "requirementId": "${newReq.id}",
-    "title": "string - specific to actual document content",
-    "description": "string - referencing actual requirements from the document",
-    "preconditions": "string",
-    "steps": [{ "action": "string", "expectedResult": "string" }],
-    "testData": "string",
+    "title": "Specific title: [verb] [feature] - [scenario type]",
+    "description": "What is being tested, why, and what the pass criteria is — reference actual document content",
+    "preconditions": "User is logged in as [role] | Test environment: staging | [Other preconditions from document]",
+    "steps": [
+      { "action": "Navigate to [exact page/URL/menu from document]", "expectedResult": "Page loads successfully with [specific element] visible" },
+      { "action": "Enter [specific value] in [exact field name from document]", "expectedResult": "Field accepts the value, validation passes" },
+      { "action": "Click [exact button/link name from document]", "expectedResult": "[Specific outcome — redirect URL, success message, modal title]" },
+      { "action": "Verify [specific data/state]", "expectedResult": "[Exact text/value/state expected]" },
+      { "action": "Validate the final result", "expectedResult": "[Final assertion — data in DB, UI state, API response]" }
+    ],
+    "testData": "field=value | username=testuser@domain.com | password=Test@123 | amount=500 | date=2024-06-15",
     "priority": "P0",
     "type": "Positive",
     "automationStatus": "Automatable",
-    "confidenceScore": 90
+    "confidenceScore": 95
   }
 ]`;
 
@@ -710,66 +720,90 @@ app.post("/api/quality/requirements/add", async (req, res) => {
   // ── AI: GENERATE TEST CASES FROM REAL CRAWLED CONTENT (Gemini → Groq) ──────
   try {
     const isUrlMode = sourceType === 'url';
-    const prompt = isUrlMode
-        ? `You are a senior QA automation engineer. Analyze the following web application data crawled from "${content}" and generate 5 detailed, realistic test cases specific to this application.
 
-CRAWLED APPLICATION DATA:
-${crawlSummary}
+    // Shared instructions block for standard TC format
+    const tcFormatInstructions = `
+MANDATORY RULES:
+1. Generate EXACTLY 10 test cases minimum covering ALL scenario types.
+2. Distribution REQUIRED: at least 3 Positive, 3 Negative, 2 Edge/Boundary, 2 additional coverage cases.
+3. Each test case MUST follow the STANDARD QA FORMAT with all fields fully populated.
+4. Steps must be DETAILED navigation steps (minimum 5 steps per TC) — include exact field names, button labels, URLs, menu paths.
+5. Test data must be SPECIFIC and REALISTIC — include actual usernames, passwords, amounts, dates, strings for each scenario.
+6. Negative TCs must cover: empty fields, invalid formats, SQL injection, XSS, special chars, boundary overflow, unauthorized access, duplicate entries, concurrent operations.
+7. Edge/Boundary TCs must cover: max length input, min/max numeric values, special characters, Unicode, whitespace-only, null/undefined values.
+8. requirementId MUST match the parent requirement exactly.
+9. Priority: P0 = Critical (login/auth/payment), P1 = High (core features), P2 = Medium (validations), P3 = Low (UI/cosmetic).
 
-INSTRUCTIONS:
-${isSpa
-  ? `This is a JavaScript SPA that requires a browser to render. Use the domain name, URL path, and page title to infer the application type and generate highly specific, realistic test cases for the actual features this application likely has. Do NOT generate generic tests — make them specific to the inferred application domain.`
-  : `Use the actual page content, form elements, input fields, and navigation links found above to generate test cases that match the REAL UI of this specific application.`
-}
+Return ONLY a valid JSON array. No markdown, no code fences, no explanation. Start with [ and end with ].`;
 
-Focus on:
-- Login/authentication flows with real credential fields
-- Core user workflows for this specific application type
-- Form validations with real field names/placeholders found
-- Navigation and page transitions
-- Edge cases specific to this application's domain
-
-Return ONLY a valid JSON array with no markdown, no explanation:
-[
+    const tcJsonSchema = `[
   {
     "id": "TC-XXXX",
     "projectId": "${pid}",
     "requirementId": "${newReq.id}",
-    "title": "string - specific test case title based on actual page content",
-    "description": "string - detailed description referencing real page elements",
-    "preconditions": "string",
+    "title": "Concise, specific test case title (verb + feature + scenario)",
+    "description": "Full description: what is being tested, why, and what the pass criteria is",
+    "preconditions": "Comma-separated preconditions: user is logged in, test data exists, environment is staging, etc.",
     "steps": [
-      { "action": "string - specific action referencing real UI element", "expectedResult": "string - specific expected result" }
+      { "action": "Step 1: Navigate to [specific URL/page/menu path]", "expectedResult": "Page loads, [specific element] is visible" },
+      { "action": "Step 2: Enter [specific value] in [specific field name]", "expectedResult": "Field accepts input, no error shown" },
+      { "action": "Step 3: Click [exact button/link label]", "expectedResult": "[Specific outcome — redirect, modal, toast message text]" },
+      { "action": "Step 4: Verify [specific element/data/state]", "expectedResult": "[Specific expected state with exact values]" },
+      { "action": "Step 5: Validate [result or database state]", "expectedResult": "[Final expected result with exact text/data]" }
     ],
-    "testData": "string - realistic test data for this specific application",
-    "priority": "P0" | "P1" | "P2" | "P3",
-    "type": "Positive" | "Negative" | "Edge" | "Boundary",
-    "automationStatus": "Automated" | "Automatable" | "Needs Manual",
-    "confidenceScore": number
-  }
-]`
-        : `You are a senior QA automation engineer. Analyze this requirement and generate 5 detailed test cases.
-
-Requirement Title: ${finalTitle}
-Requirement Description: ${finalContent}
-
-Return ONLY a valid JSON array with no markdown, no explanation:
-[
-  {
-    "id": "TC-XXXX",
-    "projectId": "${pid}",
-    "requirementId": "${newReq.id}",
-    "title": "string",
-    "description": "string",
-    "preconditions": "string",
-    "steps": [{ "action": "string", "expectedResult": "string" }],
-    "testData": "string",
-    "priority": "P0" | "P1" | "P2" | "P3",
-    "type": "Positive" | "Negative" | "Edge" | "Boundary",
-    "automationStatus": "Automated" | "Automatable" | "Needs Manual",
-    "confidenceScore": number
+    "testData": "field1=value1 | field2=value2 | credentials=user@test.com/Pass@123 | amount=100.00 | date=2024-12-31",
+    "priority": "P0",
+    "type": "Positive",
+    "automationStatus": "Automatable",
+    "confidenceScore": 95
   }
 ]`;
+
+    const prompt = isUrlMode
+        ? `You are a senior QA engineer with 10+ years of experience writing enterprise-grade test cases.
+
+Analyze this web application and generate comprehensive test cases.
+
+APPLICATION URL: ${content}
+CRAWLED DATA:
+${crawlSummary}
+
+${isSpa
+  ? `NOTE: This is a JavaScript SPA. Infer the application features from the URL, domain, and page structure. Make test cases highly specific to the actual domain (e-commerce/banking/HR/LMS/etc).`
+  : `Use the actual page elements, forms, fields, and navigation from the crawled data above.`
+}
+
+${tcFormatInstructions}
+
+SCHEMA FOR EACH TEST CASE:
+${tcJsonSchema}`
+        : `You are a senior QA engineer with 10+ years of experience writing enterprise-grade test cases for STLC projects.
+
+Analyze the following requirement and generate comprehensive test cases covering ALL scenarios.
+
+REQUIREMENT ID: ${newReq.id}
+REQUIREMENT TITLE: ${finalTitle}
+REQUIREMENT DESCRIPTION:
+${finalContent}
+
+${tcFormatInstructions}
+
+COVERAGE CHECKLIST — ensure at least one TC for each applicable item:
+✓ Happy path / normal flow (Positive)
+✓ Authentication / authorization check (if applicable)
+✓ Form validation — required fields empty (Negative)
+✓ Form validation — invalid format / wrong data type (Negative)
+✓ Form validation — field length boundaries (Boundary)
+✓ Duplicate/conflict scenario (Negative)
+✓ Concurrent/race condition (Edge)
+✓ Special characters / SQL injection / XSS attempt (Negative/Security)
+✓ Maximum boundary value (Boundary)
+✓ Minimum/zero boundary value (Boundary)
+✓ Unauthorized access attempt (Negative)
+✓ Workflow state transitions (Positive/Edge)
+
+SCHEMA FOR EACH TEST CASE:
+${tcJsonSchema}`;
 
     const aiText = await generateAI(prompt, true);
     const cleaned = aiText.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -875,7 +909,8 @@ Respond in this exact JSON (no markdown):
     testingPriority: aiForecast.testingPriority,
     relatedTestCases: relatedTCs.map(t => t.split(']')[0].replace('[', '').trim())
   };
-  saveRow('defect_hotspots', `DH-${Date.now().toString(36)}`, newHotspot);
+  const hotspotId = `DH-${Date.now().toString(36)}`;
+  dbInsert('defect_hotspots', { id: hotspotId, module: title || 'unknown', raw_json: JSON.stringify(newHotspot) });
 
   addAudit("Defect Prediction", "Predictive Analytics Agent", `AI risk analysis for "${title}": ${aiForecast.riskScore}% risk, ${aiForecast.testingPriority} priority`, Date.now() - start);
   res.json({ success: true, predicted: newHotspot });
@@ -2197,18 +2232,31 @@ app.post("/api/quality/testcases/:id/regenerate", async (req, res) => {
   const { feedback } = req.body; // optional user feedback to guide regen
   const start = Date.now();
 
-  const prompt = `Improve and refine this existing test case based on QA feedback.
+  const prompt = `You are a senior QA engineer. Improve and refine this existing test case to be ENTERPRISE-GRADE quality.
 
-Current test case:
+CURRENT TEST CASE:
 ID: ${tc.id}
+Requirement ID: ${tc.requirementId || 'N/A'}
 Title: ${tc.title}
 Type: ${tc.type}
-Steps: ${(tc.steps || []).map((s: any, i: number) => `${i+1}. ${s.action} → ${s.expectedResult}`).join(', ')}
+Priority: ${tc.priority}
+Description: ${tc.description || ''}
+Preconditions: ${tc.preconditions || ''}
+Steps: ${(tc.steps || []).map((s: any, i: number) => `${i+1}. ACTION: ${s.action} → EXPECTED: ${s.expectedResult}`).join(' | ')}
+Test Data: ${tc.testData || ''}
 
-User feedback: ${feedback || 'Make it more comprehensive with better assertions and edge cases'}
+USER FEEDBACK / IMPROVEMENT REQUEST: ${feedback || 'Make it more comprehensive — add detailed navigation steps (minimum 6 steps), specific test data with realistic values, and improve expected results to be more precise and verifiable'}
 
-Return improved JSON (same schema):
-{"title":"...","description":"...","preconditions":"...","steps":[{"action":"...","expectedResult":"..."}],"testData":"...","priority":"P0|P1|P2|P3","type":"Positive|Negative|Edge|Boundary","automationStatus":"Automatable|Needs Manual|Automated","confidenceScore":85}`;
+REQUIREMENTS FOR IMPROVED VERSION:
+- Steps must be DETAILED with exact UI element names, field labels, button text, page URLs
+- Each step must have a SPECIFIC, verifiable expected result (not generic "page loads")
+- Test data must be SPECIFIC: use real-looking values (emails, passwords, amounts, dates, IDs)
+- If type is Negative: include the specific error message text expected
+- If type is Boundary: specify the exact boundary value and what happens at boundary+1
+- Preconditions must list ALL required setup steps
+
+Return ONLY the improved JSON object (no markdown, no array wrapper):
+{"title":"...","description":"...","preconditions":"...","steps":[{"action":"...","expectedResult":"..."}],"testData":"...","priority":"P0","type":"Positive","automationStatus":"Automatable","confidenceScore":95}`;
 
   try {
     const aiText = await generateAI(prompt, true);

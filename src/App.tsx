@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Zap, 
   TrendingUp, 
@@ -72,6 +72,50 @@ import AnalyticsTab from './components/AnalyticsTab';
 import ProjectHub from './components/ProjectHub';
 import RAGKnowledgeBase from './components/RAGKnowledgeBase';
 import VoicePromptBar from './components/VoicePromptBar';
+
+// ── Sidebar helper components ────────────────────────────────────────────────
+function SidebarItem({ id, label, Icon, active, onClick }: {
+  id: string; label: string; Icon: React.ElementType; active: boolean; onClick: () => void;
+}) {
+  return (
+    <button onClick={onClick}
+      className={`sidebar-item${active ? ' active' : ''}`}
+      title={label}
+    >
+      <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${active ? 'text-blue-400' : 'text-slate-500'}`} />
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
+function SidebarGroup({ label, children, defaultOpen = false }: {
+  label: string; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="mb-1">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-2 py-1 mt-2 group"
+        style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+      >
+        <span className="sidebar-section-label" style={{ margin: 0, letterSpacing: '0.08em', fontSize: 9 }}>{label}</span>
+        <svg
+          className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          style={{ color: 'rgba(166,180,205,0.4)', flexShrink: 0 }}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <nav className="flex flex-col mt-0.5">
+          {children}
+        </nav>
+      )}
+    </div>
+  );
+}
 
 // ── REQ-30: TEST PLAN CRUD ────────────────────────────────────────────────────
 function TestPlansTab() {
@@ -1020,131 +1064,102 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
       {!authUser && <AuthModal onLogin={handleLogin} />}
 
       {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
-      <aside className="sidebar">
-        {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/[0.06]">
+      <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        {/* Logo — fixed at top */}
+        <div className="px-4 py-4 shrink-0 border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-900/40">
               <Zap className="w-4 h-4 text-white" />
             </div>
             <div>
               <p className="text-[15px] font-black text-white tracking-widest leading-tight" style={{letterSpacing:"0.18em"}}>EDGE<span className="text-blue-400 ml-1">QI</span></p>
-              <p className="text-[8px] font-mono text-slate-400 leading-tight uppercase tracking-widest">Edge Quality Intelligence</p>
+              <p className="text-[8px] font-mono text-slate-400 leading-tight uppercase tracking-widest">Quality Intelligence</p>
             </div>
           </div>
         </div>
 
-        {/* Primary Nav — pb-32 reserves space for the absolute footer so items don't overlap */}
-        <div className="px-2 pt-3 pb-32">
-          <span className="sidebar-section-label">Project</span>
-          <nav className="flex flex-col mt-1">
-            {[
-              { id: 'projects', label: 'Project Hub',      icon: FolderOpen },
-              { id: 'rag-kb',   label: 'Knowledge Base',   icon: Brain },
-            ].map((page) => {
-              const Icon = page.icon;
-              const isSelected = activeTab === page.id;
-              return (
-                <button
-                  key={page.id}
-                  onClick={() => setActiveTab(page.id as any)}
-                  className={`sidebar-item${isSelected ? ' active' : ''}`}
-                >
-                  <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-500'}`} />
-                  <span>{page.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+        {/* Scrollable Nav area — fills all space between logo and footer */}
+        <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
 
-          <span className="sidebar-section-label mt-3">Core Modules</span>
-          <nav className="flex flex-col mt-1">
+          {/* ── Section: Project ─────────────────────────────────────── */}
+          <SidebarGroup label="Project" defaultOpen>
             {[
-              { id: 'agentic',          label: 'Auto Pipeline',        icon: Zap },
-              { id: 'requirements',     label: 'Requirements',         icon: FileText },
-              { id: 'test-plans',       label: 'Test Plans',           icon: TableProperties },
-              { id: 'testcases',        label: 'Test Cases',           icon: TableProperties },
-              { id: 'traceability',     label: 'Traceability',         icon: Table },
-              { id: 'scripts',          label: 'Script Generator',     icon: Settings2 },
-              { id: 'defects',          label: 'Impact Analyzer',      icon: Crosshair },
-              { id: 'execution',        label: 'Execution Engine',     icon: Cpu },
-              { id: 'performance',      label: 'Performance Testing',  icon: Sliders },
-              { id: 'security',         label: 'Security Testing',     icon: ShieldAlert },
-              { id: 'dashboard',        label: 'QA Dashboard',         icon: TrendingUp },
-              { id: 'manual-execution', label: 'Manual Execution',     icon: CheckSquare },
-              { id: 'audit',            label: 'Audit Log',            icon: History },
-              { id: 'converter',        label: 'Enterprise Converter', icon: RefreshCw },
-            ].map((page) => {
-              const Icon = page.icon;
-              const isSelected = activeTab === page.id;
-              return (
-                <button
-                  key={page.id}
-                  onClick={() => setActiveTab(page.id as any)}
-                  className={`sidebar-item${isSelected ? ' active' : ''}`}
-                >
-                  <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-500'}`} />
-                  <span>{page.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+              { id: 'projects', label: 'Project Hub',    icon: FolderOpen },
+              { id: 'rag-kb',   label: 'Knowledge Base', icon: Brain },
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+          </SidebarGroup>
 
-          <span className="sidebar-section-label mt-3">Config &amp; Integrations</span>
-          <nav className="flex flex-col mt-1">
+          {/* ── Section: STLC ────────────────────────────────────────── */}
+          <SidebarGroup label="STLC Pipeline" defaultOpen>
             {[
+              { id: 'agentic',     label: 'Auto Pipeline',    icon: Zap },
+              { id: 'requirements',label: 'Requirements',      icon: FileText },
+              { id: 'test-plans',  label: 'Test Plans',        icon: TableProperties },
+              { id: 'testcases',   label: 'Test Cases',        icon: TableProperties },
+              { id: 'traceability',label: 'Traceability',      icon: Table },
+              { id: 'scripts',     label: 'Script Generator',  icon: Settings2 },
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+          </SidebarGroup>
+
+          {/* ── Section: Execution & Quality ─────────────────────────── */}
+          <SidebarGroup label="Execution & Quality" defaultOpen>
+            {[
+              { id: 'execution',        label: 'Execution Engine',    icon: Cpu },
+              { id: 'manual-execution', label: 'Manual Execution',    icon: CheckSquare },
+              { id: 'defects',          label: 'Impact Analyzer',     icon: Crosshair },
+              { id: 'performance',      label: 'Performance Testing', icon: Sliders },
+              { id: 'security',         label: 'Security Testing',    icon: ShieldAlert },
+              { id: 'dashboard',        label: 'QA Dashboard',        icon: TrendingUp },
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+          </SidebarGroup>
+
+          {/* ── Section: Config & Integrations ───────────────────────── */}
+          <SidebarGroup label="Config & Integrations">
+            {[
+              { id: 'integrations', label: 'TMS Integrations',  icon: Link },
+              { id: 'cicd',         label: 'CI/CD',             icon: GitBranch },
               { id: 'scheduler',    label: 'Test Scheduler',    icon: Clock },
               { id: 'analytics',    label: 'AI Analytics',      icon: BarChart3 },
-              { id: 'cicd',         label: 'CI/CD Integration', icon: GitBranch },
-              { id: 'integrations', label: 'TMS Integrations',  icon: Link },
               { id: 'llm-config',   label: 'LLM Providers',     icon: Cpu },
+              { id: 'converter',    label: 'Converter',         icon: RefreshCw },
               { id: 'feedback',     label: 'Prompts & Feedback',icon: BookOpen },
-            ].map((page) => {
-              const Icon = page.icon;
-              const isSelected = activeTab === page.id;
-              return (
-                <button
-                  key={page.id}
-                  onClick={() => setActiveTab(page.id as any)}
-                  className={`sidebar-item${isSelected ? ' active' : ''}`}
-                >
-                  <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-500'}`} />
-                  <span>{page.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+              { id: 'audit',        label: 'Audit Log',         icon: History },
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+          </SidebarGroup>
+
         </div>
 
-        {/* User footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-          {/* Back to Home / Landing page link */}
-          <button
-            onClick={() => { setShowLanding(true); }}
-            className="flex items-center gap-2 px-1 mb-2 w-full"
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-            title="View EDGE QI Landing Page"
-          >
-            <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(166,180,205,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>← Home Page</span>
-          </button>
-          {authUser && (
-            <div className="flex items-center gap-2 px-1 mb-2">
-              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#1e96df' }}>
-                <span className="text-[9px] font-bold text-white">{authUser.name.charAt(0)}</span>
+        {/* User footer — always visible at bottom, never overlaps */}
+        <div className="shrink-0 px-3 py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.15)' }}>
+          {authUser ? (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-bold text-[10px] text-white" style={{ background: '#1e96df' }}>
+                {authUser.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="truncate" style={{ fontSize: 11, fontWeight: 600, color: '#dbe2ea' }}>{authUser.name}</p>
+                <p className="truncate font-semibold" style={{ fontSize: 11, color: '#dbe2ea' }}>{authUser.name}</p>
                 <p className="truncate" style={{ fontSize: 9, color: '#6b82ab' }}>{authUser.role.replace('_', ' ')}</p>
               </div>
-              <button onClick={handleLogout} title="Sign out" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#6b82ab' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#ff5e5e')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#6b82ab')}>
-                <LogOut className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setShowLanding(true)} title="Home" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#6b82ab' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#a6b4cd')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#6b82ab')}>
+                  <Layers className="w-3 h-3" />
+                </button>
+                <button onClick={handleLogout} title="Sign out" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#6b82ab' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#ff5e5e')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#6b82ab')}>
+                  <LogOut className="w-3 h-3" />
+                </button>
+              </div>
             </div>
+          ) : (
+            <button onClick={() => setShowLanding(true)} className="flex items-center gap-1 px-1 w-full" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(166,180,205,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>← Home Page</span>
+            </button>
           )}
-          <div className="flex items-center justify-between px-1" style={{ fontSize: 9, fontFamily: 'monospace', color: '#6b82ab' }}>
-            <span>PORT 3000</span>
+          <div className="flex items-center justify-between mt-1.5 px-0.5" style={{ fontSize: 9, fontFamily: 'monospace', color: '#4a5a72' }}>
+            <span>EDGE QI · v3.0</span>
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#36b37e' }} />LIVE</span>
           </div>
         </div>

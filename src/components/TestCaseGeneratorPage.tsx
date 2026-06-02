@@ -772,113 +772,159 @@ export default function TestCaseGeneratorPage({
                     </div>
                   </div>
 
-                  {/* Expansion info content */}
+                  {/* ── EXPANDED: Standard TC Format ──────────────────── */}
                   {isSelected && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 text-xs leading-relaxed text-slate-705" onClick={(e) => e.stopPropagation()}>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                        <div>
-                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Preconditions</span>
-                          <p className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-slate-800 font-mono text-[11px]">
-                            {tc.preconditions}
-                          </p>
+                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-3" onClick={(e) => e.stopPropagation()}>
+
+                      {/* Standard Header Table */}
+                      <div className="rounded-xl border border-slate-200 overflow-hidden text-xs">
+                        <table className="w-full">
+                          <tbody>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider w-32 border-r border-slate-100">Test Case ID</td>
+                              <td className="px-3 py-2 font-mono font-bold text-blue-700">{tc.id}</td>
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider w-32 border-l border-r border-slate-100">Requirement ID</td>
+                              <td className="px-3 py-2 font-mono font-bold text-purple-700">{tc.requirementId || '—'}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Title</td>
+                              <td className="px-3 py-2 font-semibold text-slate-800" colSpan={3}>{tc.title}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Description</td>
+                              <td className="px-3 py-2 text-slate-700 leading-relaxed" colSpan={3}>{tc.description}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Preconditions</td>
+                              <td className="px-3 py-2 text-slate-700" colSpan={3}>
+                                <ul className="list-disc list-inside space-y-0.5">
+                                  {(tc.preconditions || '').split(/[,;|\n]/).filter(Boolean).map((p, i) => (
+                                    <li key={i} className="text-[11px] text-slate-600">{p.trim()}</li>
+                                  ))}
+                                </ul>
+                              </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Test Data</td>
+                              <td className="px-3 py-2 font-mono text-[11px] text-blue-700 break-all" colSpan={3}>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(tc.testData || '').split(/\s*\|\s*/).filter(Boolean).map((d, i) => (
+                                    <span key={i} className="bg-blue-50 border border-blue-100 rounded px-2 py-0.5 text-[10px]">{d.trim()}</span>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Type / Priority</td>
+                              <td className="px-3 py-2" colSpan={3}>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    tc.type === 'Positive' ? 'bg-green-50 text-green-700 border-green-200' :
+                                    tc.type === 'Negative' ? 'bg-red-50 text-red-700 border-red-200' :
+                                    tc.type === 'Edge' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                    'bg-purple-50 text-purple-700 border-purple-200'
+                                  }`}>{tc.type}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                    tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                    tc.priority === 'P2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                    'bg-slate-50 text-slate-600 border-slate-200'
+                                  }`}>{tc.priority} — {tc.priority === 'P0' ? 'Critical' : tc.priority === 'P1' ? 'High' : tc.priority === 'P2' ? 'Medium' : 'Low'}</span>
+                                  <span className="text-[10px] text-slate-500 font-mono">Confidence: <strong className="text-blue-600">{tc.confidenceScore}%</strong></span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${tc.automationStatus === 'Automated' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{tc.automationStatus}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Steps Table — standard format */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Test Steps</span>
+                          <span className="text-[9px] text-slate-400">({tc.steps?.length || 0} steps)</span>
                         </div>
-                        <div>
-                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Execution Parameters & Test Data</span>
-                          <p className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-blue-700 font-mono text-[11px] break-all">
-                            {tc.testData}
-                          </p>
+                        <div className="rounded-xl border border-slate-200 overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr style={{ background: '#1f3965' }}>
+                                <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-300 uppercase tracking-wider w-10">#</th>
+                                <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-300 uppercase tracking-wider w-1/2">Action / Navigation Step</th>
+                                <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-300 uppercase tracking-wider">Expected Result</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(tc.steps || []).map((st, i) => (
+                                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'} style={{ borderTop: '1px solid #e2e8f0' }}>
+                                  <td className="px-3 py-2.5 font-mono font-bold text-slate-400 text-center text-[11px]">{i + 1}</td>
+                                  <td className="px-3 py-2.5 text-slate-700 leading-relaxed">{st.action}</td>
+                                  <td className="px-3 py-2.5 text-green-700 leading-relaxed font-medium">{st.expectedResult}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
 
-                      <div className="text-left">
-                        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Sequential Testing Steps Mapped</span>
-                        <div className="space-y-2 bg-slate-900 text-slate-200 p-4 rounded-xl border border-slate-800">
-                          {tc.steps?.map((st, i) => (
-                            <div key={i} className="flex gap-2 text-[11px]">
-                              <span className="text-slate-400 font-mono">[{i + 1}]</span>
-                              <div className="flex-1">
-                                <span className="text-white font-bold">{st.action}</span>
-                                <p className="text-[10px] text-blue-400 font-mono mt-0.5">➔ Assert: {st.expectedResult}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-3 flex-wrap gap-2 text-[10px] font-mono text-slate-500">
-                        <span>Confidence Threshold: <strong className="text-blue-600 font-bold">{tc.confidenceScore}%</strong></span>
+                      {/* Actions row */}
+                      <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100">
+                        {/* Sign-off */}
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingTestCase(tc)}
-                            className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 px-2.5 py-1 rounded-md text-blue-700 font-sans font-bold text-[10px] transition-all"
-                          >
-                            <Edit2 className="w-3 h-3" /> Edit Test Case
-                          </button>
-                          <span className="flex items-center gap-1 text-[11px]">
-                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                            Parsed by NLP Core
-                          </span>
+                          <span className="text-[10px] font-mono text-slate-500 font-bold uppercase">Sign-off:</span>
+                          {approvalMap[tc.id] === 'approved' ? (
+                            <span className="text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-bold">✔ Approved</span>
+                          ) : approvalMap[tc.id] === 'rejected' ? (
+                            <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">✘ Rejected</span>
+                          ) : (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'approve'); }} disabled={approvingId === tc.id}
+                                className="flex items-center gap-1 text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-lg hover:bg-green-600 hover:text-white transition-all disabled:opacity-50">
+                                <ThumbsUp className="w-3 h-3" /> Approve
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'reject'); }} disabled={approvingId === tc.id}
+                                className="flex items-center gap-1 text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50">
+                                <ThumbsDown className="w-3 h-3" /> Reject
+                              </button>
+                            </>
+                          )}
                         </div>
-                      </div>
-                      {/* REQ-36: Approval / sign-off */}
-                      <div className="border-t border-slate-100 pt-2 flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">Sign-off:</span>
-                        {approvalMap[tc.id] === 'approved' ? (
-                          <span className="text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-bold">✔ Approved</span>
-                        ) : approvalMap[tc.id] === 'rejected' ? (
-                          <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">✘ Rejected</span>
-                        ) : (
-                          <>
-                            <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'approve'); }} disabled={approvingId === tc.id}
-                              className="flex items-center gap-1 text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-lg hover:bg-green-600 hover:text-white transition-all disabled:opacity-50">
-                              <ThumbsUp className="w-3 h-3" /> Approve
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'reject'); }} disabled={approvingId === tc.id}
-                              className="flex items-center gap-1 text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50">
-                              <ThumbsDown className="w-3 h-3" /> Reject
-                            </button>
-                          </>
-                        )}
-                      </div>
 
-                      {/* REQ-13: Tag input */}
-                      <div className="border-t border-slate-100 pt-2 flex items-center gap-2 flex-wrap">
-                        <Tag className="w-3 h-3 text-blue-400 shrink-0" />
-                        {(tagsMap[tc.id] || []).map(tag => (
-                          <span key={tag} className="text-[9px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">#{tag}</span>
-                        ))}
-                        <input type="text" placeholder="Add tags (comma-sep)..." value={tagInput[tc.id] || ''}
-                          onChange={(e) => setTagInput(prev => ({ ...prev, [tc.id]: e.target.value }))}
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(tc.id); } }}
-                          className="flex-1 min-w-[120px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300" />
-                        <button onClick={(e) => { e.stopPropagation(); handleSaveTags(tc.id); }}
-                          className="text-[10px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
-                          Save
-                        </button>
-                      </div>
+                        {/* Tags */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Tag className="w-3 h-3 text-blue-400 shrink-0" />
+                          {(tagsMap[tc.id] || []).map(tag => (
+                            <span key={tag} className="text-[9px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">#{tag}</span>
+                          ))}
+                          <input type="text" placeholder="Add tags..." value={tagInput[tc.id] || ''}
+                            onChange={(e) => setTagInput(prev => ({ ...prev, [tc.id]: e.target.value }))}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(tc.id); } }}
+                            className="w-24 bg-slate-50 border border-slate-200 rounded px-2 py-0.5 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                          <button onClick={(e) => { e.stopPropagation(); handleSaveTags(tc.id); }}
+                            className="text-[9px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-600 hover:text-white transition-all">Save</button>
+                        </div>
 
-                      {/* AI Regenerate with feedback (REQ-29) */}
-                      <div className="border-t border-slate-100 pt-2 flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Optional: feedback for AI regeneration..."
-                          value={regenFeedback[tc.id] || ''}
-                          onChange={(e) => setRegenFeedback(prev => ({ ...prev, [tc.id]: e.target.value }))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleRegenerate(tc, regenFeedback[tc.id]); }}
-                          disabled={regeneratingId === tc.id}
-                          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold disabled:opacity-50 transition-all"
-                        >
-                          {regeneratingId === tc.id
-                            ? <><RefreshCw className="w-3 h-3 animate-spin" /> Regenerating...</>
-                            : <><Sparkles className="w-3 h-3" /> AI Regen</>}
-                        </button>
+                        {/* Edit + AI Regen */}
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => setEditingTestCase(tc)}
+                            className="inline-flex items-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md text-slate-700 text-[10px] font-semibold transition-all">
+                            <Edit2 className="w-3 h-3" /> Edit
+                          </button>
+                          <div className="flex items-center gap-1">
+                            <input type="text" placeholder="AI feedback..."
+                              value={regenFeedback[tc.id] || ''}
+                              onChange={(e) => setRegenFeedback(prev => ({ ...prev, [tc.id]: e.target.value }))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-32 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                            <button type="button"
+                              onClick={(e) => { e.stopPropagation(); handleRegenerate(tc, regenFeedback[tc.id]); }}
+                              disabled={regeneratingId === tc.id}
+                              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold disabled:opacity-50 transition-all">
+                              {regeneratingId === tc.id ? <><RefreshCw className="w-3 h-3 animate-spin" />Regenerating...</> : <><Sparkles className="w-3 h-3" />AI Regen</>}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
