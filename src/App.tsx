@@ -72,6 +72,7 @@ import AnalyticsTab from './components/AnalyticsTab';
 import ProjectHub from './components/ProjectHub';
 import RAGKnowledgeBase from './components/RAGKnowledgeBase';
 import VoicePromptBar from './components/VoicePromptBar';
+import ProjectContextBar from './components/ProjectContextBar';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
 function SidebarItem({ id, label, Icon, active, onClick }: {
@@ -532,32 +533,54 @@ export default function App() {
 
   // Project Partitioning — load from DB
   const [currentProjectId, setCurrentProjectId] = useState<string>('ALL');
-  const [dbProjects, setDbProjects] = useState<{ id: string; name: string; icon: string; color: string }[]>([]);
+  const [dbProjects, setDbProjects] = useState<{ id: string; name: string; icon: string; color: string; status: string }[]>([]);
   const [dbSprints, setDbSprints] = useState<{ id: string; project_id: string; name: string; status: string }[]>([]);
+  // All sprints across all projects — used by ProjectContextBar when user switches project inline
+  const [allDbSprints, setAllDbSprints] = useState<{ id: string; project_id: string; name: string; status: string }[]>([]);
 
-  // Load projects from DB on mount and when switching projects
-  useEffect(() => {
+  // Load projects from DB on mount and whenever user leaves ProjectHub
+  const reloadProjects = () => {
     const token = localStorage.getItem('iq_token') || '';
     fetch('/api/quality/projects', { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then((data: any[]) => setDbProjects(data.map(p => ({ id: p.id, name: p.name, icon: p.icon, color: p.color }))))
+      .then(r => r.ok ? r.json() : { projects: [] })
+      .then((data: any) => {
+        const list = data.projects || data || [];
+        setDbProjects(list.map((p: any) => ({ id: p.id, name: p.name, icon: p.icon || '🚀', color: p.color || '#1e96df', status: p.status || 'active' })));
+      })
       .catch(() => {});
-  }, []);
+    fetch('/api/quality/sprints', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : { sprints: [] })
+      .then((data: any) => { setAllDbSprints(data.sprints || data || []); })
+      .catch(() => {});
+  };
+  useEffect(() => { reloadProjects(); }, []);
+  // Reload project list whenever user navigates away from Project Hub (they may have created one)
+  useEffect(() => { if (activeTab !== 'projects') reloadProjects(); }, [activeTab]);
 
   // Load sprints when project changes
   useEffect(() => {
     if (currentProjectId === 'ALL') { setDbSprints([]); setCurrentSprintId(''); return; }
     const token = localStorage.getItem('iq_token') || '';
     fetch(`/api/quality/sprints?project_id=${currentProjectId}`, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then((data: any[]) => {
-        setDbSprints(data);
+      .then(r => r.ok ? r.json() : { sprints: [] })
+      .then((data: any) => {
+        const list = data.sprints || data || [];
+        setDbSprints(list);
         // Auto-select active sprint
-        const active = data.find((s: any) => s.status === 'active');
-        setCurrentSprintId(active?.id || data[0]?.id || '');
+        const active = list.find((s: any) => s.status === 'active');
+        setCurrentSprintId(active?.id || list[0]?.id || '');
       })
       .catch(() => {});
   }, [currentProjectId]);
+
+  // Handler used by ProjectContextBar — changes active project and auto-selects its sprint
+  const handleContextBarProjectChange = (id: string) => {
+    setCurrentProjectId(id);
+    if (id === 'ALL') { setCurrentSprintId(''); return; }
+    const projectSprints = allDbSprints.filter(s => s.project_id === id);
+    const active = projectSprints.find(s => s.status === 'active');
+    setCurrentSprintId(active?.id || projectSprints[0]?.id || '');
+  };
 
   // Collect all unique project IDs from existing data + DB projects
   const allProjectIds = Array.from(new Set([
@@ -1258,88 +1281,158 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           )}
 
           {activeTab === 'dashboard' && (
-            <DashboardMetrics
-              testCases={filteredTestCases}
-              defects={filteredDefectHotspots}
-              vulnerabilities={filteredVulnerabilities}
-              performanceConfigs={filteredPerformanceConfigs}
-              onTriggerRerun={handleRerunMockTestCase}
-              onApplyHeal={handleApplyHealMock}
-              onNavigateToModule={handleNavigateToModule}
-              onNavigateToAgentic={() => setActiveTab('agentic')}
-              onNavigateTo={setActiveTab}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="QA Dashboard"
+              />
+              <DashboardMetrics
+                testCases={filteredTestCases}
+                defects={filteredDefectHotspots}
+                vulnerabilities={filteredVulnerabilities}
+                performanceConfigs={filteredPerformanceConfigs}
+                onTriggerRerun={handleRerunMockTestCase}
+                onApplyHeal={handleApplyHealMock}
+                onNavigateToModule={handleNavigateToModule}
+                onNavigateToAgentic={() => setActiveTab('agentic')}
+                onNavigateTo={setActiveTab}
+              />
+            </div>
           )}
 
           {activeTab === 'execution' && (
-            <ExecutionEnginePage
-              activeSteps={activeSteps}
-              currentRunId={currentRunId}
-              isRunning={isRunning}
-              onTriggerRun={handleExecuteAutonomousCycle}
-              onOverrideConfirm={handleManualOverrideConfig}
-              onNavigateToDashboard={() => setActiveTab('dashboard')}
-              currentProjectId={currentProjectId}
-              currentSprintId={currentSprintId}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Execution Engine"
+              />
+              <ExecutionEnginePage
+                activeSteps={activeSteps}
+                currentRunId={currentRunId}
+                isRunning={isRunning}
+                onTriggerRun={handleExecuteAutonomousCycle}
+                onOverrideConfirm={handleManualOverrideConfig}
+                onNavigateToDashboard={() => setActiveTab('dashboard')}
+                currentProjectId={currentProjectId}
+                currentSprintId={currentSprintId}
+              />
+            </div>
           )}
 
           {activeTab === 'requirements' && (
-            <RequirementsTab
-              requirements={filteredRequirements}
-              testCases={filteredTestCases}
-              onAddRequirement={handleAddRequirement}
-              isGenerating={isGeneratingRequirements}
-              onGenerateTestCaseCode={(tcId) => handleGenerateScript(tcId, 'Playwright', 'TypeScript')}
-              onNavigateToTestCases={() => setActiveTab('testcases')}
-              currentProjectId={currentProjectId}
-              currentSprintId={currentSprintId}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Requirements"
+              />
+              <RequirementsTab
+                requirements={filteredRequirements}
+                testCases={filteredTestCases}
+                onAddRequirement={handleAddRequirement}
+                isGenerating={isGeneratingRequirements}
+                onGenerateTestCaseCode={(tcId) => handleGenerateScript(tcId, 'Playwright', 'TypeScript')}
+                onNavigateToTestCases={() => setActiveTab('testcases')}
+                currentProjectId={currentProjectId}
+                currentSprintId={currentSprintId}
+              />
+            </div>
           )}
 
           {activeTab === 'testcases' && (
-            <TestCaseGeneratorPage
-              testCases={filteredTestCases}
-              onTriggerRerun={handleRerunMockTestCase}
-              onApplyHeal={handleApplyHealMock}
-              onAddManualTestCase={(newCase) => setTestCases(prev => [{ ...newCase, projectId: currentProjectId }, ...prev])}
-              onUpdateTestCase={handleUpdateTestCase}
-              currentProjectId={currentProjectId}
-              currentSprintId={currentSprintId}
-              onNavigateToScripts={() => setActiveTab('scripts')}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Test Cases"
+              />
+              <TestCaseGeneratorPage
+                testCases={filteredTestCases}
+                onTriggerRerun={handleRerunMockTestCase}
+                onApplyHeal={handleApplyHealMock}
+                onAddManualTestCase={(newCase) => setTestCases(prev => [{ ...newCase, projectId: currentProjectId }, ...prev])}
+                onUpdateTestCase={handleUpdateTestCase}
+                currentProjectId={currentProjectId}
+                currentSprintId={currentSprintId}
+                onNavigateToScripts={() => setActiveTab('scripts')}
+              />
+            </div>
           )}
 
 
           {activeTab === 'traceability' && (
-            <TraceabilityTab
-              requirements={filteredRequirements}
-              testCases={filteredTestCases}
-              onTriggerRerun={handleRerunMockTestCase}
-              currentProjectId={currentProjectId}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Traceability Matrix"
+              />
+              <TraceabilityTab
+                requirements={filteredRequirements}
+                testCases={filteredTestCases}
+                onTriggerRerun={handleRerunMockTestCase}
+                currentProjectId={currentProjectId}
+              />
+            </div>
           )}
 
           {activeTab === 'defects' && (
-            <DefectPredictTab
-              defects={filteredDefectHotspots}
-              impactReports={impactReports}
-              onPredictHotspots={handlePredictHotspots}
-              onAnalyzeImpact={handleAnalyzeImpact}
-              isAnalyzing={isAnalyzingImpact}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Impact & Defect Analysis"
+              />
+              <DefectPredictTab
+                defects={filteredDefectHotspots}
+                impactReports={impactReports}
+                onPredictHotspots={handlePredictHotspots}
+                onAnalyzeImpact={handleAnalyzeImpact}
+                isAnalyzing={isAnalyzingImpact}
+              />
+            </div>
           )}
 
           {activeTab === 'scripts' && (
-            <ScriptTab
-              testCases={filteredTestCases}
-              scripts={filteredScripts}
-              onGenerateScript={handleGenerateScript}
-              isGeneratingScript={isGeneratingRequirements || isGeneratingScript}
-              currentProjectId={currentProjectId}
-              currentSprintId={currentSprintId}
-              onNavigateToExecution={() => setActiveTab('execution')}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Script Generator"
+              />
+              <ScriptTab
+                testCases={filteredTestCases}
+                scripts={filteredScripts}
+                onGenerateScript={handleGenerateScript}
+                isGeneratingScript={isGeneratingRequirements || isGeneratingScript}
+                currentProjectId={currentProjectId}
+                currentSprintId={currentSprintId}
+                onNavigateToExecution={() => setActiveTab('execution')}
+              />
+            </div>
           )}
 
           {activeTab === 'converter' && (
@@ -1347,23 +1440,43 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           )}
 
           {activeTab === 'performance' && (
-            <PerformanceTab
-              configs={filteredPerformanceConfigs}
-              testCases={filteredTestCases}
-              onExecutePerformanceTest={handleExecutePerformanceTest}
-              isExecuting={isExecutingPerformance}
-              onNavigateToDashboard={() => setActiveTab('dashboard')}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Performance Testing"
+              />
+              <PerformanceTab
+                configs={filteredPerformanceConfigs}
+                testCases={filteredTestCases}
+                onExecutePerformanceTest={handleExecutePerformanceTest}
+                isExecuting={isExecutingPerformance}
+                onNavigateToDashboard={() => setActiveTab('dashboard')}
+              />
+            </div>
           )}
 
           {activeTab === 'security' && (
-            <SecurityTab
-              vulnerabilities={filteredVulnerabilities}
-              testCases={filteredTestCases}
-              onApplyRemediation={handleApplyRemediation}
-              isRemediating={isRemediatingSecurity}
-              onNavigateToDashboard={() => setActiveTab('dashboard')}
-            />
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Security Testing"
+              />
+              <SecurityTab
+                vulnerabilities={filteredVulnerabilities}
+                testCases={filteredTestCases}
+                onApplyRemediation={handleApplyRemediation}
+                isRemediating={isRemediatingSecurity}
+                onNavigateToDashboard={() => setActiveTab('dashboard')}
+              />
+            </div>
           )}
 
           {activeTab === 'test-plans' && <TestPlansTab />}

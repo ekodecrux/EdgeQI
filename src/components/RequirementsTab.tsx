@@ -299,7 +299,7 @@ export default function RequirementsTab({
       if (!pendingFile) { setErrorText('Please select a file to upload.'); return; }
       try {
         const formData = new FormData();
-        formData.append('file', pendingFile); formData.append('projectId', 'PROJ-WEB');
+        formData.append('file', pendingFile); formData.append('projectId', currentProjectId && currentProjectId !== 'ALL' ? currentProjectId : 'PROJ-DEFAULT');
         const resp = await fetch('/api/quality/requirements/upload-file', { method: 'POST', body: formData });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || 'Upload failed');
