@@ -960,8 +960,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               <Zap className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-white tracking-tight leading-tight">IQ Studio</p>
-              <p className="text-[9px] font-mono text-slate-400 leading-tight">AI Quality Platform</p>
+              <p className="text-[15px] font-black text-white tracking-widest leading-tight" style={{letterSpacing:"0.18em"}}>EDGE<span className="text-blue-400 ml-1">QI</span></p>
+              <p className="text-[8px] font-mono text-slate-400 leading-tight uppercase tracking-widest">Edge Quality Intelligence</p>
             </div>
           </div>
         </div>
@@ -1058,10 +1058,10 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-sm font-extrabold tracking-tight text-slate-900">
-                Agentic AI Quality Intelligence
+              <h1 className="text-sm font-extrabold tracking-tight text-slate-900" style={{letterSpacing:"0.06em"}}>
+                EDGE <span className="text-blue-600">QI</span>
               </h1>
-              <p className="text-[10px] text-slate-400 font-mono">Autonomous End-to-End Quality Engineering Core</p>
+              <p className="text-[10px] text-slate-400 font-mono">Edge Quality Intelligence Platform</p>
             </div>
           </div>
 
@@ -1271,7 +1271,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
 
         {/* Footer */}
         <footer className="border-t border-slate-200/60 py-3 px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-400 text-[10px] font-mono bg-white/50">
-          <span>© 2026 Agentic AI Quality Intelligence Platform · All pipelines active</span>
+          <span>© 2026 EDGE QI · All pipelines active</span>
           <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
             <span>Port 3000 · SSL Active · 2 Workers Online</span>

@@ -162,7 +162,7 @@ sqliteDb.exec(`
   CREATE TABLE IF NOT EXISTS audit_logs (
     id TEXT PRIMARY KEY,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    user_email TEXT DEFAULT 'system@agenticstack.ai',
+    user_email TEXT DEFAULT 'system@edgeqi.ai',
     action TEXT NOT NULL,
     affected_entity TEXT,
     details TEXT,
@@ -175,7 +175,7 @@ sqliteDb.exec(`
     name TEXT NOT NULL,
     prompt TEXT NOT NULL,
     category TEXT DEFAULT 'general',
-    created_by TEXT DEFAULT 'system@agenticstack.ai',
+    created_by TEXT DEFAULT 'system@edgeqi.ai',
     use_count INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -198,7 +198,7 @@ sqliteDb.exec(`
     entity_id TEXT NOT NULL,
     vote TEXT NOT NULL,
     comment TEXT,
-    user_email TEXT DEFAULT 'user@agenticstack.ai',
+    user_email TEXT DEFAULT 'user@edgeqi.ai',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 

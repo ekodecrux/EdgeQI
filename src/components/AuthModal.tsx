@@ -48,7 +48,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'demo@agenticstack.ai', password: 'Demo@2025', name: 'Demo User', role: 'qa_lead' }),
+        body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'Demo@2025', name: 'Demo User', role: 'qa_lead' }),
       });
       const data = await res.json();
       if (data.token) {
@@ -63,7 +63,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'demo@agenticstack.ai', password: 'Demo@2025' }),
+        body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'Demo@2025' }),
       });
       const data = await res.json();
       if (data.token) {
@@ -84,12 +84,12 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/40">
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div className="text-left">
-              <h1 className="text-2xl font-black text-white tracking-tight">iQStudio</h1>
-              <p className="text-xs text-indigo-400 font-medium">Agentic AI Quality Intelligence</p>
+              <h1 className="text-2xl font-black text-white" style={{letterSpacing:"0.15em"}}>EDGE<span className="text-blue-400 ml-1.5">QI</span></h1>
+              <p className="text-xs text-blue-400 font-mono uppercase tracking-widest">Edge Quality Intelligence</p>
             </div>
           </div>
           <p className="text-slate-400 text-sm">
@@ -103,13 +103,13 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
           <div className="flex bg-slate-800 rounded-xl p-1 mb-6">
             <button
               onClick={() => { setMode('login'); setError(''); }}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === 'login' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === 'login' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
             >
               Sign In
             </button>
             <button
               onClick={() => { setMode('register'); setError(''); }}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === 'register' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === 'register' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
             >
               Register
             </button>

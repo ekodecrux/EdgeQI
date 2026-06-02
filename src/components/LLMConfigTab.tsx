@@ -490,7 +490,7 @@ export default function LLMConfigTab() {
           </div>
         )}
         <p className="text-slate-500 text-xs leading-relaxed">
-          When the primary provider fails, iQStudio automatically tries the next <span className="text-emerald-400 font-mono">ON</span> provider in priority order. Drag rows or use arrows to reorder.
+          When the primary provider fails, EDGE QI automatically tries the next <span className="text-emerald-400 font-mono">ON</span> provider in priority order. Drag rows or use arrows to reorder.
         </p>
       </div>
 
