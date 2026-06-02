@@ -986,6 +986,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             {[
               { id: 'agentic',          label: 'Auto Pipeline',        icon: Zap },
               { id: 'requirements',     label: 'Requirements',         icon: FileText },
+              { id: 'test-plans',       label: 'Test Plans',           icon: TableProperties },
               { id: 'testcases',        label: 'Test Cases',           icon: TableProperties },
               { id: 'traceability',     label: 'Traceability',         icon: Table },
               { id: 'scripts',          label: 'Script Generator',     icon: Settings2 },
@@ -994,7 +995,6 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'performance',      label: 'Performance Testing',  icon: Sliders },
               { id: 'security',         label: 'Security Testing',     icon: ShieldAlert },
               { id: 'dashboard',        label: 'QA Dashboard',         icon: TrendingUp },
-              { id: 'test-plans',       label: 'Test Plans',           icon: TableProperties },
               { id: 'manual-execution', label: 'Manual Execution',     icon: CheckSquare },
               { id: 'audit',            label: 'Audit Log',            icon: History },
               { id: 'converter',        label: 'Enterprise Converter', icon: RefreshCw },
