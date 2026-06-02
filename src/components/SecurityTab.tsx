@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap, Download, Package } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap, Download, Package, ArrowRight, CheckCircle, TableProperties } from 'lucide-react';
 
 // REQ-83: Security report export
 async function exportSecurityReport(format: 'csv' | 'json') {
@@ -9,18 +9,22 @@ async function exportSecurityReport(format: 'csv' | 'json') {
   const a = document.createElement('a'); a.href = url; a.download = `security-report.${format}`; a.click();
   URL.revokeObjectURL(url);
 }
-import { SecurityVulnerability } from '../types';
+import { SecurityVulnerability, TestCase } from '../types';
 
 interface SecurityProps {
   vulnerabilities: SecurityVulnerability[];
+  testCases?: TestCase[];
   onApplyRemediation: (vulnerabilityId: string) => Promise<void>;
   isRemediating: string | null;
+  onNavigateToDashboard?: () => void;
 }
 
 export default function SecurityTab({
   vulnerabilities,
+  testCases = [],
   onApplyRemediation,
   isRemediating,
+  onNavigateToDashboard,
 }: SecurityProps) {
   const [selectedVulId, setSelectedVulId] = useState<string | null>(vulnerabilities[0]?.id || null);
   
@@ -117,8 +121,45 @@ export default function SecurityTab({
     }
   };
 
+  const openVulns = mergedVulns.filter(v => v.status === 'Open').length;
+  const fixedVulns = mergedVulns.filter(v => v.status !== 'Open').length;
+
   return (
     <div className="space-y-6">
+
+    {/* Page Header */}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:16,borderBottom:'1px solid #dbe2ea'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <ShieldAlert style={{width:20,height:20,color:'#ffffff'}} />
+        </div>
+        <div>
+          <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Security Testing</h1>
+          <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>OWASP-mapped vulnerability scanner with severity scoring</p>
+        </div>
+      </div>
+    </div>
+
+    {/* Test case quick-pick — seed scan target from test case titles */}
+    {testCases.length > 0 && (
+      <div style={{background:'#f8fafc',border:'1px solid #dbe2ea',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <TableProperties style={{width:15,height:15,color:'#1e96df',flexShrink:0}} />
+        <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#1f3965'}}>Scan from test cases:</span>
+        {testCases.slice(0, 5).map(tc => (
+          <button
+            key={tc.id}
+            onClick={() => {
+              setScanMode('url');
+              setScanTarget(`https://staging.qa-env.io/${tc.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 40)}`);
+            }}
+            style={{background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:6,padding:'3px 10px',fontFamily:'"Lato",Arial,sans-serif',fontSize:11,color:'#1e96df',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis'}}
+            title={tc.title}
+          >
+            {tc.id}
+          </button>
+        ))}
+      </div>
+    )}
 
       {/* Scan Input Panel */}
       <div className="glass-card p-6 space-y-5">
@@ -497,6 +538,29 @@ export default function SecurityTab({
           <p className="text-xs text-slate-400 font-mono text-center py-4">Click "Run Dep Scan" to check dependencies for known CVEs.</p>
         )}
       </div>
+
+    {/* ── NEXT STEP: View Dashboard after scan ── */}
+    {mergedVulns.length > 0 && (
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+          <div>
+            <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+              {openVulns} open · {fixedVulns} remediated
+            </span>
+            <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+              Security findings are reported in the QA Dashboard.
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={onNavigateToDashboard}
+          style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+        >
+          QA Dashboard <ArrowRight style={{width:14,height:14}} />
+        </button>
+      </div>
+    )}
     </div>
   );
 }

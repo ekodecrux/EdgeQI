@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle, RefreshCw, History } from 'lucide-react';
-import { PerformanceConfig } from '../types';
+import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle, RefreshCw, History, ArrowRight, CheckCircle, TableProperties } from 'lucide-react';
+import { PerformanceConfig, TestCase } from '../types';
 
 interface PerformanceProps {
   configs: PerformanceConfig[];
+  testCases?: TestCase[];
   onExecutePerformanceTest: (
     testType: 'Browser' | 'API',
     endpointOrJourney: string,
@@ -13,12 +14,15 @@ interface PerformanceProps {
     rpsLimit?: number
   ) => Promise<void>;
   isExecuting: boolean;
+  onNavigateToDashboard?: () => void;
 }
 
 export default function PerformanceTab({
   configs,
+  testCases = [],
   onExecutePerformanceTest,
   isExecuting,
+  onNavigateToDashboard,
 }: PerformanceProps) {
   const [testType, setTestType] = useState<'Browser' | 'API'>('API');
   const [endpointOrJourney, setEndpointOrJourney] = useState('POST /api/v1/checkout/charge');
@@ -67,7 +71,52 @@ export default function PerformanceTab({
     await onExecutePerformanceTest(testType, endpointOrJourney, virtualUsers, durationSeconds, rampUpTimeSeconds, rpsLimit);
   };
 
+  // Build endpoint suggestions from test cases
+  const tcEndpoints = testCases
+    .filter(tc => tc.title || tc.description)
+    .slice(0, 10)
+    .map(tc => tc.testData ? (() => { try { const d = JSON.parse(tc.testData); return d.endpoint || d.url || null; } catch { return null; } })() : null)
+    .filter(Boolean) as string[];
+
+  const hasRunBefore = configs.length > 0;
+
   return (
+    <div className="space-y-4">
+
+    {/* Page Header */}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:16,borderBottom:'1px solid #dbe2ea'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <Sliders style={{width:20,height:20,color:'#ffffff'}} />
+        </div>
+        <div>
+          <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Performance Testing</h1>
+          <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Load test your API endpoints and browser journeys</p>
+        </div>
+      </div>
+    </div>
+
+    {/* Test case quick-pick — prefill endpoint from existing TCs */}
+    {testCases.length > 0 && (
+      <div style={{background:'#f8fafc',border:'1px solid #dbe2ea',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <TableProperties style={{width:15,height:15,color:'#1e96df',flexShrink:0}} />
+        <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#1f3965'}}>From test cases:</span>
+        {testCases.slice(0, 6).map(tc => (
+          <button
+            key={tc.id}
+            onClick={() => {
+              setTestType('API');
+              setEndpointOrJourney(`GET /api/${tc.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 40)}`);
+            }}
+            style={{background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:6,padding:'3px 10px',fontFamily:'"Lato",Arial,sans-serif',fontSize:11,color:'#1e96df',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis'}}
+            title={tc.title}
+          >
+            {tc.id}
+          </button>
+        ))}
+      </div>
+    )}
+
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* Configure stress sliders panel */}
       <div className="lg:col-span-5 glass-card p-6 space-y-5">
@@ -385,6 +434,30 @@ export default function PerformanceTab({
           )}
         </div>
       </div>
+    </div>
+
+    {/* ── NEXT STEP: View Dashboard after run ── */}
+    {hasRunBefore && (
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+          <div>
+            <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+              {configs.length} performance run{configs.length !== 1 ? 's' : ''} recorded
+            </span>
+            <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+              View results in the QA Dashboard.
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={onNavigateToDashboard}
+          style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+        >
+          QA Dashboard <ArrowRight style={{width:14,height:14}} />
+        </button>
+      </div>
+    )}
     </div>
   );
 }

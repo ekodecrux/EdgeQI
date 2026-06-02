@@ -54,7 +54,7 @@ import PerformanceTab from './components/PerformanceTab';
 import SecurityTab from './components/SecurityTab';
 import ChatbotSlideout from './components/ChatbotSlideout';
 import TraceabilityTab from './components/TraceabilityTab';
-import ModulePagesTab from './components/ModulePagesTab';
+// ModulePagesTab removed — module health absorbed into QA Dashboard
 import ScriptConverterTab from './components/ScriptConverterTab';
 import TestCaseGeneratorPage from './components/TestCaseGeneratorPage';
 import ExecutionEnginePage from './components/ExecutionEnginePage';
@@ -428,7 +428,6 @@ export default function App() {
     'defects' | 
     'performance' | 
     'security' | 
-    'modules' | 
     'traceability' | 
     'audit' |
     'llm-config' |
@@ -506,7 +505,7 @@ export default function App() {
 
   const handleNavigateToModule = (moduleId: string) => {
     setSelectedModuleId(moduleId);
-    setActiveTab('modules');
+    setActiveTab('dashboard');
   };
 
   const handleUpdateTestCase = (updated: TestCase) => {
@@ -985,17 +984,16 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           <span className="sidebar-section-label">Core Modules</span>
           <nav className="flex flex-col mt-1">
             {[
-              { id: 'agentic',          label: 'Agentic AI Engine',   icon: Zap },
+              { id: 'agentic',          label: 'Auto Pipeline',        icon: Zap },
               { id: 'requirements',     label: 'Requirements',         icon: FileText },
               { id: 'testcases',        label: 'Test Cases',           icon: TableProperties },
               { id: 'traceability',     label: 'Traceability',         icon: Table },
               { id: 'scripts',          label: 'Script Generator',     icon: Settings2 },
               { id: 'defects',          label: 'Impact Analyzer',      icon: Crosshair },
+              { id: 'execution',        label: 'Execution Engine',     icon: Cpu },
               { id: 'performance',      label: 'Performance Testing',  icon: Sliders },
               { id: 'security',         label: 'Security Testing',     icon: ShieldAlert },
-              { id: 'dashboard',        label: 'QE Dashboard',         icon: TrendingUp },
-              { id: 'modules',          label: 'Module Quality',       icon: Layers },
-              { id: 'execution',        label: 'Execution Engine',     icon: Cpu },
+              { id: 'dashboard',        label: 'QA Dashboard',         icon: TrendingUp },
               { id: 'test-plans',       label: 'Test Plans',           icon: TableProperties },
               { id: 'manual-execution', label: 'Manual Execution',     icon: CheckSquare },
               { id: 'audit',            label: 'Audit Log',            icon: History },
@@ -1144,10 +1142,12 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               testCases={filteredTestCases}
               defects={filteredDefectHotspots}
               vulnerabilities={filteredVulnerabilities}
+              performanceConfigs={filteredPerformanceConfigs}
               onTriggerRerun={handleRerunMockTestCase}
               onApplyHeal={handleApplyHealMock}
               onNavigateToModule={handleNavigateToModule}
               onNavigateToAgentic={() => setActiveTab('agentic')}
+              onNavigateTo={setActiveTab}
             />
           )}
 
@@ -1158,6 +1158,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               isRunning={isRunning}
               onTriggerRun={handleExecuteAutonomousCycle}
               onOverrideConfirm={handleManualOverrideConfig}
+              onNavigateToDashboard={() => setActiveTab('dashboard')}
             />
           )}
 
@@ -1168,6 +1169,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               onAddRequirement={handleAddRequirement}
               isGenerating={isGeneratingRequirements}
               onGenerateTestCaseCode={(tcId) => handleGenerateScript(tcId, 'Playwright', 'TypeScript')}
+              onNavigateToTestCases={() => setActiveTab('testcases')}
             />
           )}
 
@@ -1179,21 +1181,10 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               onAddManualTestCase={(newCase) => setTestCases(prev => [{ ...newCase, projectId: currentProjectId }, ...prev])}
               onUpdateTestCase={handleUpdateTestCase}
               currentProjectId={currentProjectId}
+              onNavigateToScripts={() => setActiveTab('scripts')}
             />
           )}
 
-          {activeTab === 'modules' && (
-            <ModulePagesTab
-              requirements={filteredRequirements}
-              testCases={filteredTestCases}
-              defects={filteredDefectHotspots}
-              vulnerabilities={filteredVulnerabilities}
-              onTriggerRerun={handleRerunMockTestCase}
-              onApplyHeal={handleApplyHealMock}
-              activeModuleId={selectedModuleId}
-              onActiveModuleIdChange={setSelectedModuleId}
-            />
-          )}
 
           {activeTab === 'traceability' && (
             <TraceabilityTab
@@ -1221,6 +1212,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               onGenerateScript={handleGenerateScript}
               isGeneratingScript={isGeneratingRequirements || isGeneratingScript}
               currentProjectId={currentProjectId}
+              onNavigateToExecution={() => setActiveTab('execution')}
             />
           )}
 
@@ -1231,16 +1223,20 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {activeTab === 'performance' && (
             <PerformanceTab
               configs={filteredPerformanceConfigs}
+              testCases={filteredTestCases}
               onExecutePerformanceTest={handleExecutePerformanceTest}
               isExecuting={isExecutingPerformance}
+              onNavigateToDashboard={() => setActiveTab('dashboard')}
             />
           )}
 
           {activeTab === 'security' && (
             <SecurityTab
               vulnerabilities={filteredVulnerabilities}
+              testCases={filteredTestCases}
               onApplyRemediation={handleApplyRemediation}
               isRemediating={isRemediatingSecurity}
+              onNavigateToDashboard={() => setActiveTab('dashboard')}
             />
           )}
 

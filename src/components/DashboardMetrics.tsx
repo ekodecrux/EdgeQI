@@ -26,16 +26,18 @@ import {
   Bell,
   HardDrive
 } from 'lucide-react';
-import { TestCase, DefectHotspot, SecurityVulnerability } from '../types';
+import { TestCase, DefectHotspot, SecurityVulnerability, PerformanceConfig } from '../types';
 
 interface DashboardProps {
   testCases: TestCase[];
   defects: DefectHotspot[];
   vulnerabilities: SecurityVulnerability[];
+  performanceConfigs?: PerformanceConfig[];
   onTriggerRerun: (id: string) => void;
   onApplyHeal: (id: string) => void;
   onNavigateToModule?: (moduleId: string) => void;
   onNavigateToAgentic?: () => void;
+  onNavigateTo?: (tab: string) => void;
 }
 
 interface ToolIntegration {
@@ -50,10 +52,12 @@ export default function DashboardMetrics({
   testCases,
   defects,
   vulnerabilities,
+  performanceConfigs = [],
   onTriggerRerun,
   onApplyHeal,
   onNavigateToModule,
   onNavigateToAgentic,
+  onNavigateTo,
 }: DashboardProps) {
   const [persona, setPersona] = useState<'tactical' | 'operational' | 'strategic'>('tactical');
 
@@ -1082,6 +1086,88 @@ export default function DashboardMetrics({
           </div>
         ) : <p className="text-xs text-slate-400 font-mono text-center py-3">Click "Check Budgets" to measure bundle sizes.</p>}
       </div>
+
+      {/* ── MODULE HEALTH GRID (absorbed from Module Quality) ──────── */}
+      <div className="glass-card p-5 space-y-4">
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <Layers className="w-4 h-4 text-blue-500" />
+            <h3 className="panel-title">Module Health</h3>
+          </div>
+          <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:11,color:'#6b82ab'}}>Health · Risk · Automation · Bugs</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+          {modulesList.map(m => {
+            const riskColor = m.risk === 'Critical' ? '#ef4444' : m.risk === 'High' ? '#f97316' : m.risk === 'Medium' ? '#eab308' : '#22c55e';
+            const healthBg = m.health >= 90 ? '#f0fdf4' : m.health >= 75 ? '#fefce8' : '#fef2f2';
+            return (
+              <div
+                key={m.name}
+                style={{background:healthBg,border:`1px solid #dbe2ea`,borderRadius:10,padding:'12px 14px',cursor:'pointer'}}
+                onClick={() => onNavigateToModule && onNavigateToModule(moduleNameToId[m.name] || 'auth')}
+              >
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#1f3965'}}>{m.name}</span>
+                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:10,fontWeight:700,color:riskColor,background:riskColor+'18',border:`1px solid ${riskColor}44`,borderRadius:4,padding:'1px 6px'}}>{m.risk}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+                  <div style={{flex:1,height:4,background:'#dbe2ea',borderRadius:2}}>
+                    <div style={{width:`${m.health}%`,height:4,background:m.health>=90?'#22c55e':m.health>=75?'#eab308':'#ef4444',borderRadius:2}} />
+                  </div>
+                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:11,fontWeight:700,color:'#1f3965',minWidth:30}}>{m.health}%</span>
+                </div>
+                <div style={{display:'flex',gap:12}}>
+                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:10,color:'#6b82ab'}}>Auto: <b style={{color:'#1f3965'}}>{m.automation}</b></span>
+                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:10,color:'#6b82ab'}}>Bugs: <b style={{color:m.bugs>2?'#ef4444':'#1f3965'}}>{m.bugs}</b></span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── PERFORMANCE RESULTS SUMMARY ────────────────────────────── */}
+      {performanceConfigs.length > 0 && (
+        <div className="glass-card p-5 space-y-4">
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <Activity className="w-4 h-4 text-blue-500" />
+              <h3 className="panel-title">Performance Results</h3>
+            </div>
+            <button
+              onClick={() => onNavigateTo && onNavigateTo('performance')}
+              style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#1e96df',background:'none',border:'none',cursor:'pointer',fontWeight:600}}
+            >
+              Run new test →
+            </button>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontFamily:'"Lato",Arial,sans-serif',fontSize:12}}>
+              <thead>
+                <tr style={{borderBottom:'1px solid #dbe2ea'}}>
+                  {['Type','Endpoint / Journey','VUsers','Avg ms','p95 ms','Error %','TPS'].map(h => (
+                    <th key={h} style={{padding:'6px 10px',textAlign:'left',color:'#6b82ab',fontWeight:600,fontSize:11,whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {performanceConfigs.slice(0,5).map((cfg, i) => (
+                  <tr key={i} style={{borderBottom:'1px solid #f2f4f8'}}>
+                    <td style={{padding:'7px 10px',color:'#1f3965',fontWeight:600}}>{cfg.testType}</td>
+                    <td style={{padding:'7px 10px',color:'#6b82ab',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cfg.endpointOrJourney}</td>
+                    <td style={{padding:'7px 10px',color:'#1f3965'}}>{cfg.virtualUsers}</td>
+                    <td style={{padding:'7px 10px',color: (cfg.metrics?.avgResponseTimeMs||0)>500?'#ef4444':'#1f3965',fontWeight:600}}>{cfg.metrics?.avgResponseTimeMs ?? '—'}</td>
+                    <td style={{padding:'7px 10px',color:(cfg.metrics?.p95Ms||0)>1000?'#ef4444':'#1f3965'}}>{cfg.metrics?.p95Ms ?? '—'}</td>
+                    <td style={{padding:'7px 10px',color:(cfg.metrics?.errorRate||0)>1?'#ef4444':'#22c55e',fontWeight:600}}>{cfg.metrics?.errorRate != null ? `${cfg.metrics.errorRate}%` : '—'}</td>
+                    <td style={{padding:'7px 10px',color:'#1f3965'}}>{cfg.metrics?.throughputTps ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

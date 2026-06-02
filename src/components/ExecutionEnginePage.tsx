@@ -41,7 +41,9 @@ import {
   Radio,
   ShieldAlert,
   ShieldOff,
-  Filter
+  Filter,
+  ArrowRight,
+  CheckCircle
 } from 'lucide-react';
 import AgentFlowVisualizer from './AgentFlowVisualizer';
 import { AgentStep } from '../types';
@@ -52,6 +54,7 @@ interface ExecutionEnginePageProps {
   isRunning: boolean;
   onTriggerRun: () => void;
   onOverrideConfirm: (stepId: string) => void;
+  onNavigateToDashboard?: () => void;
 }
 
 interface VisualSnapshot {
@@ -183,7 +186,8 @@ export default function ExecutionEnginePage({
   currentRunId,
   isRunning,
   onTriggerRun,
-  onOverrideConfirm
+  onOverrideConfirm,
+  onNavigateToDashboard
 }: ExecutionEnginePageProps) {
   
   // Find currently active step or execution logs
@@ -1115,6 +1119,29 @@ export default function ExecutionEnginePage({
           isRunning={isRunning}
           onTriggerRun={onTriggerRun}
         />
+
+        {/* ── NEXT STEP: View QA Dashboard after run completes ── */}
+        {!isRunning && history.length > 0 && (
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+              <div>
+                <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+                  Last run: {history[0].passed} passed · {history[0].healed} healed · {history[0].failed} failed
+                </span>
+                <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+                  View full results, module health and trends.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onNavigateToDashboard}
+              style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+            >
+              QA Dashboard <ArrowRight style={{width:14,height:14}} />
+            </button>
+          </div>
+        )}
 
         {/* Parallel Run Configuration Panel (REQ-47) */}
         {showParallelPanel && (

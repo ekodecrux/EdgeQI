@@ -23,7 +23,8 @@ import {
   X,
   ThumbsUp,
   ThumbsDown,
-  Tag
+  Tag,
+  ArrowRight
 } from 'lucide-react';
 import { TestCase } from '../types';
 
@@ -34,6 +35,7 @@ interface TestCaseGeneratorPageProps {
   onAddManualTestCase?: (tc: TestCase) => void;
   onUpdateTestCase?: (tc: TestCase) => void;
   currentProjectId?: string;
+  onNavigateToScripts?: () => void;
 }
 
 export default function TestCaseGeneratorPage({
@@ -42,7 +44,8 @@ export default function TestCaseGeneratorPage({
   onApplyHeal,
   onAddManualTestCase,
   onUpdateTestCase,
-  currentProjectId = 'ALL'
+  currentProjectId = 'ALL',
+  onNavigateToScripts,
 }: TestCaseGeneratorPageProps) {
   const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -1128,6 +1131,28 @@ export default function TestCaseGeneratorPage({
         </div>
       )}
 
+      {/* ── NEXT STEP CTA ─────────────────────────────────────────── */}
+      {localTestCases.length > 0 && (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+            <div>
+              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+                {localTestCases.length} test case{localTestCases.length !== 1 ? 's' : ''} ready
+              </span>
+              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+                Generate automation scripts for your test suite.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onNavigateToScripts}
+            style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+          >
+            Script Generator <ArrowRight style={{width:14,height:14}} />
+          </button>
+        </div>
+      )}
     </div>
     </div>
   );

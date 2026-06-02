@@ -305,7 +305,9 @@ export default function AgenticOrchestrator({
     await new Promise(r => setTimeout(r, 800));
     
     setOrchestratorState('completed');
-    appendLog('SYS-CORE', '⚡ Connected Agentic AI QA Process successfully finalized! Dashboard updated with newest pipeline states.', 'success');
+    appendLog('SYS-CORE', '⚡ Full QA cycle complete! Navigating to QA Dashboard...', 'success');
+    await new Promise(r => setTimeout(r, 2000));
+    onNavigateToTab('dashboard');
   };
 
   // Trigger performance load run from recommendations panel
@@ -363,8 +365,8 @@ export default function AgenticOrchestrator({
             <Zap style={{width:20,height:20,color:'#ffffff'}} />
           </div>
           <div>
-            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Agentic AI Engine</h1>
-            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>One-click end-to-end QA automation</p>
+            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Auto Pipeline</h1>
+            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Requirements → Tests → Scripts → Execution → Dashboard</p>
           </div>
         </div>
       </div>
@@ -433,7 +435,7 @@ export default function AgenticOrchestrator({
                 ) : (
                   <>
                     <Play className="w-4 h-4 text-indigo-200 fill-indigo-200" />
-                    Kickstart Agentic AI Engine
+                    Run Full QA Cycle
                   </>
                 )}
               </button>
@@ -474,7 +476,7 @@ export default function AgenticOrchestrator({
                   onClick={() => onNavigateToTab('dashboard')}
                   className="w-full py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-mono text-[10px] rounded-lg border border-emerald-600 transition-colors flex items-center justify-center gap-1.5 font-bold"
                 >
-                  View Updated QE Dashboard <ArrowRight className="w-3" />
+                  View QA Dashboard <ArrowRight className="w-3" />
                 </button>
               </div>
             </div>
