@@ -980,8 +980,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           </div>
         </div>
 
-        {/* Primary Nav */}
-        <div className="px-2 pt-3">
+        {/* Primary Nav — pb-32 reserves space for the absolute footer so items don't overlap */}
+        <div className="px-2 pt-3 pb-32">
           <span className="sidebar-section-label">Core Modules</span>
           <nav className="flex flex-col mt-1">
             {[

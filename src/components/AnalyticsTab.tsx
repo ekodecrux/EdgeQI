@@ -122,7 +122,7 @@ export default function AnalyticsTab() {
             <BarChart3 className="w-3.5 h-3.5 text-violet-300 animate-pulse" />
             AI Analytics — REQ-99/100
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight">AI Cost & Latency Analytics</h2>
+          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>AI Cost & Latency Analytics</h2>
           <p className="text-slate-200 text-xs sm:text-sm mt-1 leading-relaxed">
             Monitor AI provider usage, token consumption, estimated cost, and latency trends aggregated
             from the audit log. Track spending by day and provider to optimize your LLM configuration.

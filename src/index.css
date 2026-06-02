@@ -92,6 +92,7 @@ body {
 }
 
 /* ── HEADINGS — Teachmint exact: #1f3965, weight 600, 110% line-height ───── */
+/* NOTE: only apply dark heading color when NOT inside a dark-bg container    */
 h1, h2, h3, h4, h5, h6 {
   font-family: "Lato", Arial, sans-serif;
   color: #1f3965;
@@ -99,6 +100,27 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.1;      /* 110% */
   margin: 0;
 }
+
+/* ── DARK BANNER HEADINGS — force white on dark gradient backgrounds ─────── */
+/* Any element with text-white class, or inside .text-white parent:           */
+/* Covers: banner divs with class="... text-white ..." and their h* children  */
+.text-white h1,
+.text-white h2,
+.text-white h3,
+.text-white h4,
+.text-white h5,
+.text-white h6,
+h1.text-white,
+h2.text-white,
+h3.text-white,
+h4.text-white,
+h5.text-white,
+h6.text-white {
+  color: #ffffff !important;
+}
+
+/* Also catch headings that sit directly inside dark inline-style containers  */
+/* (These components use style={{color:'...'}} on the wrapper div = text-white class) */
 
 p {
   color: #6b82ab;
@@ -219,14 +241,17 @@ p {
 .sidebar {
   background: var(--sidebar-bg);
   width: var(--sidebar-w);
-  min-height: 100vh;
+  height: 100vh;           /* exact viewport height — not min-height */
   position: fixed;
-  left: 0; top: 0; bottom: 0;
+  left: 0; top: 0;
   border-right: 1px solid rgba(255,255,255,0.05);
   box-shadow: 4px 0 24px rgba(7,39,69,0.4);
   z-index: 40;
-  overflow-y: auto;
+  overflow-y: auto;        /* scroll the nav items */
+  overflow-x: hidden;
   scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
 }
 .sidebar::-webkit-scrollbar { display: none; }
 

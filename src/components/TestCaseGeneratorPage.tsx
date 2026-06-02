@@ -430,7 +430,7 @@ export default function TestCaseGeneratorPage({
             <Cpu className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
             Active Workspace Scope: {getProjectBadgeStr()}
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight">
+          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
             QA Test Case Matrix Generator
           </h2>
           <p className="text-blue-100 text-xs sm:text-sm mt-1 leading-relaxed">

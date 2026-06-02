@@ -487,7 +487,7 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
             <Sparkles className="w-3.5 h-3.5 text-purple-300" />
             Autonomous Script Transpiler & Enterprise Bridge Pro
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight">
+          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
             Universal Automation Script Converter
           </h2>
           <p className="text-purple-100 text-xs sm:text-sm mt-2 leading-relaxed">

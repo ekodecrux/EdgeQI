@@ -328,7 +328,7 @@ export default function DashboardMetrics({
             <Zap className="w-3 h-3 text-blue-400 animate-pulse" />
             Connected AI Cycle Standby
           </div>
-          <h4 className="text-sm sm:text-base font-sans font-extrabold tracking-tight">
+          <h4 className="text-sm sm:text-base font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
             Execute Multi-Module Connected Agentic AI QA Process
           </h4>
           <p className="text-xs text-blue-200 leading-relaxed">

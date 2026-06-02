@@ -920,10 +920,10 @@ export default function ExecutionEnginePage({
             <Cpu className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
             Core Cluster Node: Live E2E Executor Grid
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight">
+          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
             Execution Engine Command Console
           </h2>
-          <p className="text-slate-200 text-xs sm:text-sm mt-1 leading-relaxed">
+          <p className="text-xs sm:text-sm mt-1 leading-relaxed" style={{color:'#bfdbfe'}}>
             Orchestrate and monitor deep automated test runs in real-time. Command clean headless virtual browser sandbox clusters, inspect compiled wrappers, and resolve selector exceptions dynamically with self-healing feedback.
           </p>
         </div>

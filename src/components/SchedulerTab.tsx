@@ -225,7 +225,7 @@ export default function SchedulerTab() {
             <Clock className="w-3.5 h-3.5 text-indigo-300 animate-pulse" />
             Cron Scheduler — REQ-51
           </div>
-          <h2 className="text-2xl font-sans font-extrabold tracking-tight">Test Suite Scheduler</h2>
+          <h2 className="text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>Test Suite Scheduler</h2>
           <p className="text-slate-200 text-xs sm:text-sm mt-1 leading-relaxed">
             Schedule automated test suite runs on recurring intervals. Supports @hourly, @daily, and every_Xm / every_Xh expressions.
             Schedules run as in-memory cron jobs with 60-second tick resolution.

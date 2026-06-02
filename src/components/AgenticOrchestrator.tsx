@@ -365,10 +365,10 @@ export default function AgenticOrchestrator({
             <Sparkles className="w-3.5 h-3.5 text-blue-300" />
             End-To-End Cross-Module Connected AI
           </div>
-          <h2 className="text-xl sm:text-2xl font-sans font-extrabold tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-sans font-extrabold tracking-tight" style={{color:'#ffffff'}}>
             Agentic AI QA Engine & Process Orchestrator
           </h2>
-          <p className="text-indigo-100 text-xs sm:text-sm mt-1 leading-relaxed">
+          <p className="text-xs sm:text-sm mt-1 leading-relaxed" style={{color:'#bfdbfe'}}>
             Eliminate isolated validation silos. The Connected Agentic Engine bridges requirements extraction, 
             test script synthesis, defect matrix-weighted regression sweeps, and browser execution grids into a unified, scheduled quality lifecycle automation flow.
           </p>
