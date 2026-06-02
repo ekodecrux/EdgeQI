@@ -1135,7 +1135,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 overflow-x-hidden">
           
           {activeTab === 'agentic' && (
             <AgenticOrchestrator

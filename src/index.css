@@ -295,8 +295,8 @@ p {
 .main-content {
   margin-left: var(--sidebar-w);
   min-height: 100vh;
-  padding: 28px 32px;
   background: #f2f4f8;
+  overflow-x: hidden;
 }
 
 /* ── PANEL HEADER ────────────────────────────────────────────────────────── */

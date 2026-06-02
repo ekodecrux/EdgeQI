@@ -648,7 +648,7 @@ export default function DefectPredictTab({
       </div>
 
       {/* REQ-74: Root Cause Cluster Grouping */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div className="xl:col-span-6 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-blue-500" />
@@ -702,7 +702,7 @@ export default function DefectPredictTab({
       </div>
 
       {/* REQ-77: AI Defect Triage Assistant */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div className="xl:col-span-6 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <Wand2 className="w-4 h-4 text-rose-500" />
           <span className="text-xs font-bold text-slate-700">AI Defect Triage Assistant</span>
