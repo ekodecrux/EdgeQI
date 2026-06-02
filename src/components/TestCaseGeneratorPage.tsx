@@ -399,7 +399,7 @@ export default function TestCaseGeneratorPage({
               </div>
 
               {importResult && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 font-mono">
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 font-mono">
                   ✅ Imported {importResult.imported} test cases · {importResult.failed} failed
                 </div>
               )}
@@ -421,19 +421,19 @@ export default function TestCaseGeneratorPage({
       )}
 
       {/* Intro Header */}
-      <div className="bg-gradient-to-r from-emerald-850 to-teal-800 rounded-3xl p-6 text-white shadow-xs relative overflow-hidden bg-slate-900 border border-slate-800">
+      <div className="rounded-3xl p-6 text-white shadow-xs relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
           <TableProperties className="w-96 h-96" />
         </div>
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-emerald-200 mb-3 font-mono font-bold">
-            <Cpu className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-blue-200 mb-3 font-mono font-bold">
+            <Cpu className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
             Active Workspace Scope: {getProjectBadgeStr()}
           </div>
           <h2 className="text-2xl font-sans font-extrabold tracking-tight">
             QA Test Case Matrix Generator
           </h2>
-          <p className="text-emerald-100 text-xs sm:text-sm mt-1 leading-relaxed">
+          <p className="text-blue-100 text-xs sm:text-sm mt-1 leading-relaxed">
             Construct, synchronize, and execute structured test matrices based on functional parameters. Edit priorities on-the-fly, declare explicit UI assertions, and run quick-checks to evaluate automated healing thresholds.
           </p>
         </div>
@@ -443,11 +443,11 @@ export default function TestCaseGeneratorPage({
 
         {/* Left column: Create Manual scenario */}
         <div className="lg:col-span-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="glass-card p-5 space-y-4">
             
             <div className="border-b border-slate-100 pb-3">
               <h3 className="font-sans font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Plus className="w-4 h-4 text-emerald-600 font-bold" />
+                <Plus className="w-4 h-4 text-blue-500 font-bold" />
                 Declare Manual Suite Scenario
               </h3>
               <p className="text-[10px] text-slate-500 mt-0.5">Quickly append specialized validations to the mapped spec.</p>
@@ -461,7 +461,7 @@ export default function TestCaseGeneratorPage({
                   placeholder="e.g. Reject negative cash wallets"
                   value={tcTitle}
                   onChange={(e) => setTcTitle(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-emerald-400"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-400"
                   required
                 />
               </div>
@@ -473,7 +473,7 @@ export default function TestCaseGeneratorPage({
                   value={tcDesc}
                   onChange={(e) => setTcDesc(e.target.value)}
                   rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-emerald-400 leading-normal"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-400 leading-normal"
                   required
                 />
               </div>
@@ -484,7 +484,7 @@ export default function TestCaseGeneratorPage({
                   <select
                     value={tcPriority}
                     onChange={(e: any) => setTcPriority(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800"
+                    className="input-glass w-full text-xs"
                   >
                     <option value="P0">P0 - Critical Focus</option>
                     <option value="P1">P1 - Standard Flow</option>
@@ -497,7 +497,7 @@ export default function TestCaseGeneratorPage({
                   <select
                     value={tcType}
                     onChange={(e) => setTcType(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800"
+                    className="input-glass w-full text-xs"
                   >
                     <option value="Positive">Positive</option>
                     <option value="Negative">Negative</option>
@@ -514,7 +514,7 @@ export default function TestCaseGeneratorPage({
                   placeholder="e.g. Account balance holds negative limit"
                   value={tcPreconditions}
                   onChange={(e) => setTcPreconditions(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-850"
+                  className="input-glass w-full text-xs"
                 />
               </div>
 
@@ -525,7 +525,7 @@ export default function TestCaseGeneratorPage({
                   value={tcSteps}
                   onChange={(e) => setTcSteps(e.target.value)}
                   rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-850 leading-normal"
+                  className="input-glass w-full text-xs leading-normal"
                 />
               </div>
 
@@ -536,20 +536,20 @@ export default function TestCaseGeneratorPage({
                   placeholder='e.g. {"balance": -10, "currency": "USD"}'
                   value={tcTestData}
                   onChange={(e) => setTcTestData(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800"
+                  className="input-glass w-full text-xs"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-bold py-2 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5"
+                className="btn-primary w-full py-2 px-4 text-xs flex items-center justify-center gap-1.5"
               >
                 <Plus className="w-4 h-4" /> Add Matrix Scenario
               </button>
             </form>
 
             {feedback && (
-              <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-800 rounded-xl text-center text-xs leading-normal font-mono animate-fade-in">
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-center text-xs leading-normal font-mono animate-fade-in">
                 {feedback}
               </div>
             )}
@@ -561,13 +561,13 @@ export default function TestCaseGeneratorPage({
           
           {/* REQ-36: Approval feedback banner */}
           {approvalMsg && (
-            <div className={`px-4 py-2 rounded-xl text-xs font-mono font-bold border ${approvalMsg.includes('approved') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : approvalMsg.includes('rejected') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+            <div className={`px-4 py-2 rounded-xl text-xs font-mono font-bold border ${approvalMsg.includes('approved') ? 'bg-green-50 text-green-700 border-green-200' : approvalMsg.includes('rejected') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
               {approvalMsg}
             </div>
           )}
 
           {/* Controls Bar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="glass-card p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             
             <div className="flex items-center gap-2 flex-wrap">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -579,8 +579,8 @@ export default function TestCaseGeneratorPage({
                     onClick={() => setActiveCategory(cat)}
                     className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border transition-all ${
                       activeCategory === cat 
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold' 
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        ? 'btn-primary text-[10px] font-bold' 
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700'
                     }`}
                   >
                     {cat}
@@ -590,10 +590,10 @@ export default function TestCaseGeneratorPage({
               {/* REQ-13: Tag filter chips */}
               {allTags.length > 0 && (
                 <div className="flex items-center gap-1 ml-2">
-                  <Tag className="w-3 h-3 text-indigo-400" />
+                  <Tag className="w-3 h-3 text-blue-400" />
                   {allTags.map(tag => (
                     <button key={tag} onClick={() => setActiveTagFilter(activeTagFilter === tag ? '' : tag)}
-                      className={`px-2 py-0.5 text-[9px] font-mono rounded-full border transition-all ${activeTagFilter === tag ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-bold' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-indigo-50'}`}>
+                      className={`px-2 py-0.5 text-[9px] font-mono rounded-full border transition-all ${activeTagFilter === tag ? 'bg-blue-100 text-blue-700 border-blue-300 font-bold' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50'}`}>
                       #{tag}
                     </button>
                   ))}
@@ -604,25 +604,25 @@ export default function TestCaseGeneratorPage({
 
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                Suite Coverage: <strong className="text-emerald-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
+                Suite Coverage: <strong className="text-blue-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
               </span>
               {/* REQ-18: Bulk priority controls */}
               {bulkSelected.size > 0 && (
-                <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1">
-                  <span className="text-[10px] font-mono text-indigo-700 font-bold">{bulkSelected.size} selected</span>
+                <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+                  <span className="text-[10px] font-mono text-blue-700 font-bold">{bulkSelected.size} selected</span>
                   <select value={bulkPriority} onChange={e => setBulkPriority(e.target.value as any)}
-                    className="text-[10px] font-mono border border-indigo-200 rounded px-1 py-0.5 bg-white text-indigo-800 focus:outline-none">
+                    className="text-[10px] font-mono border border-blue-200 rounded px-1 py-0.5 bg-white text-blue-800 focus:outline-none">
                     <option value="P0">P0</option>
                     <option value="P1">P1</option>
                     <option value="P2">P2</option>
                     <option value="P3">P3</option>
                   </select>
                   <button onClick={handleBulkPriorityUpdate} disabled={bulkUpdating}
-                    className="flex items-center gap-1 text-[10px] font-mono bg-indigo-600 text-white px-2 py-0.5 rounded hover:bg-indigo-700 disabled:opacity-50">
+                    className="flex items-center gap-1 text-[10px] font-mono bg-blue-600 text-white px-2 py-0.5 rounded hover:bg-blue-700 disabled:opacity-50">
                     {bulkUpdating ? <RefreshCw className="w-3 h-3 animate-spin" /> : null} Apply
                   </button>
                   <button onClick={() => setBulkSelected(new Set())}
-                    className="text-[10px] text-indigo-500 hover:text-indigo-700"><X className="w-3 h-3" /></button>
+                    className="text-[10px] text-blue-500 hover:text-blue-700"><X className="w-3 h-3" /></button>
                 </div>
               )}
               {/* Export + Import buttons */}
@@ -630,7 +630,7 @@ export default function TestCaseGeneratorPage({
                 <button
                   onClick={() => handleExport('csv')}
                   disabled={isExporting || filteredCases.length === 0}
-                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
                   title="Export as CSV" aria-label="Export test cases as CSV"
                 >
                   {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
@@ -639,7 +639,7 @@ export default function TestCaseGeneratorPage({
                 <button
                   onClick={() => handleExport('json')}
                   disabled={isExporting || filteredCases.length === 0}
-                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
+                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
                   title="Export as JSON" aria-label="Export test cases as JSON"
                 >
                   {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileJson className="w-3 h-3" />}
@@ -665,8 +665,8 @@ export default function TestCaseGeneratorPage({
                 <div
                   key={tc.id}
                   onClick={() => setSelectedTestCase(isSelected ? null : tc)}
-                  className={`bg-white border hover:border-slate-300 rounded-2xl p-4 transition-all cursor-pointer shadow-xs ${bulkSelected.has(tc.id) ? 'ring-1 ring-indigo-400 border-indigo-300 ' : ''}${
-                    isSelected ? 'ring-1 ring-emerald-500 border-emerald-500' : 'border-slate-200'
+                  className={`glass-card p-4 transition-all cursor-pointer ${bulkSelected.has(tc.id) ? 'ring-1 ring-blue-400 border-blue-300 ' : ''}${
+                    isSelected ? 'ring-1 ring-blue-500 border-blue-500' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -674,10 +674,10 @@ export default function TestCaseGeneratorPage({
                     <input type="checkbox" checked={bulkSelected.has(tc.id)}
                       onChange={e => { e.stopPropagation(); setBulkSelected(prev => { const s = new Set(prev); s.has(tc.id) ? s.delete(tc.id) : s.add(tc.id); return s; }); }}
                       onClick={e => e.stopPropagation()}
-                      className="mt-1 accent-indigo-600 w-3.5 h-3.5 shrink-0" />
+                      className="mt-1 accent-blue-600 w-3.5 h-3.5 shrink-0" />
                     <div className="space-y-1 text-left flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-mono text-emerald-700 font-bold">{tc.id}</span>
+                        <span className="text-[10px] font-mono text-blue-600 font-bold">{tc.id}</span>
                         <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
                           tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border border-rose-200/50' :
                           tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border border-amber-200/50' : 'bg-slate-100 text-slate-600'
@@ -688,7 +688,7 @@ export default function TestCaseGeneratorPage({
                           {tc.type}
                         </span>
                         <span className={`text-[9px] font-mono px-1.5 rounded-sm ${
-                          tc.automationStatus === 'Automated' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-blue-50 text-indigo-700 border border-blue-100'
+                          tc.automationStatus === 'Automated' ? 'badge badge-green' : 'badge badge-blue'
                         }`}>
                           {tc.automationStatus}
                         </span>
@@ -704,7 +704,7 @@ export default function TestCaseGeneratorPage({
                           e.stopPropagation();
                           handleRerun(tc.id);
                         }}
-                        className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all text-slate-500"
+                        className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all text-slate-500"
                         title="Simulate validation test"
                       >
                         <Play className="w-3.5 h-3.5" />
@@ -723,7 +723,7 @@ export default function TestCaseGeneratorPage({
                       {/* REQ-16: Inline step editor button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingStepsId(tc.id); setEditingSteps(tc.steps ? tc.steps.map(s => ({...s})) : []); }}
-                        className="bg-teal-50 text-teal-700 p-1.5 rounded-lg border border-teal-200 hover:bg-teal-600 hover:text-white transition-all"
+                        className="bg-blue-50 text-blue-700 p-1.5 rounded-lg border border-blue-200 hover:bg-blue-600 hover:text-white transition-all"
                         title="Edit steps inline" aria-label={`Edit steps for ${tc.id}`}
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -736,7 +736,7 @@ export default function TestCaseGeneratorPage({
                           handleRegenerate(tc);
                         }}
                         disabled={regeneratingId === tc.id}
-                        className="bg-purple-50 text-purple-700 p-1.5 rounded-lg border border-purple-200 hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
+                        className="bg-blue-50 text-blue-700 p-1.5 rounded-lg border border-blue-200 hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50"
                         title="AI Regenerate this test case" aria-label={`AI regenerate test case ${tc.id}`}
                       >
                         {regeneratingId === tc.id
@@ -771,7 +771,7 @@ export default function TestCaseGeneratorPage({
                         </div>
                         <div>
                           <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Execution Parameters & Test Data</span>
-                          <p className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-emerald-800 font-mono text-[11px] break-all">
+                          <p className="bg-slate-50 p-2.5 rounded-xl border border-slate-150 text-blue-700 font-mono text-[11px] break-all">
                             {tc.testData}
                           </p>
                         </div>
@@ -785,7 +785,7 @@ export default function TestCaseGeneratorPage({
                               <span className="text-slate-400 font-mono">[{i + 1}]</span>
                               <div className="flex-1">
                                 <span className="text-white font-bold">{st.action}</span>
-                                <p className="text-[10px] text-emerald-400 font-mono mt-0.5">➔ Assert: {st.expectedResult}</p>
+                                <p className="text-[10px] text-blue-400 font-mono mt-0.5">➔ Assert: {st.expectedResult}</p>
                               </div>
                             </div>
                           ))}
@@ -793,17 +793,17 @@ export default function TestCaseGeneratorPage({
                       </div>
 
                       <div className="flex items-center justify-between border-t border-slate-100 pt-3 flex-wrap gap-2 text-[10px] font-mono text-slate-500">
-                        <span>Confidence Threshold: <strong className="text-emerald-700 font-bold">{tc.confidenceScore}%</strong></span>
+                        <span>Confidence Threshold: <strong className="text-blue-600 font-bold">{tc.confidenceScore}%</strong></span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setEditingTestCase(tc)}
-                            className="inline-flex items-center gap-1 bg-purple-50 hover:bg-purple-600 hover:text-white border border-purple-200 px-2.5 py-1 rounded-md text-purple-700 font-sans font-bold text-[10px] transition-all"
+                            className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 px-2.5 py-1 rounded-md text-blue-700 font-sans font-bold text-[10px] transition-all"
                           >
                             <Edit2 className="w-3 h-3" /> Edit Test Case
                           </button>
                           <span className="flex items-center gap-1 text-[11px]">
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
                             Parsed by NLP Core
                           </span>
                         </div>
@@ -812,13 +812,13 @@ export default function TestCaseGeneratorPage({
                       <div className="border-t border-slate-100 pt-2 flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">Sign-off:</span>
                         {approvalMap[tc.id] === 'approved' ? (
-                          <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">✔ Approved</span>
+                          <span className="text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-bold">✔ Approved</span>
                         ) : approvalMap[tc.id] === 'rejected' ? (
                           <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">✘ Rejected</span>
                         ) : (
                           <>
                             <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'approve'); }} disabled={approvingId === tc.id}
-                              className="flex items-center gap-1 text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-50">
+                              className="flex items-center gap-1 text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-lg hover:bg-green-600 hover:text-white transition-all disabled:opacity-50">
                               <ThumbsUp className="w-3 h-3" /> Approve
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'reject'); }} disabled={approvingId === tc.id}
@@ -831,17 +831,17 @@ export default function TestCaseGeneratorPage({
 
                       {/* REQ-13: Tag input */}
                       <div className="border-t border-slate-100 pt-2 flex items-center gap-2 flex-wrap">
-                        <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
+                        <Tag className="w-3 h-3 text-blue-400 shrink-0" />
                         {(tagsMap[tc.id] || []).map(tag => (
-                          <span key={tag} className="text-[9px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-full">#{tag}</span>
+                          <span key={tag} className="text-[9px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">#{tag}</span>
                         ))}
                         <input type="text" placeholder="Add tags (comma-sep)..." value={tagInput[tc.id] || ''}
                           onChange={(e) => setTagInput(prev => ({ ...prev, [tc.id]: e.target.value }))}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(tc.id); } }}
-                          className="flex-1 min-w-[120px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                          className="flex-1 min-w-[120px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300" />
                         <button onClick={(e) => { e.stopPropagation(); handleSaveTags(tc.id); }}
-                          className="text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all">
+                          className="text-[10px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
                           Save
                         </button>
                       </div>
@@ -854,13 +854,13 @@ export default function TestCaseGeneratorPage({
                           value={regenFeedback[tc.id] || ''}
                           onChange={(e) => setRegenFeedback(prev => ({ ...prev, [tc.id]: e.target.value }))}
                           onClick={(e) => e.stopPropagation()}
-                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleRegenerate(tc, regenFeedback[tc.id]); }}
                           disabled={regeneratingId === tc.id}
-                          className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold disabled:opacity-50 transition-all"
+                          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold disabled:opacity-50 transition-all"
                         >
                           {regeneratingId === tc.id
                             ? <><RefreshCw className="w-3 h-3 animate-spin" /> Regenerating...</>
@@ -881,7 +881,7 @@ export default function TestCaseGeneratorPage({
                   <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
                     <div className="flex items-center justify-between p-4 border-b border-slate-200">
                       <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
-                        <Edit2 className="w-4 h-4 text-teal-600" /> Edit Steps &mdash; {editingStepsId}
+                        <Edit2 className="w-4 h-4 text-blue-500" /> Edit Steps &mdash; {editingStepsId}
                       </h3>
                       <button onClick={() => setEditingStepsId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
                     </div>
@@ -892,10 +892,10 @@ export default function TestCaseGeneratorPage({
                             <span className="text-[10px] font-mono text-slate-400 mt-2.5 shrink-0">#{idx+1}</span>
                             <input type="text" placeholder="Action" value={step.action}
                               onChange={e => { const s = [...editingSteps]; s[idx] = {...s[idx], action: e.target.value}; setEditingSteps(s); }}
-                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-400" />
                             <input type="text" placeholder="Expected result" value={step.expectedResult}
                               onChange={e => { const s = [...editingSteps]; s[idx] = {...s[idx], expectedResult: e.target.value}; setEditingSteps(s); }}
-                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] text-teal-800 focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                             <button onClick={() => setEditingSteps(prev => prev.filter((_, i) => i !== idx))}
                               className="text-rose-400 hover:text-rose-600 mt-1.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
                           </div>
@@ -903,13 +903,13 @@ export default function TestCaseGeneratorPage({
                         {editingSteps.length === 0 && <p className="text-center text-slate-400 text-[11px] py-4 font-mono">No steps. Add one below.</p>}
                       </div>
                       <button onClick={() => setEditingSteps(prev => [...prev, { action: '', expectedResult: '' }])}
-                        className="text-[11px] font-mono text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg hover:bg-teal-600 hover:text-white transition-all">
+                        className="text-[11px] font-mono text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
                         + Add Step
                       </button>
                       <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
                         <button onClick={() => setEditingStepsId(null)} className="px-4 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
                         <button onClick={() => handleSaveSteps(editingStepsId!)} disabled={savingSteps}
-                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-50">
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
                           {savingSteps ? <><RefreshCw className="w-3 h-3 animate-spin" /> Saving...</> : 'Save Steps'}
                         </button>
                       </div>
@@ -920,7 +920,7 @@ export default function TestCaseGeneratorPage({
             })()}
 
             {filteredCases.length === 0 && (
-              <div className="bg-white border border-slate-200 border-dashed rounded-2xl p-8 text-center text-slate-500">
+              <div className="glass-card border-dashed p-8 text-center text-slate-500">
                 <TableProperties className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                 <span className="text-sm font-bold block">No Test Scenarios Loaded</span>
                 <p className="text-xs text-slate-400 max-w-sm mt-1 mx-auto leading-normal">
@@ -936,7 +936,7 @@ export default function TestCaseGeneratorPage({
       {/* Edit Scenario Modal Overlay */}
       {editingTestCase && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setEditingTestCase(null)}>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="glass-card-lg p-6 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-slate-150 pb-3 flex justify-between items-center text-left">
               <div>
                 <h3 className="font-sans font-bold text-slate-950 text-sm">
@@ -959,7 +959,7 @@ export default function TestCaseGeneratorPage({
                   type="text"
                   value={editingTestCase.title}
                   onChange={(e) => setEditingTestCase({ ...editingTestCase, title: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-none"
+                  className="input-glass w-full text-xs"
                 />
               </div>
 
@@ -969,7 +969,7 @@ export default function TestCaseGeneratorPage({
                   value={editingTestCase.description}
                   onChange={(e) => setEditingTestCase({ ...editingTestCase, description: e.target.value })}
                   rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 leading-normal"
+                  className="input-glass w-full text-xs leading-normal"
                 />
               </div>
 
@@ -979,7 +979,7 @@ export default function TestCaseGeneratorPage({
                   <select
                     value={editingTestCase.priority}
                     onChange={(e: any) => setEditingTestCase({ ...editingTestCase, priority: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-sans"
+                    className="input-glass w-full text-xs"
                   >
                     <option value="P0">P0 - Critical Focus</option>
                     <option value="P1">P1 - Standard Flow</option>
@@ -992,7 +992,7 @@ export default function TestCaseGeneratorPage({
                   <select
                     value={editingTestCase.type}
                     onChange={(e: any) => setEditingTestCase({ ...editingTestCase, type: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800 font-sans"
+                    className="input-glass w-full text-xs"
                   >
                     <option value="Positive">Positive</option>
                     <option value="Negative">Negative</option>
@@ -1008,7 +1008,7 @@ export default function TestCaseGeneratorPage({
                   <select
                     value={editingTestCase.automationStatus}
                     onChange={(e: any) => setEditingTestCase({ ...editingTestCase, automationStatus: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-850 font-sans"
+                    className="input-glass w-full text-xs"
                   >
                     <option value="Automatable">Automatable</option>
                     <option value="Needs Manual">Needs Manual</option>
@@ -1021,7 +1021,7 @@ export default function TestCaseGeneratorPage({
                     type="number"
                     value={editingTestCase.confidenceScore}
                     onChange={(e) => setEditingTestCase({ ...editingTestCase, confidenceScore: Math.min(100, Math.max(0, Number(e.target.value))) })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-800"
+                    className="input-glass w-full text-xs"
                   />
                 </div>
               </div>
@@ -1032,7 +1032,7 @@ export default function TestCaseGeneratorPage({
                   type="text"
                   value={editingTestCase.preconditions}
                   onChange={(e) => setEditingTestCase({ ...editingTestCase, preconditions: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-850"
+                  className="input-glass w-full text-xs"
                 />
               </div>
 
@@ -1042,7 +1042,7 @@ export default function TestCaseGeneratorPage({
                   type="text"
                   value={editingTestCase.testData}
                   onChange={(e) => setEditingTestCase({ ...editingTestCase, testData: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800"
+                  className="input-glass w-full text-xs"
                 />
               </div>
 
@@ -1056,7 +1056,7 @@ export default function TestCaseGeneratorPage({
                       steps.push({ action: 'Proceed to next check state', expectedResult: 'State responds matches specifications.' });
                       setEditingTestCase({ ...editingTestCase, steps });
                     }}
-                    className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-sm hover:underline font-mono"
+                    className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-sm hover:underline font-mono"
                   >
                     + Add Stage Step
                   </button>
@@ -1074,7 +1074,7 @@ export default function TestCaseGeneratorPage({
                           steps[idx].action = e.target.value;
                           setEditingTestCase({ ...editingTestCase, steps });
                         }}
-                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-slate-800 focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-slate-800 focus:ring-1 focus:ring-blue-400 focus:outline-none"
                       />
                       <input
                         type="text"
@@ -1085,7 +1085,7 @@ export default function TestCaseGeneratorPage({
                           steps[idx].expectedResult = e.target.value;
                           setEditingTestCase({ ...editingTestCase, steps });
                         }}
-                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-emerald-800 focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-blue-700 focus:ring-1 focus:ring-blue-400 focus:outline-none"
                       />
                       <button
                         type="button"
@@ -1127,7 +1127,7 @@ export default function TestCaseGeneratorPage({
                   setFeedback(`Scenario ${editingTestCase.id} updated and saved successfully!`);
                   setTimeout(() => setFeedback(''), 3000);
                 }}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white font-mono text-[11px] px-4 py-1.5 rounded-xl font-bold transition-all"
+                className="btn-primary font-mono text-[11px] px-4 py-1.5"
               >
                 Save Settings
               </button>

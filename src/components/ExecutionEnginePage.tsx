@@ -896,13 +896,13 @@ export default function ExecutionEnginePage({
       
       {/* Toast Notification Banner */}
       {showToast && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900 text-white border border-indigo-500 rounded-2xl p-4 shadow-2xl flex items-center gap-3 animate-slide-up">
-          <div className="p-2 bg-indigo-600 rounded-xl">
-            <Sparkles className="w-5 h-5 text-indigo-100 animate-pulse" />
+        <div className="fixed bottom-6 right-6 z-50 max-w-md glass-card p-4 shadow-2xl flex items-center gap-3 animate-slide-up border-blue-300">
+          <div className="p-2 bg-blue-600 rounded-xl">
+            <Sparkles className="w-5 h-5 text-blue-100 animate-pulse" />
           </div>
           <div className="flex-1">
-            <h4 className="text-xs font-sans font-extrabold text-indigo-300">DOM Core Telemetry Event</h4>
-            <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{showToast}</p>
+            <h4 className="text-xs font-sans font-extrabold text-blue-600">DOM Core Telemetry Event</h4>
+            <p className="text-[11px] text-slate-700 mt-0.5 leading-relaxed">{showToast}</p>
           </div>
           <button onClick={() => setShowToast(null)} className="text-slate-400 hover:text-white p-1">
             <X className="w-4 h-4" />
@@ -911,13 +911,13 @@ export default function ExecutionEnginePage({
       )}
 
       {/* Intro Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xs relative overflow-hidden">
+      <div className="rounded-3xl p-6 text-white shadow-xs relative overflow-hidden" style={{background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)'}}>
         <div className="absolute right-0 top-0 opacity-10 pointer-events-none transform translate-x-12 -translate-y-6">
           <Terminal className="w-96 h-96" />
         </div>
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-indigo-200 mb-3 font-mono font-bold">
-            <Cpu className="w-3.5 h-3.5 text-indigo-300 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs text-blue-200 mb-3 font-mono font-bold">
+            <Cpu className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
             Core Cluster Node: Live E2E Executor Grid
           </div>
           <h2 className="text-2xl font-sans font-extrabold tracking-tight">
@@ -931,7 +931,7 @@ export default function ExecutionEnginePage({
 
       {/* REQ-34: Auto-Defect Logging from Failed Runs */}
       {showAutoDefects && (
-        <div className="bg-white border border-rose-200 rounded-2xl p-5 shadow-xs space-y-3">
+        <div className="glass-card p-5 space-y-3 border-rose-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bug className="w-4 h-4 text-rose-500" />
@@ -972,7 +972,7 @@ export default function ExecutionEnginePage({
 
       {/* REQ-53: Flaky Test Quarantine Panel */}
       {showQuarantine && (
-        <div className="bg-white border border-orange-200 rounded-2xl p-5 shadow-xs space-y-3">
+        <div className="glass-card p-5 space-y-3 border-orange-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-orange-500" />
@@ -1012,7 +1012,7 @@ export default function ExecutionEnginePage({
                       <td className="p-3 text-center"><span className={`text-[9px] px-2 py-0.5 rounded border font-mono font-bold ${q.autoDetected ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>{q.autoDetected ? 'AUTO' : 'MANUAL'}</span></td>
                       <td className="p-3 text-slate-400 font-mono text-[10px]">{new Date(q.quarantinedAt).toLocaleString()}</td>
                       <td className="p-3 text-center">
-                        <button onClick={() => handleReleaseQuarantine(q.tcId)} title="Release from quarantine" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition-all mx-auto">
+                        <button onClick={() => handleReleaseQuarantine(q.tcId)} title="Release from quarantine" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-50 border border-green-200 text-green-700 text-[10px] font-bold hover:bg-green-100 transition-all mx-auto">
                           <ShieldOff className="w-3 h-3" /> Release
                         </button>
                       </td>
@@ -1026,7 +1026,7 @@ export default function ExecutionEnginePage({
       )}
 
       {/* Main Agent Sequence Flow */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs">
+      <div className="glass-card p-5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100">
           <div>
             <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-bold block">Autonomous Agent Orchestration Map</span>
@@ -1034,14 +1034,14 @@ export default function ExecutionEnginePage({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {currentRunId && (
-              <span className="text-[10px] font-mono bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold">
+              <span className="text-[10px] font-mono bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1 rounded-full font-bold">
                 Run ID: {currentRunId}
               </span>
             )}
             {/* Parallel Run button (REQ-47) */}
             <button
               onClick={() => setShowParallelPanel(!showParallelPanel)}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-sans font-bold py-2 px-3 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              className="btn-primary font-sans font-bold py-2 px-3 text-xs flex items-center gap-1.5 shadow-sm"
             >
               <Layers className="w-3.5 h-3.5" />
               Parallel Run
@@ -1051,7 +1051,7 @@ export default function ExecutionEnginePage({
                 onClick={onTriggerRun}
                 disabled={isRunning}
                 aria-label="Launch test suite run"
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-450 text-white font-sans font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all uppercase tracking-wider"
+                className="btn-primary font-sans font-bold py-2 px-4 text-xs flex items-center gap-1.5 shadow-sm uppercase tracking-wider disabled:opacity-50"
               >
                 {isRunning ? (
                   <>
@@ -1060,7 +1060,7 @@ export default function ExecutionEnginePage({
                   </>
                 ) : (
                   <>
-                    <Play className="w-3.5 h-3.5 text-indigo-200 animate-pulse animate-bounce" />
+                    <Play className="w-3.5 h-3.5 text-blue-200 animate-pulse animate-bounce" />
                     Launch Suite Run
                   </>
                 )}
@@ -1124,11 +1124,11 @@ export default function ExecutionEnginePage({
 
         {/* Parallel Run Configuration Panel (REQ-47) */}
         {showParallelPanel && (
-          <div className="mt-4 p-5 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-4">
+          <div className="mt-4 glass-card p-5 space-y-4 border-blue-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-sans font-bold text-purple-900">Parallel Execution Engine (REQ-47)</span>
+                <Layers className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-sans font-bold text-slate-800">Parallel Execution Engine (REQ-47)</span>
               </div>
               <button onClick={() => setShowParallelPanel(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
@@ -1140,15 +1140,15 @@ export default function ExecutionEnginePage({
                 <input
                   type="range" min="1" max="5" value={parallelWorkers}
                   onChange={e => setParallelWorkers(Number(e.target.value))}
-                  className="w-full accent-purple-600"
+                  className="w-full accent-blue-600"
                 />
-                <span className="text-xs font-mono text-purple-700 font-bold">{parallelWorkers} workers</span>
+                <span className="text-xs font-mono text-blue-700 font-bold">{parallelWorkers} workers</span>
               </div>
               <div className="flex items-end">
                 <button
                   onClick={handleParallelRun}
                   disabled={parallelRunning}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
+                  className="btn-primary w-full py-2 px-4 text-xs flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {parallelRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running...</> : <><Play className="w-3.5 h-3.5" /> Launch Parallel Run</>}
                 </button>
@@ -1160,14 +1160,14 @@ export default function ExecutionEnginePage({
               </div>
             </div>
             {parallelResult && !parallelResult.error && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-purple-200">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-blue-100">
                 {[
                   { label: 'Total', val: parallelResult.total || 0, color: 'text-slate-800' },
-                  { label: 'Passed', val: parallelResult.passed || 0, color: 'text-emerald-700' },
+                  { label: 'Passed', val: parallelResult.passed || 0, color: 'text-green-700' },
                   { label: 'Failed', val: parallelResult.failed || 0, color: 'text-rose-700' },
-                  { label: 'Duration', val: `${((parallelResult.durationMs || 0)/1000).toFixed(2)}s`, color: 'text-indigo-700' },
+                  { label: 'Duration', val: `${((parallelResult.durationMs || 0)/1000).toFixed(2)}s`, color: 'text-blue-700' },
                 ].map(m => (
-                  <div key={m.label} className="bg-white border border-purple-100 rounded-xl p-3 text-center">
+                  <div key={m.label} className="metal-surface rounded-xl p-3 text-center">
                     <p className="text-[10px] font-mono text-slate-400">{m.label}</p>
                     <p className={`text-lg font-extrabold font-mono ${m.color}`}>{m.val}</p>
                   </div>
@@ -1196,20 +1196,20 @@ export default function ExecutionEnginePage({
                 placeholder="Run ID (e.g. RUN-12345)"
                 value={sseRunId}
                 onChange={e => setSseRunId(e.target.value)}
-                className="bg-slate-900 border border-slate-600 text-white text-xs px-2 py-1.5 rounded-lg w-36 focus:outline-none focus:border-indigo-500 font-mono"
+                className="bg-slate-900 border border-slate-600 text-white text-xs px-2 py-1.5 rounded-lg w-36 focus:outline-none focus:border-blue-500 font-mono"
               />
               {!sseConnected ? (
                 <button
                   onClick={() => connectSSE(sseRunId || currentRunId || 'demo')}
                   disabled={!sseRunId && !currentRunId}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded-lg transition-all disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 border border-green-300 text-green-700 text-xs font-mono rounded-lg transition-all disabled:opacity-50"
                 >
                   <Play className="w-3 h-3" /> Connect
                 </button>
               ) : (
                 <button
                   onClick={disconnectSSE}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-400 text-xs font-mono rounded-lg transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-300 text-red-600 text-xs font-mono rounded-lg transition-all"
                 >
                   <X className="w-3 h-3" /> Disconnect
                 </button>
@@ -1217,7 +1217,7 @@ export default function ExecutionEnginePage({
               {sseLines.length > 0 && (
                 <button
                   onClick={() => setSseLines([])}
-                  className="text-slate-500 hover:text-slate-300 text-xs font-mono px-2 py-1.5 border border-slate-600 rounded-lg"
+                  className="text-slate-500 hover:text-slate-700 text-xs font-mono px-2 py-1.5 border border-slate-200 rounded-lg"
                 >
                   Clear
                 </button>
@@ -1237,14 +1237,14 @@ export default function ExecutionEnginePage({
       </div>
 
       {/* Pipeline Execution Analytics & Drift Comparison */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+      <div className="glass-card p-6 space-y-6">
         
         {/* Component Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
-                <BarChart3 className="w-4 h-4 text-indigo-600" />
+              <span className="p-1.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100">
+                <BarChart3 className="w-4 h-4 text-blue-600" />
               </span>
               <h3 className="font-sans font-extrabold text-slate-900 text-base">
                 Pipeline Execution Analytics & Drift Comparison
@@ -1260,7 +1260,7 @@ export default function ExecutionEnginePage({
               onClick={() => setShowThresholdConfig(!showThresholdConfig)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
                 showThresholdConfig 
-                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs' 
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-xs' 
                   : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
               }`}
             >
@@ -1273,7 +1273,7 @@ export default function ExecutionEnginePage({
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-slate-950 text-xs font-extrabold shadow-sm transition-all cursor-pointer"
               title="Export professional PDF Performance Report"
             >
-              <Download className="w-3.5 h-3.5 text-indigo-200" />
+              <Download className="w-3.5 h-3.5 text-blue-200" />
               <span>Export PDF Report</span>
             </button>
 
@@ -1283,7 +1283,7 @@ export default function ExecutionEnginePage({
               <select
                 value={selectedRunId}
                 onChange={(e) => setSelectedRunId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-xl font-mono focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-bold"
+                className="input-glass text-xs font-mono font-bold"
               >
                 {history.map(r => (
                   <option key={r.runId} value={r.runId}>Primary: {r.runId} ({r.timestamp})</option>
@@ -1296,7 +1296,7 @@ export default function ExecutionEnginePage({
               <select
                 value={compareRunId}
                 onChange={(e) => setCompareRunId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3 py-1.5 rounded-xl font-mono focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-bold"
+                className="input-glass text-xs font-mono font-bold"
               >
                 {history.map(r => (
                   <option key={r.runId} value={r.runId} disabled={r.runId === selectedRunId}>
@@ -1334,14 +1334,14 @@ export default function ExecutionEnginePage({
               
               {/* Threshold CONFIGURATION Inputs PANEL */}
               {showThresholdConfig && (
-                <div className="p-5 bg-indigo-50/20 border border-indigo-100 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-6 transition-all">
+                <div className="p-5 bg-blue-50/20 border border-blue-100 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-6 transition-all">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs font-sans font-extrabold text-slate-800">
                       <span className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
                         Target Success Rate Goal
                       </span>
-                      <span className="text-indigo-650 font-mono font-black border border-indigo-100 bg-indigo-50 px-2 py-0.5 rounded text-xs">{successThreshold}%</span>
+                      <span className="text-blue-700 font-mono font-black border border-blue-100 bg-blue-50 px-2 py-0.5 rounded text-xs">{successThreshold}%</span>
                     </div>
                     <input
                       type="range"
@@ -1349,7 +1349,7 @@ export default function ExecutionEnginePage({
                       max="100"
                       value={successThreshold}
                       onChange={(e) => setSuccessThreshold(Number(e.target.value))}
-                      className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                       <span>50% Success</span>
@@ -1361,10 +1361,10 @@ export default function ExecutionEnginePage({
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs font-sans font-extrabold text-slate-800">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
                         Max Duration SLA Limit
                       </span>
-                      <span className="text-indigo-650 font-mono font-black border border-indigo-100 bg-indigo-50 px-2 py-0.5 rounded text-xs">{durationThreshold.toFixed(1)}s</span>
+                      <span className="text-blue-700 font-mono font-black border border-blue-100 bg-blue-50 px-2 py-0.5 rounded text-xs">{durationThreshold.toFixed(1)}s</span>
                     </div>
                     <input
                       type="range"
@@ -1373,7 +1373,7 @@ export default function ExecutionEnginePage({
                       step="0.1"
                       value={durationThreshold}
                       onChange={(e) => setDurationThreshold(Number(e.target.value))}
-                      className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                       <span>2.0s (SLA Optimal)</span>
@@ -1388,7 +1388,7 @@ export default function ExecutionEnginePage({
                         <span className="w-2 h-2 rounded-full bg-amber-500" />
                         Min Self Healing Resolves
                       </span>
-                      <span className="text-indigo-650 font-mono font-black border border-indigo-100 bg-indigo-50 px-2 py-0.5 rounded text-xs">{healedThreshold} Locators</span>
+                      <span className="text-blue-700 font-mono font-black border border-blue-100 bg-blue-50 px-2 py-0.5 rounded text-xs">{healedThreshold} Locators</span>
                     </div>
                     <input
                       type="range"
@@ -1396,7 +1396,7 @@ export default function ExecutionEnginePage({
                       max="10"
                       value={healedThreshold}
                       onChange={(e) => setHealedThreshold(Number(e.target.value))}
-                      className="w-full accent-indigo-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full accent-blue-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                     />
                     <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                       <span>0 Heals (None)</span>
@@ -1412,18 +1412,18 @@ export default function ExecutionEnginePage({
                 
                 {/* Metric Card 1: Success Rate */}
                 <div className={`border rounded-2xl p-4 flex flex-col justify-between space-y-2 relative overflow-hidden transition-all ${
-                  selectedSuccess >= successThreshold ? 'border-emerald-200 bg-emerald-50/10' : 'border-rose-200 bg-rose-50/10'
+                  selectedSuccess >= successThreshold ? 'border-green-200 bg-green-50/10' : 'border-rose-200 bg-rose-50/10'
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Suite Success Rate</span>
-                    <Percent className={`w-3.5 h-3.5 ${selectedSuccess >= successThreshold ? 'text-emerald-500' : 'text-rose-500'}`} />
+                    <Percent className={`w-3.5 h-3.5 ${selectedSuccess >= successThreshold ? 'text-green-500' : 'text-rose-500'}`} />
                   </div>
                   <div>
                     <h4 className="text-2xl font-sans font-extrabold text-slate-800 tracking-tight flex items-baseline gap-2">
                       {selectedSuccess.toFixed(1)}%
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-extrabold tracking-wider uppercase border ${
                         selectedSuccess >= successThreshold 
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                          ? 'bg-green-50 border-green-200 text-green-700' 
                           : 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse'
                       }`}>
                         {selectedSuccess >= successThreshold ? 'PASSED' : 'FAILING'}
@@ -1435,7 +1435,7 @@ export default function ExecutionEnginePage({
                   </div>
                   <div className="border-t border-slate-200/65 pt-2 flex items-center justify-between text-[11px]">
                     <span className="text-slate-400 font-mono">Drift Status:</span>
-                    <span className={`inline-flex items-center gap-0.5 font-bold font-mono ${successDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <span className={`inline-flex items-center gap-0.5 font-bold font-mono ${successDiff >= 0 ? 'text-green-600' : 'text-rose-600'}`}>
                       {successDiff >= 0 ? '+' : ''}{successDiff.toFixed(1)}%
                       {successDiff !== 0 && (
                         <TrendingUp className={`w-3 h-3 ${successDiff < 0 ? 'transform rotate-180' : ''}`} />
@@ -1460,7 +1460,7 @@ export default function ExecutionEnginePage({
                   </div>
                   <div className="border-t border-slate-200/65 pt-2 flex items-center justify-between text-[11px]">
                     <span className="text-slate-400 font-mono">Comparison Delta:</span>
-                    <span className={`font-bold font-mono ${failedDiff < 0 ? 'text-emerald-650' : failedDiff > 0 ? 'text-rose-650' : 'text-slate-500'}`}>
+                    <span className={`font-bold font-mono ${failedDiff < 0 ? 'text-green-600' : failedDiff > 0 ? 'text-rose-600' : 'text-slate-500'}`}>
                       {failedDiff > 0 ? '+' : ''}{failedDiff} failures
                     </span>
                   </div>
@@ -1468,18 +1468,18 @@ export default function ExecutionEnginePage({
 
                 {/* Metric Card 3: Deep AI Self Heal Ratio */}
                 <div className={`border rounded-2xl p-4 flex flex-col justify-between space-y-2 relative overflow-hidden transition-all ${
-                  selectedRun.healed >= healedThreshold ? 'border-emerald-200 bg-emerald-50/10' : 'border-amber-200 bg-amber-50/10'
+                  selectedRun.healed >= healedThreshold ? 'border-green-200 bg-green-50/10' : 'border-amber-200 bg-amber-50/10'
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">AI Self Healed</span>
-                    <Zap className={`w-3.5 h-3.5 ${selectedRun.healed >= healedThreshold ? 'text-emerald-600' : 'text-amber-500'} animate-pulse`} />
+                    <Zap className={`w-3.5 h-3.5 ${selectedRun.healed >= healedThreshold ? 'text-green-600' : 'text-amber-500'} animate-pulse`} />
                   </div>
                   <div>
                     <h4 className="text-2xl font-sans font-extrabold text-slate-800 tracking-tight flex items-baseline gap-2">
                       {selectedRun.healed}
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-extrabold tracking-wider uppercase border ${
                         selectedRun.healed >= healedThreshold 
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                          ? 'bg-green-50 border-green-200 text-green-700' 
                           : 'bg-amber-50 border-amber-200 text-amber-700'
                       }`}>
                         {selectedRun.healed >= healedThreshold ? 'COMPLIANT' : 'UNDER TARGET'}
@@ -1491,7 +1491,7 @@ export default function ExecutionEnginePage({
                   </div>
                   <div className="border-t border-slate-200/65 pt-2 flex items-center justify-between text-[11px]">
                     <span className="text-slate-400 font-mono">Healed Delta:</span>
-                    <span className={`font-bold font-mono ${healedDiff >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    <span className={`font-bold font-mono ${healedDiff >= 0 ? 'text-green-600' : 'text-rose-500'}`}>
                       {healedDiff >= 0 ? '+' : ''}{healedDiff} resolves
                     </span>
                   </div>
@@ -1499,18 +1499,18 @@ export default function ExecutionEnginePage({
 
                 {/* Metric Card 4: Virtual Clustered Speed */}
                 <div className={`border rounded-2xl p-4 flex flex-col justify-between space-y-2 relative overflow-hidden transition-all ${
-                  (selectedRun.durationMs / 1000) <= durationThreshold ? 'border-emerald-200 bg-emerald-50/10' : 'border-rose-200 bg-rose-50/10'
+                  (selectedRun.durationMs / 1000) <= durationThreshold ? 'border-green-200 bg-green-50/10' : 'border-rose-200 bg-rose-50/10'
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Grid Elapsed Time</span>
-                    <Clock className={`w-3.5 h-3.5 ${(selectedRun.durationMs / 1000) <= durationThreshold ? 'text-emerald-500' : 'text-rose-500'}`} />
+                    <Clock className={`w-3.5 h-3.5 ${(selectedRun.durationMs / 1000) <= durationThreshold ? 'text-green-500' : 'text-rose-500'}`} />
                   </div>
                   <div>
                     <h4 className="text-2xl font-sans font-extrabold text-slate-800 tracking-tight flex items-baseline gap-2">
                       {(selectedRun.durationMs / 1000).toFixed(2)}s
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-extrabold tracking-wider uppercase border ${
                         (selectedRun.durationMs / 1000) <= durationThreshold
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                          ? 'bg-green-50 border-green-200 text-green-700' 
                           : 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
                       }`}>
                         {(selectedRun.durationMs / 1000) <= durationThreshold ? 'OPTIMAL' : 'TIMEOUT'}
@@ -1522,7 +1522,7 @@ export default function ExecutionEnginePage({
                   </div>
                   <div className="border-t border-slate-200/65 pt-2 flex items-center justify-between text-[11px]">
                     <span className="text-slate-400 font-mono">Speed Diff:</span>
-                    <span className={`font-bold font-mono ${durationDiffMs <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    <span className={`font-bold font-mono ${durationDiffMs <= 0 ? 'text-green-600' : 'text-amber-600'}`}>
                       {durationDiffMs > 0 ? '+' : ''}{(durationDiffMs / 1000).toFixed(2)}s {durationDiffMs <= 0 ? 'faster' : 'slower'}
                     </span>
                   </div>
@@ -1531,7 +1531,7 @@ export default function ExecutionEnginePage({
               </div>
 
               {/* Side-By-Side Visual Stack Breakdown */}
-              <div className="p-5 border border-slate-150 bg-slate-50/50 rounded-2xl space-y-4">
+              <div className="p-5 metal-surface rounded-2xl space-y-4">
                 <span className="text-[11px] font-mono font-extrabold uppercase text-slate-500 tracking-wider block">
                   Run Composition & Distribution Alignment Comparison
                 </span>
@@ -1541,7 +1541,7 @@ export default function ExecutionEnginePage({
                   {/* Selected Run Bar */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="font-bold text-indigo-700 flex items-center gap-1">
+                      <span className="font-bold text-blue-700 flex items-center gap-1">
                         <Check className="w-3.5 h-3.5" />
                         Selected Run: {selectedRun.runId}
                       </span>
@@ -1561,7 +1561,7 @@ export default function ExecutionEnginePage({
                       {selectedRun.healed > 0 && (
                         <div 
                           style={{ width: `${(selectedRun.healed / selectedRun.totalTests) * 100}%` }}
-                          className="bg-indigo-500 flex items-center justify-center transition-all min-w-[20px]"
+                          className="bg-blue-500 flex items-center justify-center transition-all min-w-[20px]"
                           title={`Auto-Healed: ${selectedRun.healed}`}
                         >
                           {selectedRun.healed} Heal
@@ -1601,7 +1601,7 @@ export default function ExecutionEnginePage({
                       {baselineRun.healed > 0 && (
                         <div 
                           style={{ width: `${(baselineRun.healed / baselineRun.totalTests) * 100}%` }}
-                          className="bg-indigo-500/80 flex items-center justify-center transition-all min-w-[20px]"
+                          className="bg-blue-500/80 flex items-center justify-center transition-all min-w-[20px]"
                           title={`Auto-Healed: ${baselineRun.healed}`}
                         >
                           {baselineRun.healed} Heal
@@ -1626,7 +1626,7 @@ export default function ExecutionEnginePage({
                     <span className="w-3 h-2 rounded bg-emerald-500 block" /> Passed Assertion Tests
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-3 h-2 rounded bg-indigo-500 block" /> Healing Resolved Exception Locators
+                    <span className="w-3 h-2 rounded bg-blue-500 block" /> Healing Resolved Exception Locators
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-3 h-2 rounded bg-rose-500 block" /> Open Unhealed Action Failures
@@ -1636,18 +1636,18 @@ export default function ExecutionEnginePage({
 
               {/* AI Summary panel (populated after real run) */}
               {aiSummaryText && (
-                <div className="p-4 bg-indigo-50/40 border border-indigo-100 rounded-2xl space-y-2">
+                <div className="p-4 bg-blue-50/40 border border-blue-100 rounded-2xl space-y-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                    <span className="text-xs font-sans font-extrabold text-indigo-900">AI Execution Intelligence Summary</span>
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-sans font-extrabold text-blue-900">AI Execution Intelligence Summary</span>
                   </div>
                   <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{aiSummaryText}</p>
                   {healingRecs.length > 0 && (
-                    <div className="pt-2 border-t border-indigo-100 space-y-1">
-                      <span className="text-[10px] font-mono font-bold text-indigo-700 uppercase">Healing Recommendations:</span>
+                    <div className="pt-2 border-t border-blue-100 space-y-1">
+                      <span className="text-[10px] font-mono font-bold text-blue-700 uppercase">Healing Recommendations:</span>
                       {healingRecs.map((rec, i) => (
                         <p key={i} className="text-[11px] text-slate-600 flex gap-1.5">
-                          <span className="text-indigo-400 shrink-0">→</span>
+                          <span className="text-blue-400 shrink-0">→</span>
                           {rec}
                         </p>
                       ))}
@@ -1660,7 +1660,7 @@ export default function ExecutionEnginePage({
               <div className="p-4 border border-slate-150 rounded-2xl bg-slate-50/30 space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-sans font-bold text-slate-800">Runner Notes for {selectedRun?.runId || '—'}</span>
-                  <span className="text-[10px] font-mono text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Live Profiler</span>
+                  <span className="text-[10px] font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Live Profiler</span>
                 </div>
                 <textarea
                   value={selectedRun?.notes || ''}
@@ -1669,7 +1669,7 @@ export default function ExecutionEnginePage({
                     setHistory(prev => prev.map(rec => rec.runId === selectedRun?.runId ? { ...rec, notes: nextVal } : rec));
                   }}
                   placeholder="Record summary observations, commit checksums, or target configuration metrics for this active trace execution..."
-                  className="w-full text-slate-600 bg-white border border-slate-200 rounded-xl p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
+                  className="w-full text-slate-600 bg-white border border-slate-200 rounded-xl p-3 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
                   rows={2}
                 />
               </div>
@@ -1689,7 +1689,7 @@ export default function ExecutionEnginePage({
                         placeholder="Search runs…"
                         value={historySearch}
                         onChange={e => setHistorySearch(e.target.value)}
-                        className="pl-7 pr-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36"
+                        className="pl-7 pr-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-300 w-36"
                         aria-label="Search run history"
                       />
                     </div>
@@ -1734,7 +1734,7 @@ export default function ExecutionEnginePage({
                           const satisfiesSome = satisfied || speedSatisfied;
 
                           return (
-                            <tr key={record.runId} className={`hover:bg-slate-50 transition-colors ${isPrimary ? 'bg-indigo-50/30' : isBaseline ? 'bg-slate-50/50' : ''}`}>
+                            <tr key={record.runId} className={`hover:bg-slate-50 transition-colors ${isPrimary ? 'bg-blue-50/30' : isBaseline ? 'bg-slate-50/50' : ''}`}>
                               <td className="p-3.5 pl-4 font-mono font-bold text-slate-800">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span 
@@ -1754,7 +1754,7 @@ export default function ExecutionEnginePage({
                                     }
                                   />
                                   {record.runId}
-                                  {isPrimary && <span className="text-[8px] bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold font-mono px-1.5 rounded uppercase">Primary</span>}
+                                  {isPrimary && <span className="text-[8px] bg-blue-100 border border-blue-200 text-blue-700 font-bold font-mono px-1.5 rounded uppercase">Primary</span>}
                                   {isBaseline && <span className="text-[8px] bg-slate-100 border border-slate-200 text-slate-600 font-bold font-mono px-1.5 rounded uppercase">Baseline</span>}
                                   {/* REQ-57: Live status badge */}
                                   {liveRunStatus[record.runId] ? (
@@ -1784,7 +1784,7 @@ export default function ExecutionEnginePage({
                               <td className="p-3.5 font-mono">
                                 <span className="text-emerald-600 text-xs font-bold">{record.passed} P</span>
                                 <span className="text-slate-400 mx-1">/</span>
-                                <span className="text-indigo-600 text-xs font-bold">{record.healed} H</span>
+                                <span className="text-blue-600 text-xs font-bold">{record.healed} H</span>
                                 <span className="text-slate-400 mx-1">/</span>
                                 <span className="text-rose-500 text-xs font-bold">{record.failed} F</span>
                               </td>
@@ -1802,7 +1802,7 @@ export default function ExecutionEnginePage({
                                   <button
                                     onClick={() => setSelectedRunId(record.runId)}
                                     disabled={isPrimary}
-                                    className={`px-2 py-1 rounded-lg border transition-all ${isPrimary ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 hover:border-slate-300 text-indigo-650 font-extrabold hover:bg-slate-50'}`}
+                                    className={`px-2 py-1 rounded-lg border transition-all ${isPrimary ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 hover:border-slate-300 text-blue-600 font-extrabold hover:bg-blue-50'}`}
                                   >
                                     Set Primary
                                   </button>
@@ -1840,7 +1840,7 @@ export default function ExecutionEnginePage({
             {/* Console Header */}
             <div className="bg-slate-900/60 px-4 py-3 border-b border-slate-900 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-slate-300 font-mono">
-                <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                <Terminal className="w-3.5 h-3.5 text-blue-400" />
                 <span>stdout_live_pipeline_feed</span>
               </div>
               <div className="flex gap-2 items-center">
@@ -1886,10 +1886,10 @@ export default function ExecutionEnginePage({
 
         {/* Workspace telemetry status panel */}
         <div className="lg:col-span-4 space-y-5">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="glass-card p-5 space-y-4">
             
             <h3 className="font-sans font-bold text-slate-900 text-sm flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <Sliders className="w-4 h-4 text-indigo-600" />
+              <Sliders className="w-4 h-4 text-blue-500" />
               Runtime Cluster Configuration
             </h3>
 
@@ -1899,7 +1899,7 @@ export default function ExecutionEnginePage({
                   <span className="font-semibold text-slate-800 block">Emulator Drivers</span>
                   <p className="text-[10px] text-slate-500">Concurrent active processes.</p>
                 </div>
-                <span className="font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[11px] font-bold border border-indigo-100">
+                <span className="font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[11px] font-bold border border-blue-100">
                   Chromium / WebKit
                 </span>
               </div>
@@ -1909,7 +1909,7 @@ export default function ExecutionEnginePage({
                   <span className="font-semibold text-slate-800 block">Self-Healing Switch</span>
                   <p className="text-[10px] text-slate-500">Real-time locator correction.</p>
                 </div>
-                <span className="font-mono text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-100">
+                <span className="font-mono text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded text-[11px] border border-green-100">
                   ENABLED (AI-DOM)
                 </span>
               </div>
@@ -1929,15 +1929,15 @@ export default function ExecutionEnginePage({
                   <span className="font-semibold text-slate-800 block">Visual Headless Grid</span>
                   <p className="text-[10px] text-slate-500">Concurrent virtual sessions.</p>
                 </div>
-                <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-[11px]">
+                <span className="font-mono text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded text-[11px]">
                   45 Threads Max
                 </span>
               </div>
             </div>
 
             {/* Quick Warning banner */}
-            <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 flex gap-2.5 text-[11px] leading-relaxed text-indigo-850">
-              <Clock className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+            <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex gap-2.5 text-[11px] leading-relaxed text-blue-800">
+              <Clock className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
               <span>
                 Standard suite cycle triggers high scale browser initialization and parses POM variables to assert all system endpoints concurrently. Estimated elapsed time is roughly ~4.5 seconds per run.
               </span>
@@ -1949,7 +1949,7 @@ export default function ExecutionEnginePage({
       </div>
 
       {/* Snapshot Gallery Panel Section */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-6">
+      <div className="glass-card p-6 space-y-6">
         
         {/* Gallery Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
@@ -1984,8 +1984,8 @@ export default function ExecutionEnginePage({
         {isRunning ? (
           <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 bg-slate-950 rounded-2xl border border-slate-900 shadow-inner relative overflow-hidden">
             {/* Pulsating Scanning Line Laser */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse animate-bounce" />
-            <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-full animate-spin">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-pulse animate-bounce" />
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full animate-spin">
               <RefreshCw className="w-8 h-8" />
             </div>
             <div className="space-y-1.5 max-w-md">
@@ -1999,7 +1999,7 @@ export default function ExecutionEnginePage({
           <div className="space-y-5">
             
             {/* Filter and Stats controls toolbar */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-150">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 metal-surface p-4 rounded-2xl">
               
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div className="flex items-center gap-2">
@@ -2013,8 +2013,8 @@ export default function ExecutionEnginePage({
                       onClick={() => setFilterModule(mod)}
                       className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border transition-all ${
                         filterModule === mod 
-                          ? 'bg-indigo-600 text-white border-indigo-600 font-bold' 
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                          ? 'btn-primary text-[10px] font-bold' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50 hover:border-blue-300'
                       }`}
                     >
                       {mod === 'all' ? 'All Areas' : mod}
@@ -2024,7 +2024,7 @@ export default function ExecutionEnginePage({
               </div>
 
               <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-                <div className="flex items-center gap-1.5 focus-within:ring-1 focus-within:ring-indigo-500 rounded-lg pr-1">
+                <div className="flex items-center gap-1.5 focus-within:ring-1 focus-within:ring-blue-500 rounded-lg pr-1">
                   <span className="text-[10px] font-mono text-slate-400 font-bold ml-1">Case:</span>
                   <input
                     type="text"
@@ -2039,7 +2039,7 @@ export default function ExecutionEnginePage({
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="bg-white border border-slate-200 text-slate-700 text-[11px] px-2.5 py-1 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="input-glass text-[11px]"
                   >
                     <option value="all">Any Outcome</option>
                     <option value="failed">❌ Open Failures</option>
@@ -2062,8 +2062,8 @@ export default function ExecutionEnginePage({
                 return (
                   <div
                     key={snap.id}
-                    className={`bg-white border hover:border-slate-300 rounded-2xl overflow-hidden transition-all shadow-xs flex flex-col group ${
-                      isHealed ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'
+                    className={`glass-card overflow-hidden transition-all flex flex-col group ${
+                      isHealed ? 'border-green-200 ring-2 ring-green-50' : ''
                     }`}
                   >
                     {/* Header Browser Bar */}
@@ -2091,7 +2091,7 @@ export default function ExecutionEnginePage({
                         <div className="w-full max-w-[240px] bg-white rounded-lg p-3 text-slate-800 space-y-2.5 shadow-xl text-[10px]">
                           <div className="border-b border-slate-100 pb-1.5 flex justify-between font-bold text-[9px] text-slate-500">
                             <span>Checkout Form</span>
-                            <span className="text-emerald-600">$24.98</span>
+                            <span className="text-green-600">$24.98</span>
                           </div>
                           <div className="space-y-1">
                             <span className="block text-[8px] text-slate-400">Card Name</span>
@@ -2269,7 +2269,7 @@ export default function ExecutionEnginePage({
                             <button
                               onClick={() => handleTriggerHeal(snap.id)}
                               disabled={healingId === snap.id}
-                              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-sans font-bold px-2.5 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1"
+                              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-sans font-bold px-2.5 py-1.5 rounded-lg text-[10px] transition-all flex items-center gap-1"
                             >
                               {healingId === snap.id ? (
                                 <>
@@ -2278,7 +2278,7 @@ export default function ExecutionEnginePage({
                                 </>
                               ) : (
                                 <>
-                                  <Wrench className="w-3 h-3 text-indigo-200" />
+                                  <Wrench className="w-3 h-3 text-white" />
                                   AI Heal
                                 </>
                               )}
@@ -2306,8 +2306,8 @@ export default function ExecutionEnginePage({
             )}
 
             {/* General informational tips banner */}
-            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 flex items-start gap-3 mt-4 text-[11px] text-indigo-900 leading-relaxed">
-              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+            <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 flex items-start gap-3 mt-4 text-[11px] text-blue-900 leading-relaxed">
+              <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
                 <span className="font-extrabold">Auto-Healing Pipeline Mechanics</span>
                 <p>
@@ -2421,7 +2421,7 @@ export default function ExecutionEnginePage({
                   </div>
 
                   {/* Browser Context info */}
-                  <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-2.5">
+                  <div className="metal-surface p-3.5 rounded-2xl space-y-2.5">
                     <span className="font-sans font-bold text-slate-800 text-[11px] block border-b border-slate-200 pb-1.5">
                       Session Metadata details
                     </span>
@@ -2451,7 +2451,7 @@ export default function ExecutionEnginePage({
                 <div className="lg:col-span-7 space-y-4">
                   <div className="space-y-1.5">
                     <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest font-bold flex items-center gap-1">
-                      <CodeIcon className="w-3.5 h-3.5 text-indigo-700" />
+                      <CodeIcon className="w-3.5 h-3.5 text-blue-600" />
                       Live DOM Tree fragment code inspector
                     </span>
                     <div className="bg-slate-900 text-slate-200 rounded-2xl overflow-hidden border border-slate-800 font-mono text-[10.5px]">
@@ -2479,19 +2479,19 @@ export default function ExecutionEnginePage({
                   </div>
 
                   {/* Healing diagnostic block */}
-                  <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between gap-4">
+                  <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl flex items-center justify-between gap-4">
                     <div className="space-y-1 max-w-[70%]">
-                      <h4 className="font-sans font-extrabold text-indigo-900 text-[11px] flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <h4 className="font-sans font-extrabold text-blue-900 text-[11px] flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                         AI Telemetry Analyzer Recommendation
                       </h4>
                       {selectedSnapshot.status === 'healed' ? (
                         <p className="text-[10.5px] text-slate-600 leading-normal">
-                          Exception repaired successfully! Replaced selector with strict element query <strong className="text-emerald-700 font-mono bg-emerald-50 px-1 py-0.2 rounded border border-emerald-100 font-bold">{selectedSnapshot.healedSelector}</strong> which correctly bypasses client authorization states.
+                          Exception repaired successfully! Replaced selector with strict element query <strong className="text-green-700 font-mono bg-green-50 px-1 py-0.2 rounded border border-green-100 font-bold">{selectedSnapshot.healedSelector}</strong> which correctly bypasses client authorization states.
                         </p>
                       ) : (
                         <p className="text-[10.5px] text-slate-600 leading-normal">
-                          The locator `{selectedSnapshot.selector}` timed out because it was disabled or obstructed. Our AI recommendations suggest compiled XPath path <strong className="text-indigo-800 font-mono">{selectedSnapshot.healedSelector}</strong>.
+                          The locator `{selectedSnapshot.selector}` timed out because it was disabled or obstructed. Our AI recommendations suggest compiled XPath path <strong className="text-blue-800 font-mono">{selectedSnapshot.healedSelector}</strong>.
                         </p>
                       )}
                     </div>
@@ -2505,7 +2505,7 @@ export default function ExecutionEnginePage({
                         <button
                           onClick={() => handleTriggerHeal(selectedSnapshot.id)}
                           disabled={healingId === selectedSnapshot.id}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 shadow-md text-[10px]"
+                          className="btn-primary font-sans font-bold px-3.5 py-2 flex items-center gap-1 shadow-md text-[10px]"
                         >
                           {healingId === selectedSnapshot.id ? (
                             <>
@@ -2514,7 +2514,7 @@ export default function ExecutionEnginePage({
                             </>
                           ) : (
                             <>
-                              <Wrench className="w-3.5 h-3.5 text-indigo-200" />
+                              <Wrench className="w-3.5 h-3.5 text-blue-200" />
                               Apply AI Heal
                             </>
                           )}
