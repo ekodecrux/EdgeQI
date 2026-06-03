@@ -32,7 +32,9 @@ import {
   Edit2,
   Play,
   FolderOpen,
-  Brain
+  Brain,
+  Target,
+  GitMerge
 } from 'lucide-react';
 
 import { 
@@ -957,12 +959,13 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {/* ── Section: Testing Workflow ────────────────────────────── */}
           <SidebarGroup label="Testing Workflow" defaultOpen>
             {[
-              { id: 'agentic',      label: 'AI Auto-Test',       icon: Zap },
-              { id: 'requirements', label: 'Requirements',        icon: FileText },
-              { id: 'test-plans',   label: 'Test Plans',          icon: TableProperties },
-              { id: 'testcases',    label: 'Test Cases',          icon: TableProperties },
-              { id: 'traceability', label: 'Traceability Matrix', icon: Table },
-              { id: 'scripts',      label: 'Test Automation',     icon: Settings2 },
+              { id: 'agentic',       label: 'AI Auto-Test',          icon: Zap },
+              { id: 'requirements',  label: 'Requirements',           icon: FileText },
+              { id: 'test-plans',    label: 'Test Plans',             icon: TableProperties },
+              { id: 'testcases',     label: 'Test Cases',             icon: TableProperties },
+              { id: 'traceability',  label: 'Traceability Matrix',    icon: Table },
+              { id: 'scripts',       label: 'Test Automation',        icon: Settings2 },
+              { id: 'defect-impact', label: 'Defect & Impact AI',     icon: Target },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
           </SidebarGroup>
 
@@ -972,7 +975,6 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'execution',        label: 'Run Tests',          icon: Cpu },
               { id: 'manual-execution', label: 'Manual Testing',     icon: CheckSquare },
               { id: 'defects',          label: 'Defects & Bugs',     icon: Crosshair },
-              { id: 'defect-impact',    label: 'Defect & Impact AI', icon: Crosshair },
               { id: 'performance',      label: 'Load & Performance', icon: Sliders },
               { id: 'security',         label: 'Security Scan',      icon: ShieldAlert },
               { id: 'dashboard',        label: 'Live Dashboard',     icon: TrendingUp },
