@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare } from 'lucide-react';
+import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare, Image, ScanLine, Zap } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
 
@@ -51,7 +51,11 @@ export default function RequirementsTab({
   currentProjectId,
   currentSprintId,
 }: RequirementsProps) {
-  const [sourceType, setSourceType] = useState<'file' | 'text' | 'url' | 'voice'>('text');
+  const [sourceType, setSourceType] = useState<'file' | 'text' | 'url' | 'voice' | 'image'>('text');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [ocrRunning, setOcrRunning] = useState(false);
+  const [ocrResult, setOcrResult] = useState<string>('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
@@ -642,18 +646,18 @@ export default function RequirementsTab({
         </div>
 
         {/* Ingest Methods selectors */}
-        <div className="grid grid-cols-4 gap-1 p-1 bg-slate-50 border border-slate-200 rounded-xl">
-          {(['text', 'file', 'url', 'voice'] as const).map((mode) => (
+        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-50 border border-slate-200 rounded-xl">
+          {([['text','Text'],['file','File'],['url','URL'],['voice','Voice'],['image','Image/OCR']] as [string,string][]).map(([mode, label]) => (
             <button
               key={mode}
               type="button"
               aria-label={`Switch to ${mode} input mode`}
-              onClick={() => { setSourceType(mode); setTitle(''); setContent(''); setUploadedFileName(''); }}
-              className={`py-2 rounded-lg text-[10px] font-mono font-medium capitalize transition-all ${
+              onClick={() => { setSourceType(mode as any); setTitle(''); setContent(''); setUploadedFileName(''); setOcrResult(''); setImagePreview(''); setImageFile(null); }}
+              className={`py-2 rounded-lg text-[9px] font-mono font-medium transition-all ${
                 sourceType === mode ? 'btn-primary' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {mode}
+              {label}
             </button>
           ))}
         </div>
@@ -699,6 +703,91 @@ export default function RequirementsTab({
               <p className="text-[10px] text-slate-500 mt-1">Accepts PDF, Word, TXT, Excel or Markdown</p>
               {uploadedFileName && (
                 <div className="mt-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-mono">Loaded: {uploadedFileName}</div>
+              )}
+            </div>
+          )}
+
+          {sourceType === 'image' && (
+            <div className="space-y-3">
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-[11px] text-purple-900">
+                <div className="flex items-center gap-1.5 font-bold mb-1"><ScanLine className="w-4 h-4" /> Wireframe / Mockup OCR</div>
+                <p className="text-slate-600 leading-relaxed">Upload a screenshot, wireframe, or UI mockup — AI will extract requirements from the visual design automatically.</p>
+              </div>
+              <div className="border border-dashed border-purple-300 rounded-xl p-5 bg-purple-50/30 text-center relative hover:bg-purple-50 transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setImageFile(f);
+                    setOcrResult('');
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+                    reader.readAsDataURL(f);
+                    setTitle(f.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '));
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  aria-label="Upload wireframe or mockup image"
+                />
+                <Image className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                <p className="text-xs text-slate-700 font-semibold">Drop wireframe or UI screenshot here</p>
+                <p className="text-[10px] text-slate-500 mt-1">PNG, JPG, WebP — AI extracts requirements via OCR</p>
+              </div>
+              {imagePreview && (
+                <div className="space-y-2">
+                  <img src={imagePreview} alt="Preview" className="w-full rounded-xl border border-slate-200 max-h-48 object-contain bg-slate-50" />
+                  <button
+                    type="button"
+                    disabled={ocrRunning}
+                    onClick={async () => {
+                      if (!imageFile) return;
+                      setOcrRunning(true);
+                      setOcrResult('');
+                      try {
+                        const token = localStorage.getItem('iq_token') || '';
+                        const fd = new FormData();
+                        fd.append('image', imageFile);
+                        fd.append('projectId', currentProjectId && currentProjectId !== 'ALL' ? currentProjectId : 'PROJ-DEFAULT');
+                        const resp = await fetch('/api/quality/requirements/ocr-image', {
+                          method: 'POST',
+                          headers: { Authorization: `Bearer ${token}` },
+                          body: fd,
+                        });
+                        const data = await resp.json();
+                        if (data.requirements_text) {
+                          setOcrResult(data.requirements_text);
+                          setContent(data.requirements_text);
+                          if (!title || title === imageFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ')) {
+                            setTitle(data.title || title);
+                          }
+                        } else {
+                          setOcrResult('⚠️ ' + (data.error || 'OCR extraction failed — try a clearer image'));
+                        }
+                      } catch (err: any) {
+                        setOcrResult('⚠️ Network error: ' + err.message);
+                      } finally {
+                        setOcrRunning(false);
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-all"
+                  >
+                    {ocrRunning ? <><RefreshCcw className="w-3.5 h-3.5 animate-spin" /> Extracting requirements…</> : <><Zap className="w-3.5 h-3.5" /> Extract Requirements from Image</>}
+                  </button>
+                </div>
+              )}
+              {ocrResult && (
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500">Extracted Requirements (editable)</label>
+                  <textarea
+                    value={ocrResult.startsWith('⚠️') ? '' : ocrResult}
+                    onChange={(e) => { setOcrResult(e.target.value); setContent(e.target.value); }}
+                    rows={5}
+                    className="input-glass w-full text-xs font-sans leading-relaxed"
+                    placeholder="Extracted text will appear here..."
+                  />
+                  {ocrResult.startsWith('⚠️') && <p className="text-xs text-red-500">{ocrResult}</p>}
+                </div>
               )}
             </div>
           )}

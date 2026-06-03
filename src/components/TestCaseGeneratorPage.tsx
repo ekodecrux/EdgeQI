@@ -24,7 +24,10 @@ import {
   ThumbsUp,
   ThumbsDown,
   Tag,
-  ArrowRight
+  ArrowRight,
+  Zap,
+  BarChart2,
+  Bot
 } from 'lucide-react';
 import { TestCase } from '../types';
 import VoicePromptBar from './VoicePromptBar';
@@ -92,6 +95,44 @@ export default function TestCaseGeneratorPage({
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkPriority, setBulkPriority] = useState<'P0' | 'P1' | 'P2' | 'P3'>('P1');
   const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  // GAP-06: Automation feasibility analysis state
+  const [showFeasibilityPanel, setShowFeasibilityPanel] = useState(false);
+  const [feasibilityRunning, setFeasibilityRunning] = useState(false);
+  const [feasibilityResults, setFeasibilityResults] = useState<any[]>([]);
+  const [feasibilitySummary, setFeasibilitySummary] = useState<any>(null);
+
+  const runFeasibilityAnalysis = async () => {
+    if (localTestCases.length === 0) return;
+    setFeasibilityRunning(true);
+    setFeasibilityResults([]);
+    setFeasibilitySummary(null);
+    try {
+      const token = localStorage.getItem('iq_token') || '';
+      const res = await fetch('/api/quality/testcases/feasibility-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          test_cases: localTestCases.slice(0, 30).map(tc => ({
+            id: tc.id, title: tc.title, type: tc.type,
+            steps: tc.steps?.length || 0, priority: tc.priority
+          }))
+        })
+      });
+      const data = await res.json();
+      if (data.results) {
+        setFeasibilityResults(data.results);
+        setFeasibilitySummary(data.summary);
+        // Update local state with AI verdicts
+        setLocalTestCases(prev => prev.map(tc => {
+          const r = data.results.find((x: any) => x.id === tc.id);
+          return r ? { ...tc, automationStatus: r.verdict === 'Automatable' ? 'Automatable' : r.verdict === 'Manual Only' ? 'Needs Manual' : tc.automationStatus, confidenceScore: r.confidence_score ?? tc.confidenceScore } : tc;
+        }));
+      }
+    } catch (e: any) {
+      setFeasibilitySummary({ error: e.message });
+    } finally { setFeasibilityRunning(false); }
+  };
 
   // REQ-26: Bulk import state
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -359,6 +400,103 @@ export default function TestCaseGeneratorPage({
   return (
     <div className="space-y-6">
       
+      {/* GAP-06: AI Feasibility Analysis Panel */}
+      {showFeasibilityPanel && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800">AI Automation Feasibility Analysis</h3>
+                  <p className="text-xs text-slate-500">AI scores each test case for automation suitability before execution</p>
+                </div>
+              </div>
+              <button onClick={() => setShowFeasibilityPanel(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {feasibilityRunning && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center animate-pulse">
+                    <Bot className="w-6 h-6 text-violet-600" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700">Analysing {localTestCases.length} test cases…</p>
+                  <p className="text-xs text-slate-400">AI is evaluating automation complexity, UI dependencies, and data requirements</p>
+                </div>
+              )}
+
+              {!feasibilityRunning && feasibilitySummary?.error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                  ⚠️ {feasibilitySummary.error} — ensure an LLM is configured in <strong>AI Model Config</strong>.
+                </div>
+              )}
+
+              {!feasibilityRunning && feasibilitySummary && !feasibilitySummary.error && (
+                <>
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { label: 'Automatable', val: feasibilitySummary.automatable ?? 0, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+                      { label: 'Semi-Auto', val: feasibilitySummary.semi_auto ?? 0, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+                      { label: 'Manual Only', val: feasibilitySummary.manual_only ?? 0, color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+                      { label: 'Avg. Confidence', val: `${feasibilitySummary.avg_confidence ?? 0}%`, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+                    ].map(c => (
+                      <div key={c.label} className={`${c.bg} ${c.border} border rounded-xl p-3 text-center`}>
+                        <div className={`text-xl font-black ${c.color}`}>{c.val}</div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{c.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Per-TC results */}
+                  <div className="space-y-2">
+                    {feasibilityResults.map((r: any) => {
+                      const color = r.verdict === 'Automatable' ? 'border-green-200 bg-green-50' : r.verdict === 'Manual Only' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50';
+                      const badge = r.verdict === 'Automatable' ? 'bg-green-100 text-green-700' : r.verdict === 'Manual Only' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+                      return (
+                        <div key={r.id} className={`flex items-start gap-3 p-3 rounded-xl border ${color}`}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-[10px] text-slate-500">{r.id}</span>
+                              <span className="text-xs font-semibold text-slate-800 truncate">{r.title}</span>
+                            </div>
+                            {r.rationale && <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{r.rationale}</p>}
+                            {r.blockers?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {r.blockers.map((b: string, i: number) => <span key={i} className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono border border-slate-200">{b}</span>)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="shrink-0 flex flex-col items-end gap-1">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold font-mono ${badge}`}>{r.verdict}</span>
+                            <span className="text-[10px] text-slate-500 font-mono">{r.confidence_score}% conf.</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-between items-center shrink-0">
+              <button
+                onClick={runFeasibilityAnalysis}
+                disabled={feasibilityRunning}
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-semibold hover:bg-violet-700 disabled:opacity-50"
+              >
+                {feasibilityRunning ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                {feasibilityRunning ? 'Analysing…' : 'Re-analyse'}
+              </button>
+              <button onClick={() => setShowFeasibilityPanel(false)} className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* REQ-26: Bulk Import Modal */}
       {showBulkImport && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -638,6 +776,15 @@ export default function TestCaseGeneratorPage({
                     className="text-[10px] text-blue-500 hover:text-blue-700"><X className="w-3 h-3" /></button>
                 </div>
               )}
+              {/* GAP-06: Feasibility Analysis Button */}
+              <button
+                onClick={() => { setShowFeasibilityPanel(true); runFeasibilityAnalysis(); }}
+                disabled={localTestCases.length === 0}
+                className="flex items-center gap-1 px-2 py-1 bg-violet-50 border border-violet-200 hover:bg-violet-100 text-violet-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
+                title="AI Automation Feasibility Analysis" aria-label="Run AI feasibility analysis"
+              >
+                <Bot className="w-3 h-3" /> AI Feasibility
+              </button>
               {/* Export + Import buttons */}
               <div className="flex items-center gap-1">
                 <button

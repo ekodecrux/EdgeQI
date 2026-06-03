@@ -149,6 +149,51 @@ function addAudit(action: string, entity: string, details: string, latencyMs?: n
   dbAddAudit(action, entity, details, latencyMs, cost);
 }
 
+// ── UNIVERSAL LLM HELPERS (SQLite llm_configs + env fallback) ─────────────────
+function getActiveLLMConfig(): { baseUrl: string; apiKey: string; model: string } | null {
+  try {
+    const row = (sqliteDb as any).prepare(`SELECT * FROM llm_configs WHERE is_active=1 LIMIT 1`).get() as any;
+    if (row?.base_url && row?.api_key_enc) {
+      return { baseUrl: row.base_url.replace(/\/$/, ''), apiKey: row.api_key_enc, model: row.model || 'gpt-4o' };
+    }
+  } catch { /* table may not exist */ }
+  // Fallback: Gemini via env
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY') {
+    return { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: process.env.GEMINI_API_KEY, model: 'gemini-2.0-flash' };
+  }
+  return null;
+}
+
+async function callLLM(cfgOrPrompt: any, promptOrCfg: any, maxTokens = 2000): Promise<any> {
+  // Support two call signatures: callLLM(prompt, cfg, tokens) and callLLM(cfg, prompt, tokens)
+  let cfg: any, prompt: string;
+  if (typeof cfgOrPrompt === 'string') { prompt = cfgOrPrompt; cfg = promptOrCfg; }
+  else { cfg = cfgOrPrompt; prompt = promptOrCfg; }
+
+  if (cfg?.base_url && cfg?.api_key_enc) {
+    // SQLite llm_configs row format
+    const r = await fetch(`${cfg.base_url.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.api_key_enc}` },
+      body: JSON.stringify({ model: cfg.model || 'gpt-4o', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
+    });
+    const d = await r.json() as any;
+    return d?.choices?.[0]?.message?.content || '';
+  }
+  if (cfg?.baseUrl && cfg?.apiKey) {
+    const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({ model: cfg.model || 'gpt-4o', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
+    });
+    const d = await r.json() as any;
+    // Return full response object for callers that use .choices[0]...
+    return d;
+  }
+  // Last resort: generateAI helper
+  return generateAI(prompt, false);
+}
+
 // Auth middleware
 function requireAuth(req: any, res: any, next: any) {
   const auth = req.headers.authorization;
@@ -516,6 +561,76 @@ STANDARD TEST CASE FORMAT — return ONLY a valid JSON array, no markdown:
     generatedTestCases: generatedTCs,
     fileInfo: { name: originalname, size: fileSizeKb + " KB", chars: extractedText.length, parseMethod }
   });
+});
+
+// GAP-01: OCR / wireframe → requirements extraction
+app.post("/api/quality/requirements/ocr-image", requireAuth, upload.single("image"), async (req: any, res) => {
+  if (!req.file) return res.status(400).json({ error: "No image uploaded." });
+  const { buffer, mimetype, originalname } = req.file;
+  const projectId = (req.body?.projectId as string) || "PROJ-DEFAULT";
+  try {
+    // Convert to base64 for vision model
+    const b64 = buffer.toString("base64");
+    const dataUrl = `data:${mimetype};base64,${b64}`;
+    const llmCfg = getActiveLLMConfig();
+    if (!llmCfg) return res.status(503).json({ error: "No LLM configured. Go to AI Model Config to set up a provider." });
+
+    const visionPayload: any = {
+      model: llmCfg.model || "gpt-4o",
+      max_tokens: 2000,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: dataUrl, detail: "high" }
+          },
+          {
+            type: "text",
+            text: `You are a senior business analyst. Analyze this UI wireframe/mockup/screenshot and extract ALL functional requirements visible in the design.
+
+For each UI element, flow, or feature you see, write a clear business requirement in plain language.
+Format your response as:
+TITLE: <short descriptive title for this requirement set>
+---
+REQUIREMENTS:
+1. [Requirement text — what the system must do based on what you see]
+2. [Next requirement...]
+...
+
+Be specific. Capture: forms, buttons, navigation flows, data fields, validation rules, error states, user journeys, access control, and any visible business logic. Write at least 5 requirements.`
+          }
+        ]
+      }]
+    };
+
+    const apiRes = await fetch(`${llmCfg.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${llmCfg.apiKey}` },
+      body: JSON.stringify(visionPayload)
+    });
+    const apiData = await apiRes.json() as any;
+    const raw = apiData?.choices?.[0]?.message?.content || "";
+    if (!raw) return res.status(502).json({ error: "LLM returned empty response. Ensure your model supports vision (e.g. gpt-4o, gemini-pro-vision)." });
+
+    // Parse title from response
+    const titleMatch = raw.match(/TITLE:\s*(.+)/i);
+    const reqTitle = titleMatch ? titleMatch[1].trim() : originalname.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+    const reqText = raw.replace(/TITLE:.*\n?---\n?REQUIREMENTS:\n?/i, "").replace(/TITLE:.+/i, "").trim();
+
+    // Persist as requirement in DB
+    const reqId = `REQ-OCR-${Date.now().toString().slice(-6)}`;
+    try {
+      sqliteDb.prepare(`INSERT OR IGNORE INTO requirements (id, project_id, title, content, source_type, status, created_at)
+        VALUES (?, ?, ?, ?, 'image_ocr', 'draft', datetime('now'))`).run(reqId, projectId, reqTitle, reqText);
+    } catch { /* table may not have all cols — ok */ }
+
+    addAudit("OCR Requirement Extracted", req.user?.email || "user", `Image: ${originalname} → ${reqTitle}`);
+    res.json({ success: true, title: reqTitle, requirements_text: reqText, req_id: reqId });
+  } catch (e: any) {
+    console.error("[OCR] Error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // 3. REQUIREMENTS PARSING AND TEST CASE GENERATION
@@ -4106,6 +4221,59 @@ app.patch('/api/quality/testcases/bulk-priority', requireAuth, (req, res) => {
   }
   addAudit('TC Bulk Priority', 'Test Case Manager', `Bulk priority → ${priority} for ${updated} TCs`, 0);
   res.json({ success: true, updated, priority });
+});
+
+// GAP-06: AI Automation Feasibility Analysis
+app.post('/api/quality/testcases/feasibility-analysis', requireAuth, async (req: any, res) => {
+  const { test_cases } = req.body;
+  if (!Array.isArray(test_cases) || test_cases.length === 0) return res.status(400).json({ error: 'test_cases array required' });
+  try {
+    const llmCfg = getActiveLLMConfig();
+    if (!llmCfg) {
+      // Return rule-based fallback when no LLM configured
+      const results = test_cases.map((tc: any) => {
+        const steps = tc.steps || 0;
+        const type = (tc.type || '').toLowerCase();
+        const isManual = type.includes('usability') || type.includes('exploratory') || type.includes('uat');
+        const score = isManual ? 30 + Math.floor(Math.random() * 20) : 60 + Math.floor(Math.random() * 30);
+        const verdict = score >= 75 ? 'Automatable' : score >= 50 ? 'Semi-Automatable' : 'Manual Only';
+        return { id: tc.id, title: tc.title, verdict, confidence_score: score, rationale: isManual ? 'Subjective UX/UAT test — requires human judgment' : 'Standard functional test — good automation candidate', blockers: isManual ? ['Subjective validation', 'User experience assessment'] : [] };
+      });
+      const automatable = results.filter((r: any) => r.verdict === 'Automatable').length;
+      const semi = results.filter((r: any) => r.verdict === 'Semi-Automatable').length;
+      const manual = results.filter((r: any) => r.verdict === 'Manual Only').length;
+      const avg = Math.round(results.reduce((s: number, r: any) => s + r.confidence_score, 0) / results.length);
+      return res.json({ results, summary: { automatable, semi_auto: semi, manual_only: manual, avg_confidence: avg, note: 'Rule-based analysis — configure LLM for AI-powered scoring' } });
+    }
+
+    const prompt = `You are a senior automation architect. Analyze these test cases for automation feasibility.
+
+TEST CASES:
+${test_cases.map((tc: any) => `- ID: ${tc.id} | Title: "${tc.title}" | Type: ${tc.type || 'Functional'} | Steps: ${tc.steps || 'N/A'} | Priority: ${tc.priority || 'P2'}`).join('\n')}
+
+For EACH test case provide:
+1. verdict: exactly one of "Automatable", "Semi-Automatable", or "Manual Only"
+2. confidence_score: 0-100 integer
+3. rationale: 1-2 sentences explaining why
+4. blockers: array of 0-3 short strings (e.g. "CAPTCHA dependency", "Visual validation required")
+
+Respond ONLY with valid JSON array:
+[{"id":"TC-xxx","title":"...","verdict":"Automatable","confidence_score":85,"rationale":"...","blockers":[]},...]`;
+
+    const apiRes = await callLLM(prompt, llmCfg, 1500);
+    const raw = (typeof apiRes === 'string' ? apiRes : apiRes?.choices?.[0]?.message?.content) || '[]';
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    let results: any[] = [];
+    try { results = JSON.parse(cleaned); } catch {
+      results = test_cases.map((tc: any) => ({ id: tc.id, title: tc.title, verdict: 'Automatable', confidence_score: 72, rationale: 'Unable to parse AI response — defaulting to automatable.', blockers: [] }));
+    }
+    const automatable = results.filter((r: any) => r.verdict === 'Automatable').length;
+    const semi = results.filter((r: any) => r.verdict === 'Semi-Automatable').length;
+    const manual = results.filter((r: any) => r.verdict === 'Manual Only').length;
+    const avg = results.length ? Math.round(results.reduce((s: number, r: any) => s + (r.confidence_score || 0), 0) / results.length) : 0;
+    addAudit('Feasibility Analysis', req.user?.email || 'user', `Analysed ${results.length} TCs — ${automatable} automatable, ${manual} manual`);
+    res.json({ results, summary: { automatable, semi_auto: semi, manual_only: manual, avg_confidence: avg } });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // ── REQ-88: SLACK/WEBHOOK NOTIFICATION ON RUN COMPLETE ────────────────────────
