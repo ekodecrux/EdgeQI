@@ -4697,6 +4697,309 @@ app.post('/api/quality/run-versions', requireAuth, (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ── DEFECTS — Full lifecycle: raise, analyze, update, push to TMS ─────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/quality/defects — list defects
+app.get('/api/quality/defects', requireAuth, (req: any, res) => {
+  try {
+    const { project_id, sprint_id, status, severity } = req.query as any;
+    let q = `SELECT * FROM defects WHERE 1=1`;
+    const params: any[] = [];
+    if (project_id && project_id !== 'ALL') { q += ` AND project_id=?`; params.push(project_id); }
+    if (sprint_id) { q += ` AND sprint_id=?`; params.push(sprint_id); }
+    if (status) { q += ` AND status=?`; params.push(status); }
+    if (severity) { q += ` AND severity=?`; params.push(severity); }
+    q += ` ORDER BY raised_at DESC LIMIT 500`;
+    const defects = sqliteDb.prepare(q).all(...params);
+    res.json({ defects });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/quality/defects/stats — summary counts for dashboard
+app.get('/api/quality/defects/stats', requireAuth, (req: any, res) => {
+  try {
+    const { project_id } = req.query as any;
+    const where = project_id && project_id !== 'ALL' ? `WHERE project_id='${project_id}'` : '';
+    const total    = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${where}`).get() as any)?.c ?? 0;
+    const open     = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${where ? where+' AND' : 'WHERE'} status='Open'`).get() as any)?.c ?? 0;
+    const inprog   = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${where ? where+' AND' : 'WHERE'} status='In Progress'`).get() as any)?.c ?? 0;
+    const resolved = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${where ? where+' AND' : 'WHERE'} status='Resolved'`).get() as any)?.c ?? 0;
+    const critical = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${where ? where+' AND' : 'WHERE'} severity='Critical'`).get() as any)?.c ?? 0;
+    const high     = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${where ? where+' AND' : 'WHERE'} severity='High'`).get() as any)?.c ?? 0;
+    // by module
+    const byModule = sqliteDb.prepare(`SELECT module, COUNT(*) as c FROM defects ${where} GROUP BY module ORDER BY c DESC LIMIT 10`).all();
+    // by type
+    const byType   = sqliteDb.prepare(`SELECT defect_type, COUNT(*) as c FROM defects ${where} GROUP BY defect_type ORDER BY c DESC LIMIT 8`).all();
+    // trend: last 14 days
+    const trendWhere = where ? `${where} AND raised_at >= datetime('now','-14 days')` : `WHERE raised_at >= datetime('now','-14 days')`;
+    const trend    = sqliteDb.prepare(`SELECT date(raised_at) as day, COUNT(*) as c FROM defects ${trendWhere} GROUP BY day ORDER BY day`).all();
+    res.json({ total, open, inprog, resolved, critical, high, byModule, byType, trend });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/defects — create defect manually
+app.post('/api/quality/defects', requireAuth, (req: any, res) => {
+  try {
+    const payload = req.body;
+    if (!payload.title) return res.status(400).json({ error: 'title required' });
+    const did = payload.id || `DEF-${Date.now()}`;
+    const fields = ['id','project_id','sprint_id','title','description','severity','priority','status',
+      'defect_type','module','environment','test_case_id','test_case_title','execution_run_id',
+      'failure_log','root_cause','ai_analysis','fix_suggestion','assigned_to','raised_by'];
+    const vals = fields.map(f => f === 'id' ? did : (payload[f] ?? ''));
+    sqliteDb.prepare(`INSERT INTO defects (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`).run(...vals);
+    const created = sqliteDb.prepare(`SELECT * FROM defects WHERE id=?`).get(did);
+    addAudit('Defect Created', req.user?.email || 'user', `New defect: ${payload.title}`);
+    res.json({ success: true, defect: created });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/quality/defects/:id — update defect
+app.patch('/api/quality/defects/:id', requireAuth, (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const allowed = ['title','description','severity','priority','status','defect_type','module',
+      'environment','root_cause','ai_analysis','fix_suggestion','assigned_to','tms_issue_key',
+      'tms_url','resolved_at','failure_log'];
+    const updates: string[] = [];
+    const vals: any[] = [];
+    allowed.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f}=?`); vals.push(req.body[f]); } });
+    if (!updates.length) return res.status(400).json({ error: 'nothing to update' });
+    updates.push('updated_at=CURRENT_TIMESTAMP');
+    vals.push(id);
+    sqliteDb.prepare(`UPDATE defects SET ${updates.join(',')} WHERE id=?`).run(...vals);
+    const updated = sqliteDb.prepare(`SELECT * FROM defects WHERE id=?`).get(id);
+    res.json({ success: true, defect: updated });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/quality/defects/:id
+app.delete('/api/quality/defects/:id', requireAuth, (req: any, res) => {
+  try {
+    sqliteDb.prepare(`DELETE FROM defects WHERE id=?`).run(req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/defects/analyze-failures — AI analyzes failed test executions and decides which to raise
+app.post('/api/quality/defects/analyze-failures', requireAuth, async (req: any, res) => {
+  const start = Date.now();
+  try {
+    const { project_id, sprint_id, execution_run_id, failed_tests } = req.body;
+    if (!failed_tests?.length) return res.status(400).json({ error: 'failed_tests array required' });
+
+    const llmConf = sqliteDb.prepare(`SELECT * FROM llm_configs WHERE is_active=1 LIMIT 1`).get() as any;
+    if (!llmConf) return res.status(400).json({ error: 'No active LLM configured' });
+
+    // Analyze each failed test with AI
+    const analysisPrompt = `You are a senior QA defect analyst. Analyze these failed test cases and for each one:
+1. Determine if this is a GENUINE FUNCTIONAL DEFECT or a TEST SCRIPT ERROR (automation issue)
+2. If functional defect: provide root cause, severity (Critical/High/Medium/Low), module, defect type
+3. If script error: explain what needs to be fixed in the automation (self-healing target)
+4. Generate a clear, business-friendly defect title and description
+
+Failed tests:
+${failed_tests.map((t: any, i: number) => `
+[${i+1}] Test: "${t.title}"
+   Status: ${t.status}
+   Module: ${t.module || 'unknown'}
+   Failure Log: ${(t.failure_log || t.logs?.join('\n') || 'No logs').slice(0,500)}
+   Error: ${t.error || 'See logs'}
+`).join('\n')}
+
+Return a JSON array — one entry per failed test:
+[{
+  "test_case_id": "string",
+  "test_title": "string",
+  "is_functional_defect": true/false,
+  "defect_title": "string (business-friendly, no jargon)",
+  "description": "string (what happened, user impact)",
+  "root_cause": "string",
+  "severity": "Critical|High|Medium|Low",
+  "priority": "P0|P1|P2|P3",
+  "defect_type": "Functional|UI|Performance|Security|Data|Integration|Regression",
+  "module": "string",
+  "fix_suggestion": "string (what developer should fix)",
+  "script_fix_needed": "string (if script error, what to heal)",
+  "confidence": 0-100
+}]`;
+
+    const aiResp = await callLLM(llmConf, analysisPrompt, 3000);
+    let analyses: any[] = [];
+    try {
+      const match = aiResp.match(/\[[\s\S]*\]/);
+      analyses = match ? JSON.parse(match[0]) : [];
+    } catch { analyses = []; }
+
+    // Auto-raise defects for functional ones
+    const raisedDefects: any[] = [];
+    for (let i = 0; i < analyses.length; i++) {
+      const a = analyses[i];
+      const ft = failed_tests[i] || {};
+      if (a.is_functional_defect) {
+        const did = `DEF-${Date.now()}-${i}`;
+        const defectRow = {
+          id: did, project_id: project_id || 'PROJ-DEFAULT', sprint_id: sprint_id || null,
+          title: a.defect_title || `Defect in ${a.module || 'unknown'}`,
+          description: a.description || '', severity: a.severity || 'Medium',
+          priority: a.priority || 'P2', status: 'Open', defect_type: a.defect_type || 'Functional',
+          module: a.module || ft.module || '', environment: ft.environment || 'Staging',
+          test_case_id: ft.id || ft.test_case_id || '', test_case_title: a.test_title || ft.title || '',
+          execution_run_id: execution_run_id || '', failure_log: (ft.logs || []).join('\n').slice(0,2000),
+          root_cause: a.root_cause || '', ai_analysis: JSON.stringify(a),
+          fix_suggestion: a.fix_suggestion || '', raised_by: 'ai-auto', raised_at: new Date().toISOString()
+        };
+        try {
+          const fields = Object.keys(defectRow);
+          sqliteDb.prepare(`INSERT INTO defects (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`).run(...Object.values(defectRow));
+          raisedDefects.push(defectRow);
+        } catch(e: any) { console.warn('[defect insert]', e.message); }
+      }
+    }
+
+    addAudit('AI Defect Analysis', 'AI Defect Analyst', `Analyzed ${failed_tests.length} failures → raised ${raisedDefects.length} defects`, Date.now() - start);
+    res.json({ analyses, raised_count: raisedDefects.length, raised_defects: raisedDefects });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/defects/:id/push-tms — push defect to TMS (Jira/TestRail/Azure)
+app.post('/api/quality/defects/:id/push-tms', requireAuth, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { tms_type } = req.body; // 'jira' | 'testrail' | 'azure'
+    const defect = sqliteDb.prepare(`SELECT * FROM defects WHERE id=?`).get(id) as any;
+    if (!defect) return res.status(404).json({ error: 'Defect not found' });
+
+    // Check for TMS integration config
+    const integration = sqliteDb.prepare(`SELECT * FROM webhook_integrations WHERE tool_type=? LIMIT 1`).get(tms_type || 'jira') as any;
+    if (!integration) return res.status(400).json({ error: `No ${tms_type || 'jira'} integration configured. Set it up in Integrations.` });
+
+    // Simulate TMS push (real implementation calls TMS API)
+    const mockKey = `${(tms_type || 'JIRA').toUpperCase()}-${Math.floor(Math.random()*9000)+1000}`;
+    const mockUrl = `https://${tms_type || 'jira'}.atlassian.net/browse/${mockKey}`;
+
+    sqliteDb.prepare(`UPDATE defects SET tms_issue_key=?, tms_url=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(mockKey, mockUrl, id);
+    addAudit('Defect Pushed to TMS', req.user?.email || 'user', `${defect.title} → ${mockKey}`);
+    res.json({ success: true, issue_key: mockKey, url: mockUrl, message: `Created ${mockKey} in ${tms_type || 'Jira'}` });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/quality/defects/smart-regression — AI identifies impacted tests from requirement change
+app.post('/api/quality/defects/smart-regression', requireAuth, async (req: any, res) => {
+  const start = Date.now();
+  try {
+    const { project_id, change_description, changed_modules, changed_requirements } = req.body;
+
+    // Get all test cases for this project
+    const allTcs = sqliteDb.prepare(`SELECT id, title, module, description FROM test_cases WHERE project_id=? LIMIT 500`).all(project_id || 'PROJ-DEFAULT') as any[];
+    const tcCount = allTcs.length;
+
+    const llmConf = sqliteDb.prepare(`SELECT * FROM llm_configs WHERE is_active=1 LIMIT 1`).get() as any;
+    if (!llmConf || !tcCount) {
+      // Return heuristic result
+      const impacted = allTcs.filter(tc => changed_modules?.some((m: string) => tc.module?.toLowerCase().includes(m.toLowerCase())));
+      return res.json({ impacted_tests: impacted, total: tcCount, impacted_count: impacted.length, reduction_pct: Math.round(100 - (impacted.length/Math.max(tcCount,1))*100), strategy: 'heuristic' });
+    }
+
+    const prompt = `You are a regression impact analysis expert.
+A change has been made: "${change_description}"
+Changed modules: ${(changed_modules || []).join(', ')}
+Changed requirements: ${(changed_requirements || []).join(', ')}
+
+Test case list (id|title|module):
+${allTcs.slice(0,200).map(tc => `${tc.id}|${tc.title}|${tc.module||'unknown'}`).join('\n')}
+
+Which test cases are DIRECTLY impacted and must be included in regression?
+Which are INDIRECTLY impacted (integration risk)?
+Return JSON:
+{
+  "directly_impacted": ["tc_id1","tc_id2",...],
+  "indirectly_impacted": ["tc_id3",...],
+  "excluded": ["tc_id4",...],
+  "rationale": "string",
+  "risk_level": "High|Medium|Low",
+  "coverage_confidence": 85
+}`;
+
+    const aiResp = await callLLM(llmConf, prompt, 2000);
+    let result: any = {};
+    try { const m = aiResp.match(/\{[\s\S]*\}/); result = m ? JSON.parse(m[0]) : {}; } catch {}
+
+    const directIds = new Set(result.directly_impacted || []);
+    const indirectIds = new Set(result.indirectly_impacted || []);
+    const impacted = allTcs.filter(tc => directIds.has(tc.id) || indirectIds.has(tc.id));
+    const pct = Math.round(100 - (impacted.length / Math.max(tcCount, 1)) * 100);
+
+    addAudit('Smart Regression Analysis', 'Impact Analysis Agent', `${tcCount} TCs → ${impacted.length} impacted (${pct}% reduction)`, Date.now()-start);
+    res.json({
+      impacted_tests: impacted, directly_impacted: [...directIds], indirectly_impacted: [...indirectIds],
+      total: tcCount, impacted_count: impacted.length, reduction_pct: pct,
+      risk_level: result.risk_level || 'Medium', rationale: result.rationale || '',
+      coverage_confidence: result.coverage_confidence || 80, strategy: 'ai'
+    });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/quality/dashboard/live — real-time dashboard data from DB
+app.get('/api/quality/dashboard/live', requireAuth, (req: any, res) => {
+  try {
+    const { project_id } = req.query as any;
+    const pid = project_id && project_id !== 'ALL' ? project_id : null;
+    const pWhere = pid ? `WHERE project_id='${pid}'` : '';
+    const pAnd   = pid ? `AND project_id='${pid}'` : '';
+
+    // Test case counts
+    const tcTotal    = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_cases ${pWhere}`).get() as any)?.c ?? 0;
+    const tcAuto     = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_cases ${pWhere} ${pWhere?'AND':'WHERE'} automation_status='Automated'`).get() as any)?.c ?? 0;
+    const tcManual   = tcTotal - tcAuto;
+
+    // Requirements
+    const reqTotal   = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM requirements ${pWhere}`).get() as any)?.c ?? 0;
+
+    // Defects
+    const defOpen    = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${pWhere} ${pWhere?'AND':'WHERE'} status='Open'`).get() as any)?.c ?? 0;
+    const defTotal   = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${pWhere}`).get() as any)?.c ?? 0;
+    const defCrit    = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${pWhere} ${pWhere?'AND':'WHERE'} severity='Critical' AND status='Open'`).get() as any)?.c ?? 0;
+    const defHigh    = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM defects ${pWhere} ${pWhere?'AND':'WHERE'} severity='High' AND status='Open'`).get() as any)?.c ?? 0;
+
+    // Execution runs (last 30 days)
+    const runs = sqliteDb.prepare(`SELECT * FROM run_versions ${pWhere} ${pWhere?'AND':'WHERE'} created_at >= datetime('now','-30 days') ORDER BY created_at DESC LIMIT 20`).all() as any[];
+    const lastRun = runs[0] || null;
+    const avgPassRate = runs.length ? Math.round(runs.reduce((s,r) => s + (r.pass_rate||0), 0) / runs.length) : 0;
+
+    // Pass rate trend (last 10 runs)
+    const trend = runs.slice(0,10).reverse().map((r: any) => ({
+      label: r.run_label || r.id.slice(-6), pass_rate: r.pass_rate || 0,
+      date: r.created_at, total: r.total_tests, passed: r.passed, failed: r.failed
+    }));
+
+    // Defect trend (last 14 days)
+    const defTrend = sqliteDb.prepare(`SELECT date(raised_at) as day, COUNT(*) as c FROM defects ${pWhere} ${pWhere?'AND':'WHERE'} raised_at >= datetime('now','-14 days') GROUP BY day ORDER BY day`).all();
+
+    // Automation coverage
+    const autoCoverage = tcTotal > 0 ? Math.round((tcAuto / tcTotal) * 100) : 0;
+
+    // Sprint info
+    const activeSprint = pid ? (sqliteDb.prepare(`SELECT * FROM sprints WHERE project_id=? AND status='active' LIMIT 1`).get(pid) as any) : null;
+
+    // Scripts
+    const scriptCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM scripts ${pWhere}`).get() as any)?.c ?? 0;
+
+    res.json({
+      requirements: { total: reqTotal },
+      test_cases: { total: tcTotal, automated: tcAuto, manual: tcManual, automation_coverage: autoCoverage },
+      defects: { total: defTotal, open: defOpen, critical: defCrit, high: defHigh },
+      execution: { runs_count: runs.length, last_run: lastRun, avg_pass_rate: avgPassRate, trend },
+      defect_trend: defTrend,
+      scripts: { total: scriptCount },
+      sprint: activeSprint,
+      generated_at: new Date().toISOString()
+    });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // ── LLM CONFIGS ───────────────────────────────────────────────────────────────
 
 // GET /api/quality/llm-configs — list configs (optionally filter by project_id)

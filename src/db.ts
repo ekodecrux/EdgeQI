@@ -314,6 +314,36 @@ sqliteDb.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- Live defects table (raised from test failures or manually)
+  CREATE TABLE IF NOT EXISTS defects (
+    id TEXT PRIMARY KEY,
+    project_id TEXT DEFAULT 'PROJ-DEFAULT',
+    sprint_id TEXT,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    severity TEXT DEFAULT 'Medium',
+    priority TEXT DEFAULT 'P2',
+    status TEXT DEFAULT 'Open',
+    defect_type TEXT DEFAULT 'Functional',
+    module TEXT DEFAULT '',
+    environment TEXT DEFAULT 'Staging',
+    test_case_id TEXT,
+    test_case_title TEXT DEFAULT '',
+    execution_run_id TEXT,
+    failure_log TEXT DEFAULT '',
+    failure_screenshot TEXT DEFAULT '',
+    root_cause TEXT DEFAULT '',
+    ai_analysis TEXT DEFAULT '',
+    fix_suggestion TEXT DEFAULT '',
+    assigned_to TEXT DEFAULT '',
+    tms_issue_key TEXT DEFAULT '',
+    tms_url TEXT DEFAULT '',
+    raised_by TEXT DEFAULT 'system',
+    raised_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   -- Indexes
   CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
   CREATE INDEX IF NOT EXISTS idx_sprints_project ON sprints(project_id);
@@ -322,7 +352,26 @@ sqliteDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_rag_v2_project ON rag_docs_v2(project_id);
   CREATE INDEX IF NOT EXISTS idx_prompt_hist_project ON prompt_history(project_id);
   CREATE INDEX IF NOT EXISTS idx_prompt_hist_module ON prompt_history(module);
+  CREATE INDEX IF NOT EXISTS idx_defects_project ON defects(project_id);
+  CREATE INDEX IF NOT EXISTS idx_defects_status ON defects(status);
+  CREATE INDEX IF NOT EXISTS idx_defects_tc ON defects(test_case_id);
 `);
+
+// Ensure defects table exists (for DBs created before this migration)
+try {
+  sqliteDb.exec(`CREATE TABLE IF NOT EXISTS defects (
+    id TEXT PRIMARY KEY, project_id TEXT DEFAULT 'PROJ-DEFAULT', sprint_id TEXT,
+    title TEXT NOT NULL, description TEXT DEFAULT '', severity TEXT DEFAULT 'Medium',
+    priority TEXT DEFAULT 'P2', status TEXT DEFAULT 'Open', defect_type TEXT DEFAULT 'Functional',
+    module TEXT DEFAULT '', environment TEXT DEFAULT 'Staging',
+    test_case_id TEXT, test_case_title TEXT DEFAULT '', execution_run_id TEXT,
+    failure_log TEXT DEFAULT '', failure_screenshot TEXT DEFAULT '',
+    root_cause TEXT DEFAULT '', ai_analysis TEXT DEFAULT '', fix_suggestion TEXT DEFAULT '',
+    assigned_to TEXT DEFAULT '', tms_issue_key TEXT DEFAULT '', tms_url TEXT DEFAULT '',
+    raised_by TEXT DEFAULT 'system', raised_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+} catch {}
 
 // Ignore column-already-exists errors from ALTER TABLE (SQLite quirk)
 try { sqliteDb.exec(`ALTER TABLE execution_runs ADD COLUMN project_id TEXT DEFAULT 'DEFAULT'`); } catch {}

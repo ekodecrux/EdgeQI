@@ -49,8 +49,10 @@ import {
 
 import AgentFlowVisualizer from './components/AgentFlowVisualizer';
 import DashboardMetrics from './components/DashboardMetrics';
+import LiveDashboard from './components/LiveDashboard';
 import RequirementsTab from './components/RequirementsTab';
 import DefectPredictTab from './components/DefectPredictTab';
+import DefectsManager from './components/DefectsManager';
 import ScriptTab from './components/ScriptTab';
 import PerformanceTab from './components/PerformanceTab';
 import SecurityTab from './components/SecurityTab';
@@ -1104,49 +1106,49 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         {/* Scrollable Nav area — fills all space between logo and footer */}
         <div className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
 
-          {/* ── Section: Project ─────────────────────────────────────── */}
-          <SidebarGroup label="Project" defaultOpen>
+          {/* ── Section: My Projects ───────────────────────────────────── */}
+          <SidebarGroup label="My Projects" defaultOpen>
             {[
               { id: 'projects', label: 'Project Hub',    icon: FolderOpen },
               { id: 'rag-kb',   label: 'Knowledge Base', icon: Brain },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
           </SidebarGroup>
 
-          {/* ── Section: STLC ────────────────────────────────────────── */}
-          <SidebarGroup label="STLC Pipeline" defaultOpen>
+          {/* ── Section: Testing Workflow ────────────────────────────── */}
+          <SidebarGroup label="Testing Workflow" defaultOpen>
             {[
-              { id: 'agentic',     label: 'Auto Pipeline',    icon: Zap },
-              { id: 'requirements',label: 'Requirements',      icon: FileText },
-              { id: 'test-plans',  label: 'Test Plans',        icon: TableProperties },
-              { id: 'testcases',   label: 'Test Cases',        icon: TableProperties },
-              { id: 'traceability',label: 'Traceability',      icon: Table },
-              { id: 'scripts',     label: 'Script Generator',  icon: Settings2 },
+              { id: 'agentic',      label: 'AI Auto-Test',       icon: Zap },
+              { id: 'requirements', label: 'Requirements',        icon: FileText },
+              { id: 'test-plans',   label: 'Test Plans',          icon: TableProperties },
+              { id: 'testcases',    label: 'Test Cases',          icon: TableProperties },
+              { id: 'traceability', label: 'Traceability Matrix', icon: Table },
+              { id: 'scripts',      label: 'Test Automation',     icon: Settings2 },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
           </SidebarGroup>
 
-          {/* ── Section: Execution & Quality ─────────────────────────── */}
-          <SidebarGroup label="Execution & Quality" defaultOpen>
+          {/* ── Section: Run & Analyze ──────────────────────────────── */}
+          <SidebarGroup label="Run & Analyze" defaultOpen>
             {[
-              { id: 'execution',        label: 'Execution Engine',    icon: Cpu },
-              { id: 'manual-execution', label: 'Manual Execution',    icon: CheckSquare },
-              { id: 'defects',          label: 'Impact Analyzer',     icon: Crosshair },
-              { id: 'performance',      label: 'Performance Testing', icon: Sliders },
-              { id: 'security',         label: 'Security Testing',    icon: ShieldAlert },
-              { id: 'dashboard',        label: 'QA Dashboard',        icon: TrendingUp },
+              { id: 'execution',        label: 'Run Tests',          icon: Cpu },
+              { id: 'manual-execution', label: 'Manual Testing',     icon: CheckSquare },
+              { id: 'defects',          label: 'Defects & Bugs',     icon: Crosshair },
+              { id: 'performance',      label: 'Load & Performance', icon: Sliders },
+              { id: 'security',         label: 'Security Scan',      icon: ShieldAlert },
+              { id: 'dashboard',        label: 'Live Dashboard',     icon: TrendingUp },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
           </SidebarGroup>
 
-          {/* ── Section: Config & Integrations ───────────────────────── */}
-          <SidebarGroup label="Config & Integrations">
+          {/* ── Section: Settings & Integrations ────────────────────── */}
+          <SidebarGroup label="Settings & Integrations">
             {[
-              { id: 'integrations', label: 'TMS Integrations',  icon: Link },
-              { id: 'cicd',         label: 'CI/CD',             icon: GitBranch },
-              { id: 'scheduler',    label: 'Test Scheduler',    icon: Clock },
-              { id: 'analytics',    label: 'AI Analytics',      icon: BarChart3 },
-              { id: 'llm-config',   label: 'LLM Providers',     icon: Cpu },
-              { id: 'converter',    label: 'Converter',         icon: RefreshCw },
-              { id: 'feedback',     label: 'Prompts & Feedback',icon: BookOpen },
-              { id: 'audit',        label: 'Audit Log',         icon: History },
+              { id: 'integrations', label: 'Connect Tools',     icon: Link },
+              { id: 'cicd',         label: 'CI/CD Pipeline',    icon: GitBranch },
+              { id: 'scheduler',    label: 'Scheduled Runs',    icon: Clock },
+              { id: 'analytics',    label: 'AI Insights',       icon: BarChart3 },
+              { id: 'llm-config',   label: 'AI Model Config',   icon: Cpu },
+              { id: 'converter',    label: 'Script Converter',  icon: RefreshCw },
+              { id: 'feedback',     label: 'Prompt Library',    icon: BookOpen },
+              { id: 'audit',        label: 'Activity Log',      icon: History },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
           </SidebarGroup>
 
@@ -1288,18 +1290,12 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
                 onChangeProject={handleContextBarProjectChange}
                 onChangeSprint={setCurrentSprintId}
                 onGoToProjectHub={() => setActiveTab('projects')}
-                moduleName="QA Dashboard"
+                moduleName="Live Dashboard"
               />
-              <DashboardMetrics
-                testCases={filteredTestCases}
-                defects={filteredDefectHotspots}
-                vulnerabilities={filteredVulnerabilities}
-                performanceConfigs={filteredPerformanceConfigs}
-                onTriggerRerun={handleRerunMockTestCase}
-                onApplyHeal={handleApplyHealMock}
-                onNavigateToModule={handleNavigateToModule}
-                onNavigateToAgentic={() => setActiveTab('agentic')}
-                onNavigateTo={setActiveTab}
+              <LiveDashboard
+                currentProjectId={currentProjectId}
+                currentSprintId={currentSprintId}
+                onNavigateTo={(t) => setActiveTab(t as any)}
               />
             </div>
           )}
@@ -1401,14 +1397,12 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
                 onChangeProject={handleContextBarProjectChange}
                 onChangeSprint={setCurrentSprintId}
                 onGoToProjectHub={() => setActiveTab('projects')}
-                moduleName="Impact & Defect Analysis"
+                moduleName="Defects & Bugs"
               />
-              <DefectPredictTab
-                defects={filteredDefectHotspots}
-                impactReports={impactReports}
-                onPredictHotspots={handlePredictHotspots}
-                onAnalyzeImpact={handleAnalyzeImpact}
-                isAnalyzing={isAnalyzingImpact}
+              <DefectsManager
+                currentProjectId={currentProjectId}
+                currentSprintId={currentSprintId}
+                onNavigateTo={(t) => setActiveTab(t as any)}
               />
             </div>
           )}
