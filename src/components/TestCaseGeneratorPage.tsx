@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Sparkles, 
-  Plus, 
-  HelpCircle, 
-  CheckCircle, 
-  Cpu, 
-  AlertTriangle, 
-  Play, 
-  RefreshCcw, 
-  Filter, 
-  Check, 
-  Clipboard, 
+import {
+  Sparkles,
+  Plus,
+  HelpCircle,
+  CheckCircle,
+  Cpu,
+  AlertTriangle,
+  Play,
+  RefreshCcw,
+  Filter,
+  Check,
+  Clipboard,
   Settings2,
   TableProperties,
   Edit2,
@@ -27,13 +27,37 @@ import {
   ArrowRight,
   Zap,
   BarChart2,
-  Bot
+  Bot,
+  Link2,
+  ChevronRight,
+  ChevronDown,
+  Layers,
+  ClipboardList,
+  CheckSquare,
+  Square,
+  Globe,
+  AlignLeft,
+  BookOpen,
+  RotateCcw,
 } from 'lucide-react';
-import { TestCase } from '../types';
+import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
+
+interface Scenario {
+  id: string;
+  title: string;
+  type: 'Positive' | 'Negative' | 'Edge' | 'Boundary';
+  priority: 'P0' | 'P1' | 'P2' | 'P3';
+  description: string;
+  requirementRef?: string;
+  approved: boolean | null; // null = not reviewed, true = approved, false = rejected
+}
 
 interface TestCaseGeneratorPageProps {
   testCases: TestCase[];
+  requirements: RequirementDoc[];
   onTriggerRerun: (id: string) => void;
   onApplyHeal: (id: string) => void;
   onAddManualTestCase?: (tc: TestCase) => void;
@@ -43,8 +67,38 @@ interface TestCaseGeneratorPageProps {
   onNavigateToScripts?: () => void;
 }
 
+// ── Wizard step type ──────────────────────────────────────────────────────────
+
+type WizardStep = 'source' | 'scenarios' | 'approve' | 'details';
+
+const STEP_LABELS: { key: WizardStep; label: string; icon: React.ElementType }[] = [
+  { key: 'source',    label: '1. Requirements Source', icon: BookOpen },
+  { key: 'scenarios', label: '2. Generate Scenarios',   icon: Sparkles },
+  { key: 'approve',   label: '3. Review & Approve',     icon: CheckSquare },
+  { key: 'details',   label: '4. Full Test Cases',       icon: ClipboardList },
+];
+
+// ── Priority / Type badge helpers ─────────────────────────────────────────────
+
+const priorityColor: Record<string, string> = {
+  P0: 'bg-red-100 text-red-700 border border-red-200',
+  P1: 'bg-orange-100 text-orange-700 border border-orange-200',
+  P2: 'bg-blue-100 text-blue-700 border border-blue-200',
+  P3: 'bg-slate-100 text-slate-600 border border-slate-200',
+};
+
+const typeColor: Record<string, string> = {
+  Positive:  'bg-green-100 text-green-700',
+  Negative:  'bg-red-100 text-red-700',
+  Edge:      'bg-purple-100 text-purple-700',
+  Boundary:  'bg-yellow-100 text-yellow-700',
+};
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+
 export default function TestCaseGeneratorPage({
   testCases,
+  requirements,
   onTriggerRerun,
   onApplyHeal,
   onAddManualTestCase,
@@ -53,54 +107,271 @@ export default function TestCaseGeneratorPage({
   currentSprintId,
   onNavigateToScripts,
 }: TestCaseGeneratorPageProps) {
-  const [selectedTestCase, setSelectedTestCase] = useState<TestCase | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [tcPriority, setTcPriority] = useState<'P0' | 'P1' | 'P2' | 'P3'>('P0');
-  const [tcType, setTcType] = useState<string>('Positive');
-  const [tcTitle, setTcTitle] = useState('');
-  const [tcDesc, setTcDesc] = useState('');
-  const [tcPreconditions, setTcPreconditions] = useState('');
-  const [tcSteps, setTcSteps] = useState('');
-  const [tcTestData, setTcTestData] = useState('');
-  
-  // Local state for interactive testcases
+
+  // ── Wizard navigation ──────────────────────────────────────────────────────
+  const [wizardStep, setWizardStep] = useState<WizardStep>('source');
+
+  // ── Source step state ──────────────────────────────────────────────────────
+  type SourceMode = 'existing' | 'text' | 'url' | 'file';
+  const [sourceMode, setSourceMode] = useState<SourceMode>('existing');
+  const [selectedReqIds, setSelectedReqIds] = useState<Set<string>>(new Set());
+  const [pastedText, setPastedText] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceUrlLoading, setSourceUrlLoading] = useState(false);
+  const [fetchedUrlContent, setFetchedUrlContent] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedFileContent, setUploadedFileContent] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Scenario generation step ───────────────────────────────────────────────
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [generatingScenarios, setGeneratingScenarios] = useState(false);
+  const [scenarioError, setScenarioError] = useState('');
+  const [scenarioCount, setScenarioCount] = useState(8);
+  const [includeTypes, setIncludeTypes] = useState<Set<string>>(new Set(['Positive', 'Negative', 'Edge', 'Boundary']));
+
+  // ── Approve step ───────────────────────────────────────────────────────────
+  const [approvalFeedback, setApprovalFeedback] = useState('');
+
+  // ── Details generation step ────────────────────────────────────────────────
+  const [generatedTCs, setGeneratedTCs] = useState<TestCase[]>([]);
+  const [generatingDetails, setGeneratingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+  const [selectedTC, setSelectedTC] = useState<TestCase | null>(null);
+
+  // ── TMS Push state ─────────────────────────────────────────────────────────
+  const [showTmsPushPanel, setShowTmsPushPanel] = useState(false);
+  const [tmsPushConfig, setTmsPushConfig] = useState({ tmsType: 'jira', baseUrl: '', projectKey: '', token: '', testCaseType: 'Test' });
+  const [tmsPushing, setTmsPushing] = useState(false);
+  const [tmsPushResult, setTmsPushResult] = useState<{ pushed: number; failed: number; urls: string[] } | null>(null);
+
+  // ── Existing TC list (from props) ──────────────────────────────────────────
   const [localTestCases, setLocalTestCases] = useState<TestCase[]>(testCases);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [tcViewMode, setTcViewMode] = useState<'wizard' | 'list'>('wizard');
   const [feedback, setFeedback] = useState('');
-  const [editingTestCase, setEditingTestCase] = useState<TestCase | null>(null);
 
-  // Export & Regenerate states
-  const [isExporting, setIsExporting] = useState(false);
-  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
-  const [regenFeedback, setRegenFeedback] = useState<Record<string, string>>({});
-
-  // REQ-36: TC approval state
-  const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [approvalMap, setApprovalMap] = useState<Record<string, 'pending'|'approved'|'rejected'>>({});
-  const [approvalMsg, setApprovalMsg] = useState('');
-
-  // REQ-13: TC tagging state
-  const [tagsMap, setTagsMap] = useState<Record<string, string[]>>({});
-  const [tagInput, setTagInput] = useState<Record<string, string>>({});
-  const [activeTagFilter, setActiveTagFilter] = useState<string>('');
-
-  // REQ-28: Clone state
-  const [cloningId, setCloningId] = useState<string | null>(null);
-
-  // REQ-16: Inline step editor state
-  const [editingStepsId, setEditingStepsId] = useState<string | null>(null);
-  const [editingSteps, setEditingSteps] = useState<{ action: string; expectedResult: string }[]>([]);
-  const [savingSteps, setSavingSteps] = useState(false);
-
-  // REQ-18: Bulk priority state
-  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
-  const [bulkPriority, setBulkPriority] = useState<'P0' | 'P1' | 'P2' | 'P3'>('P1');
-  const [bulkUpdating, setBulkUpdating] = useState(false);
-
-  // GAP-06: Automation feasibility analysis state
+  // ── Feasibility ───────────────────────────────────────────────────────────
   const [showFeasibilityPanel, setShowFeasibilityPanel] = useState(false);
   const [feasibilityRunning, setFeasibilityRunning] = useState(false);
   const [feasibilityResults, setFeasibilityResults] = useState<any[]>([]);
   const [feasibilitySummary, setFeasibilitySummary] = useState<any>(null);
+
+  // ── Sync with parent testCases prop ───────────────────────────────────────
+  useEffect(() => {
+    setLocalTestCases(testCases);
+  }, [testCases]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  const token = () => localStorage.getItem('iq_token') || '';
+  const authH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
+
+  const toast = (msg: string, ms = 3500) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(''), ms);
+  };
+
+  // ── Source step helpers ───────────────────────────────────────────────────
+
+  const filteredRequirements = currentProjectId === 'ALL'
+    ? requirements
+    : requirements.filter(r => !r.projectId || r.projectId === currentProjectId);
+
+  const toggleReqSelection = (id: string) => {
+    setSelectedReqIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllReqs = () => {
+    setSelectedReqIds(new Set(filteredRequirements.map(r => r.id)));
+  };
+
+  const clearReqSelection = () => setSelectedReqIds(new Set());
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => setUploadedFileContent(ev.target?.result as string || '');
+    reader.readAsText(file);
+  };
+
+  const handleFetchUrl = async () => {
+    if (!sourceUrl.trim()) return;
+    setSourceUrlLoading(true);
+    setFetchedUrlContent('');
+    try {
+      const res = await fetch('/api/quality/requirements/fetch-url', {
+        method: 'POST',
+        headers: authH(),
+        body: JSON.stringify({ url: sourceUrl }),
+      });
+      const data = await res.json();
+      if (data.content) {
+        setFetchedUrlContent(data.content);
+        toast(`✅ Fetched content from URL (${data.content.length} chars)`);
+      } else {
+        setFetchedUrlContent('');
+        toast(`⚠️ Could not fetch content: ${data.error || 'unknown error'}`);
+      }
+    } catch (e: any) {
+      toast(`⚠️ Fetch failed: ${e.message}`);
+    } finally {
+      setSourceUrlLoading(false);
+    }
+  };
+
+  // Compose the requirements text to send to AI from whatever source mode is active
+  const buildRequirementsPayload = (): string => {
+    if (sourceMode === 'existing') {
+      const selected = filteredRequirements.filter(r => selectedReqIds.has(r.id));
+      if (selected.length === 0) return '';
+      return selected.map(r => `## ${r.title}\n${r.content}`).join('\n\n---\n\n');
+    }
+    if (sourceMode === 'text') return pastedText.trim();
+    if (sourceMode === 'url') return fetchedUrlContent.trim();
+    if (sourceMode === 'file') return uploadedFileContent.trim();
+    return '';
+  };
+
+  const canProceedToScenarios = (): boolean => {
+    if (sourceMode === 'existing') return selectedReqIds.size > 0;
+    if (sourceMode === 'text') return pastedText.trim().length > 10;
+    if (sourceMode === 'url') return fetchedUrlContent.length > 10;
+    if (sourceMode === 'file') return uploadedFileContent.length > 10;
+    return false;
+  };
+
+  // ── Scenario generation ───────────────────────────────────────────────────
+
+  const handleGenerateScenarios = async () => {
+    const requirementsText = buildRequirementsPayload();
+    if (!requirementsText) {
+      setScenarioError('No requirements content found. Go back and select/enter requirements.');
+      return;
+    }
+    setGeneratingScenarios(true);
+    setScenarioError('');
+    setScenarios([]);
+    try {
+      const res = await fetch('/api/quality/testcases/generate-scenarios', {
+        method: 'POST',
+        headers: authH(),
+        body: JSON.stringify({
+          requirementsText,
+          count: scenarioCount,
+          types: Array.from(includeTypes),
+          projectId: currentProjectId,
+        }),
+      });
+      const data = await res.json();
+      if (data.scenarios && Array.isArray(data.scenarios)) {
+        setScenarios(data.scenarios.map((s: any) => ({ ...s, approved: null })));
+        setWizardStep('approve');
+      } else {
+        setScenarioError(data.error || 'AI returned no scenarios. Please try again.');
+      }
+    } catch (e: any) {
+      setScenarioError(`Generation failed: ${e.message}`);
+    } finally {
+      setGeneratingScenarios(false);
+    }
+  };
+
+  // ── Approval step ─────────────────────────────────────────────────────────
+
+  const toggleApproval = (id: string, value: boolean) => {
+    setScenarios(prev => prev.map(s => s.id === id ? { ...s, approved: value } : s));
+  };
+
+  const approveAll = () => setScenarios(prev => prev.map(s => ({ ...s, approved: true })));
+  const rejectAll  = () => setScenarios(prev => prev.map(s => ({ ...s, approved: false })));
+
+  const approvedScenarios = scenarios.filter(s => s.approved === true);
+  const canGenerateDetails = approvedScenarios.length > 0;
+
+  // ── Details generation ────────────────────────────────────────────────────
+
+  const handleGenerateDetails = async () => {
+    if (!canGenerateDetails) return;
+    setGeneratingDetails(true);
+    setDetailsError('');
+    setGeneratedTCs([]);
+    try {
+      const res = await fetch('/api/quality/testcases/generate-details', {
+        method: 'POST',
+        headers: authH(),
+        body: JSON.stringify({
+          scenarios: approvedScenarios,
+          requirementsText: buildRequirementsPayload(),
+          projectId: currentProjectId,
+        }),
+      });
+      const data = await res.json();
+      if (data.testCases && Array.isArray(data.testCases)) {
+        setGeneratedTCs(data.testCases);
+        setWizardStep('details');
+      } else {
+        setDetailsError(data.error || 'AI returned no test cases. Please try again.');
+      }
+    } catch (e: any) {
+      setDetailsError(`Generation failed: ${e.message}`);
+    } finally {
+      setGeneratingDetails(false);
+    }
+  };
+
+  // ── Save generated TCs to app state ──────────────────────────────────────
+
+  const handleSaveAllGenerated = () => {
+    generatedTCs.forEach(tc => onAddManualTestCase?.({ ...tc, projectId: currentProjectId }));
+    setLocalTestCases(prev => [...generatedTCs.map(tc => ({ ...tc, projectId: currentProjectId })), ...prev]);
+    toast(`✅ Saved ${generatedTCs.length} test cases to project!`);
+    // Reset wizard for another round
+    setTimeout(() => {
+      setWizardStep('source');
+      setGeneratedTCs([]);
+      setScenarios([]);
+      setSelectedReqIds(new Set());
+      setPastedText('');
+      setFetchedUrlContent('');
+      setUploadedFileContent('');
+    }, 2000);
+  };
+
+  // ── TMS Push handler ──────────────────────────────────────────────────────
+
+  const handlePushToTMS = async () => {
+    if (generatedTCs.length === 0) { toast('❌ No test cases to push'); return; }
+    if (!tmsPushConfig.baseUrl && tmsPushConfig.tmsType !== 'demo') { toast('❌ TMS Base URL required'); return; }
+    setTmsPushing(true);
+    setTmsPushResult(null);
+    try {
+      const res = await fetch('/api/quality/integrations/tms/push-testcases', {
+        method: 'POST',
+        headers: authH(),
+        body: JSON.stringify({ ...tmsPushConfig, testCases: generatedTCs }),
+      });
+      const data = await res.json();
+      if (data.pushed !== undefined) {
+        setTmsPushResult({ pushed: data.pushed, failed: data.failed || 0, urls: data.urls || [] });
+        toast(`✅ Pushed ${data.pushed} test cases to ${tmsPushConfig.tmsType.toUpperCase()}`);
+      } else {
+        toast(`❌ TMS push failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      toast(`❌ Network error: ${e.message}`);
+    } finally {
+      setTmsPushing(false);
+    }
+  };
+
+  // ── Feasibility analysis ──────────────────────────────────────────────────
 
   const runFeasibilityAnalysis = async () => {
     if (localTestCases.length === 0) return;
@@ -108,25 +379,25 @@ export default function TestCaseGeneratorPage({
     setFeasibilityResults([]);
     setFeasibilitySummary(null);
     try {
-      const token = localStorage.getItem('iq_token') || '';
       const res = await fetch('/api/quality/testcases/feasibility-analysis', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: authH(),
         body: JSON.stringify({
           test_cases: localTestCases.slice(0, 30).map(tc => ({
             id: tc.id, title: tc.title, type: tc.type,
-            steps: tc.steps?.length || 0, priority: tc.priority
-          }))
-        })
+            steps: tc.steps?.length || 0, priority: tc.priority,
+          })),
+        }),
       });
       const data = await res.json();
       if (data.results) {
         setFeasibilityResults(data.results);
         setFeasibilitySummary(data.summary);
-        // Update local state with AI verdicts
         setLocalTestCases(prev => prev.map(tc => {
           const r = data.results.find((x: any) => x.id === tc.id);
-          return r ? { ...tc, automationStatus: r.verdict === 'Automatable' ? 'Automatable' : r.verdict === 'Manual Only' ? 'Needs Manual' : tc.automationStatus, confidenceScore: r.confidence_score ?? tc.confidenceScore } : tc;
+          return r
+            ? { ...tc, automationStatus: r.verdict === 'Automatable' ? 'Automatable' : r.verdict === 'Manual Only' ? 'Needs Manual' : tc.automationStatus, confidenceScore: r.confidence_score ?? tc.confidenceScore }
+            : tc;
         }));
       }
     } catch (e: any) {
@@ -134,30 +405,9 @@ export default function TestCaseGeneratorPage({
     } finally { setFeasibilityRunning(false); }
   };
 
-  // REQ-26: Bulk import state
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importJson, setImportJson] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; failed: number } | null>(null);
-  const bulkFileRef = useRef<HTMLInputElement>(null);
+  // ── Export ────────────────────────────────────────────────────────────────
 
-  // Sync state whenever parent props update (CRITICAL for project-level separation)
-  useEffect(() => {
-    setLocalTestCases(testCases);
-  }, [testCases]);
-
-  // Handle local simulation rerun
-  const handleRerun = (id: string) => {
-    onTriggerRerun(id);
-    setLocalTestCases(prev => prev.map(tc => tc.id === id ? { ...tc, confidenceScore: 100 } : tc));
-    setFeedback(`TestCase ${id} simulation rerun passed successfully!`);
-    setTimeout(() => setFeedback(''), 3000);
-  };
-
-  // Export test cases
   const handleExport = async (format: 'csv' | 'json') => {
-    setIsExporting(true);
     try {
       const params = new URLSearchParams({ format });
       if (currentProjectId && currentProjectId !== 'ALL') params.set('projectId', currentProjectId);
@@ -165,1204 +415,857 @@ export default function TestCaseGeneratorPage({
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `testcases-export.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setFeedback(`Exported ${filteredCases.length} test cases as ${format.toUpperCase()}`);
-      setTimeout(() => setFeedback(''), 3000);
+      a.href = url; a.download = `testcases-export.${format}`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      toast(`Exported test cases as ${format.toUpperCase()}`);
     } catch (e: any) {
-      setFeedback(`Export failed: ${e.message}`);
-      setTimeout(() => setFeedback(''), 3000);
-    } finally {
-      setIsExporting(false);
+      toast(`Export failed: ${e.message}`);
     }
   };
 
-  // AI Regenerate a test case with optional feedback
-  const handleRegenerate = async (tc: TestCase, userFeedback?: string) => {
-    setRegeneratingId(tc.id);
-    try {
-      const res = await fetch(`/api/quality/testcases/${tc.id}/regenerate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback: userFeedback || '' })
-      });
-      const data = await res.json();
-      if (data.success && data.testCase) {
-        setLocalTestCases(prev => prev.map(t => t.id === tc.id ? { ...t, ...data.testCase } : t));
-        setFeedback(`AI regenerated ${tc.id} successfully!`);
-        setTimeout(() => setFeedback(''), 3000);
-      }
-    } catch (e: any) {
-      setFeedback(`Regeneration failed: ${e.message}`);
-      setTimeout(() => setFeedback(''), 3000);
-    } finally {
-      setRegeneratingId(null);
-      setRegenFeedback(prev => ({ ...prev, [tc.id]: '' }));
-    }
-  };
-
-  const handleHeal = (id: string) => {
-    onApplyHeal(id);
-    setLocalTestCases(prev => prev.map(tc => tc.id === id ? { ...tc, automationStatus: 'Automated', confidenceScore: 99 } : tc));
-    setFeedback(`Injected real-time DOM telemetry repair on ${id}. Selector locator healed!`);
-    setTimeout(() => setFeedback(''), 3000);
-  };
-
-  // REQ-36: TC approval/sign-off
-  const handleApprove = async (tc: TestCase, action: 'approve' | 'reject') => {
-    setApprovingId(tc.id);
-    try {
-      const token = localStorage.getItem('iq_token');
-      const res = await fetch(`/api/quality/testcases/${tc.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action, approvedBy: 'qa-lead' })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setApprovalMap(prev => ({ ...prev, [tc.id]: data.status }));
-        setApprovalMsg(`${tc.id} ${data.status}`);
-        setTimeout(() => setApprovalMsg(''), 3000);
-      }
-    } catch (e: any) {
-      setApprovalMsg(`Approval failed: ${e.message}`);
-      setTimeout(() => setApprovalMsg(''), 3000);
-    } finally { setApprovingId(null); }
-  };
-
-  // REQ-13: Save tags for a TC
-  const handleSaveTags = async (tcId: string) => {
-    const raw = tagInput[tcId] || '';
-    const tags = raw.split(',').map(t => t.trim()).filter(Boolean);
-    try {
-      const token = localStorage.getItem('iq_token');
-      await fetch(`/api/quality/testcases/${tcId}/tags`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ tags })
-      });
-      setTagsMap(prev => ({ ...prev, [tcId]: tags }));
-      setTagInput(prev => ({ ...prev, [tcId]: '' }));
-    } catch { /* silent */ }
-  };
-
-  // REQ-16: Save inline steps to backend
-  const handleSaveSteps = async (tcId: string) => {
-    setSavingSteps(true);
-    try {
-      const token = localStorage.getItem('iq_token');
-      const res = await fetch(`/api/quality/testcases/${tcId}/steps`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ steps: editingSteps })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setLocalTestCases(prev => prev.map(tc => tc.id === tcId ? { ...tc, steps: editingSteps } : tc));
-        setFeedback(`Steps for ${tcId} saved successfully!`);
-        setEditingStepsId(null);
-        setTimeout(() => setFeedback(''), 3000);
-      }
-    } catch (e: any) {
-      setFeedback(`Steps save failed: ${e.message}`);
-      setTimeout(() => setFeedback(''), 3000);
-    } finally { setSavingSteps(false); }
-  };
-
-  // REQ-18: Bulk priority update
-  const handleBulkPriorityUpdate = async () => {
-    if (bulkSelected.size === 0) return;
-    setBulkUpdating(true);
-    try {
-      const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/testcases/bulk-priority', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ids: Array.from(bulkSelected), priority: bulkPriority })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setLocalTestCases(prev => prev.map(tc => bulkSelected.has(tc.id) ? { ...tc, priority: bulkPriority } : tc));
-        setFeedback(`Updated priority to ${bulkPriority} for ${data.updated} test case(s)`);
-        setBulkSelected(new Set());
-        setTimeout(() => setFeedback(''), 3000);
-      }
-    } catch (e: any) {
-      setFeedback(`Bulk update failed: ${e.message}`);
-      setTimeout(() => setFeedback(''), 3000);
-    } finally { setBulkUpdating(false); }
-  };
-
-  // REQ-28: Clone test case
-  const handleClone = async (tc: TestCase) => {
-    setCloningId(tc.id);
-    try {
-      const res = await fetch(`/api/quality/testcases/${tc.id}/clone`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success && data.testCase) {
-        setLocalTestCases(prev => [...prev, data.testCase]);
-        setFeedback(`Cloned ${tc.id} → ${data.testCase.id}`);
-        setTimeout(() => setFeedback(''), 3000);
-      }
-    } catch (e: any) {
-      setFeedback(`Clone failed: ${e.message}`);
-      setTimeout(() => setFeedback(''), 3000);
-    } finally { setCloningId(null); }
-  };
-
-  // REQ-26: Bulk import test cases
-  const handleBulkImport = async () => {
-    setImporting(true);
-    try {
-      const formData = new FormData();
-      if (importFile) {
-        formData.append('file', importFile);
-      } else if (importJson.trim()) {
-        formData.append('testCasesJson', importJson.trim());
-      } else {
-        setFeedback('Provide a CSV file or JSON data to import.');
-        setTimeout(() => setFeedback(''), 3000);
-        return;
-      }
-      const res = await fetch('/api/quality/testcases/bulk-import', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        setImportResult({ imported: data.imported, failed: data.failed });
-        setLocalTestCases(prev => [...prev, ...(data.testCases || [])]);
-        setFeedback(`Imported ${data.imported} test cases successfully!`);
-        setTimeout(() => setFeedback(''), 4000);
-        setImportFile(null); setImportJson('');
-      } else {
-        setFeedback(`Import failed: ${data.error}`);
-        setTimeout(() => setFeedback(''), 3000);
-      }
-    } catch (e: any) {
-      setFeedback(`Import error: ${e.message}`);
-      setTimeout(() => setFeedback(''), 3000);
-    } finally { setImporting(false); }
-  };
+  // ── Filtered TC list ──────────────────────────────────────────────────────
 
   const categories = ['all', 'Positive', 'Negative', 'Edge', 'Boundary'];
+  const filteredCases = localTestCases.filter(tc =>
+    (activeCategory === 'all' || tc.type === activeCategory)
+  );
 
-  const filteredCases = localTestCases.filter(tc => {
-    const catOk = activeCategory === 'all' || tc.type.toLowerCase() === activeCategory.toLowerCase();
-    const tagOk = !activeTagFilter || (tagsMap[tc.id] || []).includes(activeTagFilter);
-    return catOk && tagOk;
-  });
+  // ── Render helpers ─────────────────────────────────────────────────────────
 
-  // All unique tags across TCs (REQ-13)
-  const allTags = Array.from(new Set(Object.values(tagsMap).flat())).filter(Boolean);
+  const renderStepIndicator = () => (
+    <div className="flex items-center gap-0 mb-6">
+      {STEP_LABELS.map((step, idx) => {
+        const currentIdx = STEP_LABELS.findIndex(s => s.key === wizardStep);
+        const isActive    = step.key === wizardStep;
+        const isCompleted = idx < currentIdx;
+        const Icon = step.icon;
+        return (
+          <React.Fragment key={step.key}>
+            <button
+              onClick={() => isCompleted ? setWizardStep(step.key) : undefined}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                ${isActive    ? 'bg-blue-600 text-white shadow-md' :
+                  isCompleted ? 'bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer' :
+                                'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{step.label}</span>
+              {isCompleted && <Check className="w-3 h-3 ml-0.5" />}
+            </button>
+            {idx < STEP_LABELS.length - 1 && (
+              <ChevronRight className={`w-4 h-4 shrink-0 mx-0.5 ${isCompleted ? 'text-green-400' : 'text-slate-300'}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
 
-  const handleCreateCase = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tcTitle.trim() || !tcDesc.trim()) return;
+  // ── STEP 1: Requirements Source ───────────────────────────────────────────
 
-    const idSuffix = Math.floor(Math.random() * 900) + 100;
-    const newCase: TestCase = {
-      id: `TC-${idSuffix}`,
-      title: tcTitle,
-      description: tcDesc,
-      priority: tcPriority as any,
-      type: tcType as any,
-      preconditions: tcPreconditions || 'User logged back inside active workspace.',
-      automationStatus: 'Needs Manual',
-      confidenceScore: 82,
-      testData: tcTestData || '{"userId": "demo-qa"}',
-      steps: tcSteps ? tcSteps.split('\n').map(step => ({ action: step, expectedResult: 'Assert target status behaves correctly.' })) : [
-        { action: 'Access main application index layout URL', expectedResult: 'State responds and sets components.' }
-      ]
-    };
+  const renderSourceStep = () => (
+    <div className="space-y-4 animate-fadeInUp">
+      <div className="glass-card p-5">
+        <h3 className="panel-title flex items-center gap-2 mb-1">
+          <BookOpen className="w-4 h-4 text-blue-500" />
+          Requirements Source
+          <span className="chip">Step 1</span>
+        </h3>
+        <p className="text-xs text-slate-500 mb-4">
+          Choose where the AI should pull requirements from to generate test scenarios.
+        </p>
 
-    if (onAddManualTestCase) {
-      onAddManualTestCase(newCase);
-    }
-    setLocalTestCases(prev => [newCase, ...prev]);
+        {/* Source mode tabs */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {[
+            { key: 'existing', label: 'From Requirements Tab', icon: Layers },
+            { key: 'text',     label: 'Paste Text',            icon: AlignLeft },
+            { key: 'url',      label: 'From URL',              icon: Globe },
+            { key: 'file',     label: 'Upload File',           icon: Upload },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setSourceMode(key as SourceMode)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
+                ${sourceMode === key
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
 
-    // Clear Form
-    setTcTitle('');
-    setTcDesc('');
-    setTcPreconditions('');
-    setTcSteps('');
-    setTcTestData('');
-    setFeedback(`Manual test case ${newCase.id} appended to current suite inventory!`);
-    setTimeout(() => setFeedback(''), 4000);
-  };
-
-  const getProjectBadgeStr = () => {
-    if (!currentProjectId || currentProjectId === 'ALL') return '🗂 All Projects';
-    return `📁 ${currentProjectId}`;
-  };
-
-  return (
-    <div className="space-y-6">
-      
-      {/* GAP-06: AI Feasibility Analysis Panel */}
-      {showFeasibilityPanel && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
-                  <Bot className="w-5 h-5 text-violet-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800">AI Automation Feasibility Analysis</h3>
-                  <p className="text-xs text-slate-500">AI scores each test case for automation suitability before execution</p>
-                </div>
+        {/* Source: Existing Requirements */}
+        {sourceMode === 'existing' && (
+          <div>
+            {filteredRequirements.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs font-mono border-2 border-dashed border-slate-200 rounded-xl">
+                <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                No requirements found for this project.
+                <br />Go to the <strong>Requirements</strong> tab to upload or add requirements first.
               </div>
-              <button onClick={() => setShowFeasibilityPanel(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {feasibilityRunning && (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center animate-pulse">
-                    <Bot className="w-6 h-6 text-violet-600" />
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-slate-500">{filteredRequirements.length} requirement(s) available — {selectedReqIds.size} selected</span>
+                  <div className="flex gap-2">
+                    <button onClick={selectAllReqs} className="text-xs text-blue-600 hover:underline">Select All</button>
+                    <span className="text-slate-300">|</span>
+                    <button onClick={clearReqSelection} className="text-xs text-slate-500 hover:underline">Clear</button>
                   </div>
-                  <p className="text-sm font-medium text-slate-700">Analysing {localTestCases.length} test cases…</p>
-                  <p className="text-xs text-slate-400">AI is evaluating automation complexity, UI dependencies, and data requirements</p>
                 </div>
-              )}
-
-              {!feasibilityRunning && feasibilitySummary?.error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                  ⚠️ {feasibilitySummary.error} — ensure an LLM is configured in <strong>AI Model Config</strong>.
-                </div>
-              )}
-
-              {!feasibilityRunning && feasibilitySummary && !feasibilitySummary.error && (
-                <>
-                  {/* Summary cards */}
-                  <div className="grid grid-cols-4 gap-3">
-                    {[
-                      { label: 'Automatable', val: feasibilitySummary.automatable ?? 0, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
-                      { label: 'Semi-Auto', val: feasibilitySummary.semi_auto ?? 0, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
-                      { label: 'Manual Only', val: feasibilitySummary.manual_only ?? 0, color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
-                      { label: 'Avg. Confidence', val: `${feasibilitySummary.avg_confidence ?? 0}%`, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
-                    ].map(c => (
-                      <div key={c.label} className={`${c.bg} ${c.border} border rounded-xl p-3 text-center`}>
-                        <div className={`text-xl font-black ${c.color}`}>{c.val}</div>
-                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{c.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Per-TC results */}
-                  <div className="space-y-2">
-                    {feasibilityResults.map((r: any) => {
-                      const color = r.verdict === 'Automatable' ? 'border-green-200 bg-green-50' : r.verdict === 'Manual Only' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50';
-                      const badge = r.verdict === 'Automatable' ? 'bg-green-100 text-green-700' : r.verdict === 'Manual Only' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
-                      return (
-                        <div key={r.id} className={`flex items-start gap-3 p-3 rounded-xl border ${color}`}>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-[10px] text-slate-500">{r.id}</span>
-                              <span className="text-xs font-semibold text-slate-800 truncate">{r.title}</span>
-                            </div>
-                            {r.rationale && <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{r.rationale}</p>}
-                            {r.blockers?.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {r.blockers.map((b: string, i: number) => <span key={i} className="text-[9px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono border border-slate-200">{b}</span>)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="shrink-0 flex flex-col items-end gap-1">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold font-mono ${badge}`}>{r.verdict}</span>
-                            <span className="text-[10px] text-slate-500 font-mono">{r.confidence_score}% conf.</span>
+                <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin pr-1">
+                  {filteredRequirements.map(req => {
+                    const isSelected = selectedReqIds.has(req.id);
+                    return (
+                      <div
+                        key={req.id}
+                        onClick={() => toggleReqSelection(req.id)}
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all
+                          ${isSelected
+                            ? 'border-blue-400 bg-blue-50/60 glow-blue'
+                            : 'border-slate-200 bg-white/60 hover:border-blue-300'}`}
+                      >
+                        <div className="mt-0.5 shrink-0">
+                          {isSelected
+                            ? <CheckSquare className="w-4 h-4 text-blue-500" />
+                            : <Square className="w-4 h-4 text-slate-400" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-800 truncate">{req.title}</p>
+                          <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{req.content?.substring(0, 120)}…</p>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono
+                              ${req.sourceType === 'file'    ? 'bg-purple-100 text-purple-700' :
+                                req.sourceType === 'url'     ? 'bg-blue-100 text-blue-700' :
+                                req.sourceType === 'voice'   ? 'bg-green-100 text-green-700' :
+                                                               'bg-slate-100 text-slate-600'}`}>
+                              {req.sourceType}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-mono">{req.id}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-slate-100 flex justify-between items-center shrink-0">
-              <button
-                onClick={runFeasibilityAnalysis}
-                disabled={feasibilityRunning}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-xs font-semibold hover:bg-violet-700 disabled:opacity-50"
-              >
-                {feasibilityRunning ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                {feasibilityRunning ? 'Analysing…' : 'Re-analyse'}
-              </button>
-              <button onClick={() => setShowFeasibilityPanel(false)} className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* REQ-26: Bulk Import Modal */}
-      {showBulkImport && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <Upload className="w-4 h-4 text-blue-600" /> Bulk Import Test Cases
-              </h3>
-              <button onClick={() => { setShowBulkImport(false); setImportResult(null); }} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <p className="text-xs text-slate-500">Import test cases from a CSV file or paste JSON data. CSV headers: <span className="font-mono text-xs bg-slate-100 px-1 rounded">title, description, priority, type, preconditions, testData, steps</span></p>
-              
-              <div>
-                <label className="block text-[11px] font-mono uppercase text-slate-500 mb-1">Upload CSV File</label>
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  ref={bulkFileRef}
-                  onChange={e => setImportFile(e.target.files?.[0] || null)}
-                  aria-label="Upload CSV file for bulk import"
-                  className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                {importFile && <p className="text-[10px] text-blue-600 mt-1 font-mono">Selected: {importFile.name}</p>}
-              </div>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
-                <div className="relative flex justify-center text-[10px] font-mono text-slate-400"><span className="bg-white px-2">or paste JSON</span></div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase text-slate-500 mb-1">JSON Array</label>
-                <textarea
-                  placeholder='[{"title":"Login test","priority":"P1","type":"Positive","steps":"Enter username"}]'
-                  value={importJson}
-                  onChange={e => setImportJson(e.target.value)}
-                  rows={4}
-                  aria-label="JSON data for bulk import"
-                  className="w-full border border-slate-200 rounded-lg p-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              {importResult && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 font-mono">
-                  ✅ Imported {importResult.imported} test cases · {importResult.failed} failed
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </>
+            )}
+          </div>
+        )}
 
-              <div className="flex gap-2 justify-end">
-                <button onClick={() => { setShowBulkImport(false); setImportResult(null); }} className="px-4 py-2 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button
-                  onClick={handleBulkImport}
-                  disabled={importing || (!importFile && !importJson.trim())}
-                  aria-label="Start bulk import"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {importing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Importing...</> : <><Upload className="w-3.5 h-3.5" /> Import Now</>}
-                </button>
+        {/* Source: Paste Text */}
+        {sourceMode === 'text' && (
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+              Paste requirements, user stories, or feature descriptions
+            </label>
+            <textarea
+              value={pastedText}
+              onChange={e => setPastedText(e.target.value)}
+              placeholder={`Example:\n\nAs a user, I want to log in with email and password so that I can access my account.\n\nAcceptance criteria:\n- Valid credentials → redirect to dashboard\n- Invalid password → show "Invalid credentials" error\n- 3 failed attempts → lock account for 15 minutes`}
+              rows={10}
+              className="input-glass w-full font-mono text-xs"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">{pastedText.length} characters</p>
+          </div>
+        )}
+
+        {/* Source: URL */}
+        {sourceMode === 'url' && (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                value={sourceUrl}
+                onChange={e => setSourceUrl(e.target.value)}
+                placeholder="https://confluence.company.com/requirements/feature-x"
+                className="input-glass flex-1"
+              />
+              <button
+                onClick={handleFetchUrl}
+                disabled={!sourceUrl.trim() || sourceUrlLoading}
+                className="btn-primary flex items-center gap-1.5 shrink-0"
+              >
+                {sourceUrlLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                {sourceUrlLoading ? 'Fetching…' : 'Fetch'}
+              </button>
+            </div>
+            {fetchedUrlContent && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
+                <p className="text-xs text-green-700 font-medium mb-1">✅ Content fetched ({fetchedUrlContent.length} chars)</p>
+                <pre className="text-[10px] text-green-800 font-mono whitespace-pre-wrap line-clamp-5">
+                  {fetchedUrlContent.substring(0, 400)}…
+                </pre>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Source: File Upload */}
+        {sourceMode === 'file' && (
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,.csv,.json,.pdf,.docx"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all"
+            >
+              <Upload className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+              <p className="text-sm text-slate-600 font-medium">
+                {uploadedFileName ? uploadedFileName : 'Click to upload requirements file'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">TXT, Markdown, CSV, JSON, PDF, DOCX</p>
+            </div>
+            {uploadedFileContent && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+                <p className="text-xs text-green-700 font-medium mb-1">✅ File loaded: {uploadedFileName} ({uploadedFileContent.length} chars)</p>
+                <pre className="text-[10px] text-green-800 font-mono whitespace-pre-wrap line-clamp-4">
+                  {uploadedFileContent.substring(0, 300)}…
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Proceed button */}
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={() => setWizardStep('scenarios')}
+            disabled={!canProceedToScenarios()}
+            className="btn-primary flex items-center gap-2 disabled:opacity-40"
+          >
+            Next: Configure Scenarios
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── STEP 2: Scenario Generation Config ────────────────────────────────────
+
+  const renderScenariosStep = () => (
+    <div className="space-y-4 animate-fadeInUp">
+      <div className="glass-card p-5">
+        <h3 className="panel-title flex items-center gap-2 mb-1">
+          <Sparkles className="w-4 h-4 text-purple-500" />
+          AI Scenario Generation
+          <span className="chip">Step 2</span>
+        </h3>
+        <p className="text-xs text-slate-500 mb-4">
+          AI will generate lightweight scenario titles and descriptions from your requirements. You'll review them before full test cases are created.
+        </p>
+
+        {/* Summary of source */}
+        <div className="p-3 bg-blue-50/60 border border-blue-200/60 rounded-xl mb-4">
+          <p className="text-xs text-blue-700 font-medium">
+            {sourceMode === 'existing'
+              ? `📋 ${selectedReqIds.size} requirement(s) selected`
+              : sourceMode === 'text'
+              ? `📝 Pasted text (${pastedText.length} chars)`
+              : sourceMode === 'url'
+              ? `🌐 URL: ${sourceUrl}`
+              : `📁 File: ${uploadedFileName}`}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          {/* Number of scenarios */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+              Scenarios to Generate
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={3}
+                max={20}
+                value={scenarioCount}
+                onChange={e => setScenarioCount(+e.target.value)}
+                className="flex-1"
+              />
+              <span className="text-sm font-bold text-blue-600 w-6 text-right">{scenarioCount}</span>
+            </div>
+          </div>
+
+          {/* Test types */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">
+              Include Test Types
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {['Positive', 'Negative', 'Edge', 'Boundary'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setIncludeTypes(prev => {
+                    const next = new Set(prev);
+                    if (next.has(t)) next.delete(t); else next.add(t);
+                    return next;
+                  })}
+                  className={`text-xs px-2 py-0.5 rounded-full border font-medium transition-all
+                    ${includeTypes.has(t) ? typeColor[t] + ' border-current' : 'bg-slate-100 text-slate-400 border-slate-200'}`}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Page Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
-        <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <TableProperties style={{width:20,height:20,color:'#ffffff'}} />
+        {scenarioError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+            <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />{scenarioError}
           </div>
-          <div>
-            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Test Cases</h1>
-            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Generate, review and manage your test suite · <span style={{color:'#1e96df',fontWeight:600}}>{getProjectBadgeStr()}</span></p>
-          </div>
+        )}
+
+        <div className="flex gap-2 justify-between">
+          <button onClick={() => setWizardStep('source')} className="btn-ghost flex items-center gap-1.5">
+            ← Back
+          </button>
+          <button
+            onClick={handleGenerateScenarios}
+            disabled={generatingScenarios || includeTypes.size === 0}
+            className="btn-primary flex items-center gap-2"
+          >
+            {generatingScenarios
+              ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating Scenarios…</>
+              : <><Sparkles className="w-3.5 h-3.5" /> Generate {scenarioCount} Scenarios</>}
+          </button>
         </div>
       </div>
 
-      {/* Voice + Prompt Bar */}
-      <VoicePromptBar
-        module="testcases"
-        currentProjectId={currentProjectId}
-        currentSprintId={currentSprintId}
-        compact={false}
-        onPromptSubmit={(text, ragContext) => {
-          const enriched = ragContext ? `${text}\n\n--- KB Context ---\n${ragContext}` : text;
-          setTcTitle(text.slice(0, 80));
-          setTcDesc(enriched);
-        }}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        {/* Left column: Create Manual scenario */}
-        <div className="lg:col-span-4">
-          <div className="glass-card p-5 space-y-4">
-            
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-sans font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Plus className="w-4 h-4 text-blue-500 font-bold" />
-                Declare Manual Suite Scenario
-              </h3>
-              <p className="text-[10px] text-slate-500 mt-0.5">Quickly append specialized validations to the mapped spec.</p>
-            </div>
-
-            <form onSubmit={handleCreateCase} className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Scenario Title (Required)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Reject negative cash wallets"
-                  value={tcTitle}
-                  onChange={(e) => setTcTitle(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-400"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Detailed Description</label>
-                <textarea
-                  placeholder="Verifies that transaction requests with a negative wallet balance throw a 403 authorization lock..."
-                  value={tcDesc}
-                  onChange={(e) => setTcDesc(e.target.value)}
-                  rows={2}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-400 leading-normal"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Priority</label>
-                  <select
-                    value={tcPriority}
-                    onChange={(e: any) => setTcPriority(e.target.value)}
-                    className="input-glass w-full text-xs"
-                  >
-                    <option value="P0">P0 - Critical Focus</option>
-                    <option value="P1">P1 - Standard Flow</option>
-                    <option value="P2">P2 - Secondary Checks</option>
-                    <option value="P3">P3 - Trivial Specs</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Testing Type</label>
-                  <select
-                    value={tcType}
-                    onChange={(e) => setTcType(e.target.value)}
-                    className="input-glass w-full text-xs"
-                  >
-                    <option value="Positive">Positive</option>
-                    <option value="Negative">Negative</option>
-                    <option value="Edge">Edge Case</option>
-                    <option value="Boundary">Boundary Check</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Preconditions</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Account balance holds negative limit"
-                  value={tcPreconditions}
-                  onChange={(e) => setTcPreconditions(e.target.value)}
-                  className="input-glass w-full text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Steps (One action per line)</label>
-                <textarea
-                  placeholder="Click Checkout Button&#10;Verify balance modal dialog exists&#10;Assert negative checkout error text is displayed"
-                  value={tcSteps}
-                  onChange={(e) => setTcSteps(e.target.value)}
-                  rows={2}
-                  className="input-glass w-full text-xs leading-normal"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Test Parameters / Mock Data</label>
-                <input
-                  type="text"
-                  placeholder='e.g. {"balance": -10, "currency": "USD"}'
-                  value={tcTestData}
-                  onChange={(e) => setTcTestData(e.target.value)}
-                  className="input-glass w-full text-xs"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn-primary w-full py-2 px-4 text-xs flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" /> Add Matrix Scenario
-              </button>
-            </form>
-
-            {feedback && (
-              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-center text-xs leading-normal font-mono animate-fade-in">
-                {feedback}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right column: Test Case Inventory List Grid */}
-        <div className="lg:col-span-8 flex flex-col space-y-4">
-          
-          {/* REQ-36: Approval feedback banner */}
-          {approvalMsg && (
-            <div className={`px-4 py-2 rounded-xl text-xs font-mono font-bold border ${approvalMsg.includes('approved') ? 'bg-green-50 text-green-700 border-green-200' : approvalMsg.includes('rejected') ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-              {approvalMsg}
-            </div>
-          )}
-
-          {/* Controls Bar */}
-          <div className="glass-card p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            
-            <div className="flex items-center gap-2 flex-wrap">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs font-bold text-slate-700 uppercase font-mono">Filter Suite:</span>
-              <div className="flex flex-wrap gap-1">
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`px-2.5 py-1 text-[10px] font-mono rounded-lg border transition-all ${
-                      activeCategory === cat 
-                        ? 'btn-primary text-[10px] font-bold' 
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-              {/* REQ-13: Tag filter chips */}
-              {allTags.length > 0 && (
-                <div className="flex items-center gap-1 ml-2">
-                  <Tag className="w-3 h-3 text-blue-400" />
-                  {allTags.map(tag => (
-                    <button key={tag} onClick={() => setActiveTagFilter(activeTagFilter === tag ? '' : tag)}
-                      className={`px-2 py-0.5 text-[9px] font-mono rounded-full border transition-all ${activeTagFilter === tag ? 'bg-blue-100 text-blue-700 border-blue-300 font-bold' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50'}`}>
-                      #{tag}
-                    </button>
-                  ))}
-                  {activeTagFilter && <button onClick={() => setActiveTagFilter('')} className="text-[9px] text-slate-400 hover:text-rose-500 ml-1"><X className="w-3 h-3" /></button>}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-                Suite Coverage: <strong className="text-blue-700">{Math.min(95, Math.max(76, filteredCases.length * 5 + 50))}%</strong>
-              </span>
-              {/* REQ-18: Bulk priority controls */}
-              {bulkSelected.size > 0 && (
-                <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
-                  <span className="text-[10px] font-mono text-blue-700 font-bold">{bulkSelected.size} selected</span>
-                  <select value={bulkPriority} onChange={e => setBulkPriority(e.target.value as any)}
-                    className="text-[10px] font-mono border border-blue-200 rounded px-1 py-0.5 bg-white text-blue-800 focus:outline-none">
-                    <option value="P0">P0</option>
-                    <option value="P1">P1</option>
-                    <option value="P2">P2</option>
-                    <option value="P3">P3</option>
-                  </select>
-                  <button onClick={handleBulkPriorityUpdate} disabled={bulkUpdating}
-                    className="flex items-center gap-1 text-[10px] font-mono bg-blue-600 text-white px-2 py-0.5 rounded hover:bg-blue-700 disabled:opacity-50">
-                    {bulkUpdating ? <RefreshCw className="w-3 h-3 animate-spin" /> : null} Apply
-                  </button>
-                  <button onClick={() => setBulkSelected(new Set())}
-                    className="text-[10px] text-blue-500 hover:text-blue-700"><X className="w-3 h-3" /></button>
-                </div>
-              )}
-              {/* GAP-06: Feasibility Analysis Button */}
-              <button
-                onClick={() => { setShowFeasibilityPanel(true); runFeasibilityAnalysis(); }}
-                disabled={localTestCases.length === 0}
-                className="flex items-center gap-1 px-2 py-1 bg-violet-50 border border-violet-200 hover:bg-violet-100 text-violet-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
-                title="AI Automation Feasibility Analysis" aria-label="Run AI feasibility analysis"
-              >
-                <Bot className="w-3 h-3" /> AI Feasibility
-              </button>
-              {/* Export + Import buttons */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleExport('csv')}
-                  disabled={isExporting || filteredCases.length === 0}
-                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
-                  title="Export as CSV" aria-label="Export test cases as CSV"
-                >
-                  {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
-                  CSV
-                </button>
-                <button
-                  onClick={() => handleExport('json')}
-                  disabled={isExporting || filteredCases.length === 0}
-                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-mono transition-all disabled:opacity-50"
-                  title="Export as JSON" aria-label="Export test cases as JSON"
-                >
-                  {isExporting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <FileJson className="w-3 h-3" />}
-                  JSON
-                </button>
-                {/* REQ-26: Bulk Import button */}
-                <button
-                  onClick={() => setShowBulkImport(true)}
-                  className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-[10px] font-mono transition-all"
-                  title="Bulk import test cases" aria-label="Bulk import test cases"
-                >
-                  <Upload className="w-3 h-3" /> Import
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* List Card Grid */}
-          <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
-            {filteredCases.map(tc => {
-              const isSelected = selectedTestCase?.id === tc.id;
-              return (
-                <div
-                  key={tc.id}
-                  onClick={() => setSelectedTestCase(isSelected ? null : tc)}
-                  className={`glass-card p-4 transition-all cursor-pointer ${bulkSelected.has(tc.id) ? 'ring-1 ring-blue-400 border-blue-300 ' : ''}${
-                    isSelected ? 'ring-1 ring-blue-500 border-blue-500' : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    {/* REQ-18: Bulk select checkbox */}
-                    <input type="checkbox" checked={bulkSelected.has(tc.id)}
-                      onChange={e => { e.stopPropagation(); setBulkSelected(prev => { const s = new Set(prev); s.has(tc.id) ? s.delete(tc.id) : s.add(tc.id); return s; }); }}
-                      onClick={e => e.stopPropagation()}
-                      className="mt-1 accent-blue-600 w-3.5 h-3.5 shrink-0" />
-                    <div className="space-y-1 text-left flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-mono text-blue-600 font-bold">{tc.id}</span>
-                        <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
-                          tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border border-rose-200/50' :
-                          tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border border-amber-200/50' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {tc.priority}
-                        </span>
-                        <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
-                          {tc.type}
-                        </span>
-                        <span className={`text-[9px] font-mono px-1.5 rounded-sm ${
-                          tc.automationStatus === 'Automated' ? 'badge badge-green' : 'badge badge-blue'
-                        }`}>
-                          {tc.automationStatus}
-                        </span>
-                      </div>
-                      <h4 className="text-sm font-bold text-slate-900 mt-1">{tc.title}</h4>
-                      <p className="text-[11px] text-slate-500 line-clamp-2">{tc.description}</p>
-                    </div>
-
-                    {/* Operational controls for cases */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRerun(tc.id);
-                        }}
-                        className="bg-slate-50 p-1.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all text-slate-500"
-                        title="Simulate validation test"
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* REQ-28: Clone button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleClone(tc); }}
-                        disabled={cloningId === tc.id}
-                        className="bg-blue-50 text-blue-700 p-1.5 rounded-lg border border-blue-200 hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50"
-                        title="Clone this test case" aria-label={`Clone test case ${tc.id}`}
-                      >
-                        {cloningId === tc.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {/* REQ-16: Inline step editor button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingStepsId(tc.id); setEditingSteps(tc.steps ? tc.steps.map(s => ({...s})) : []); }}
-                        className="bg-blue-50 text-blue-700 p-1.5 rounded-lg border border-blue-200 hover:bg-blue-600 hover:text-white transition-all"
-                        title="Edit steps inline" aria-label={`Edit steps for ${tc.id}`}
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* AI Regenerate button (REQ-29) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRegenerate(tc);
-                        }}
-                        disabled={regeneratingId === tc.id}
-                        className="bg-blue-50 text-blue-700 p-1.5 rounded-lg border border-blue-200 hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50"
-                        title="AI Regenerate this test case" aria-label={`AI regenerate test case ${tc.id}`}
-                      >
-                        {regeneratingId === tc.id
-                          ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          : <Sparkles className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {tc.confidenceScore < 90 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleHeal(tc.id);
-                          }}
-                          className="bg-amber-50 text-amber-800 p-1.5 rounded-lg border border-amber-200 hover:bg-amber-600 hover:text-white transition-all animate-pulse"
-                          title="Heal locators dynamically"
-                        >
-                          <RefreshCcw className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ── EXPANDED: Standard TC Format ──────────────────── */}
-                  {isSelected && (
-                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-3" onClick={(e) => e.stopPropagation()}>
-
-                      {/* Standard Header Table */}
-                      <div className="rounded-xl border border-slate-200 overflow-hidden text-xs">
-                        <table className="w-full">
-                          <tbody>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider w-32 border-r border-slate-100">Test Case ID</td>
-                              <td className="px-3 py-2 font-mono font-bold text-blue-700">{tc.id}</td>
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider w-32 border-l border-r border-slate-100">Requirement ID</td>
-                              <td className="px-3 py-2 font-mono font-bold text-purple-700">{tc.requirementId || '—'}</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Title</td>
-                              <td className="px-3 py-2 font-semibold text-slate-800" colSpan={3}>{tc.title}</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Description</td>
-                              <td className="px-3 py-2 text-slate-700 leading-relaxed" colSpan={3}>{tc.description}</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Preconditions</td>
-                              <td className="px-3 py-2 text-slate-700" colSpan={3}>
-                                <ul className="list-disc list-inside space-y-0.5">
-                                  {(tc.preconditions || '').split(/[,;|\n]/).filter(Boolean).map((p, i) => (
-                                    <li key={i} className="text-[11px] text-slate-600">{p.trim()}</li>
-                                  ))}
-                                </ul>
-                              </td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Test Data</td>
-                              <td className="px-3 py-2 font-mono text-[11px] text-blue-700 break-all" colSpan={3}>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {(tc.testData || '').split(/\s*\|\s*/).filter(Boolean).map((d, i) => (
-                                    <span key={i} className="bg-blue-50 border border-blue-100 rounded px-2 py-0.5 text-[10px]">{d.trim()}</span>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td className="px-3 py-2 bg-slate-50 font-bold text-slate-500 uppercase text-[10px] tracking-wider border-r border-slate-100">Type / Priority</td>
-                              <td className="px-3 py-2" colSpan={3}>
-                                <div className="flex items-center gap-2">
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                    tc.type === 'Positive' ? 'bg-green-50 text-green-700 border-green-200' :
-                                    tc.type === 'Negative' ? 'bg-red-50 text-red-700 border-red-200' :
-                                    tc.type === 'Edge' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                    'bg-purple-50 text-purple-700 border-purple-200'
-                                  }`}>{tc.type}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                    tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                    tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                    tc.priority === 'P2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                    'bg-slate-50 text-slate-600 border-slate-200'
-                                  }`}>{tc.priority} — {tc.priority === 'P0' ? 'Critical' : tc.priority === 'P1' ? 'High' : tc.priority === 'P2' ? 'Medium' : 'Low'}</span>
-                                  <span className="text-[10px] text-slate-500 font-mono">Confidence: <strong className="text-blue-600">{tc.confidenceScore}%</strong></span>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${tc.automationStatus === 'Automated' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{tc.automationStatus}</span>
-                                </div>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Steps Table — standard format */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Test Steps</span>
-                          <span className="text-[9px] text-slate-400">({tc.steps?.length || 0} steps)</span>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 overflow-hidden">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr style={{ background: '#1f3965' }}>
-                                <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-300 uppercase tracking-wider w-10">#</th>
-                                <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-300 uppercase tracking-wider w-1/2">Action / Navigation Step</th>
-                                <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-300 uppercase tracking-wider">Expected Result</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(tc.steps || []).map((st, i) => (
-                                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'} style={{ borderTop: '1px solid #e2e8f0' }}>
-                                  <td className="px-3 py-2.5 font-mono font-bold text-slate-400 text-center text-[11px]">{i + 1}</td>
-                                  <td className="px-3 py-2.5 text-slate-700 leading-relaxed">{st.action}</td>
-                                  <td className="px-3 py-2.5 text-green-700 leading-relaxed font-medium">{st.expectedResult}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* Actions row */}
-                      <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-100">
-                        {/* Sign-off */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono text-slate-500 font-bold uppercase">Sign-off:</span>
-                          {approvalMap[tc.id] === 'approved' ? (
-                            <span className="text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-bold">✔ Approved</span>
-                          ) : approvalMap[tc.id] === 'rejected' ? (
-                            <span className="text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">✘ Rejected</span>
-                          ) : (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'approve'); }} disabled={approvingId === tc.id}
-                                className="flex items-center gap-1 text-[10px] font-mono bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-lg hover:bg-green-600 hover:text-white transition-all disabled:opacity-50">
-                                <ThumbsUp className="w-3 h-3" /> Approve
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleApprove(tc, 'reject'); }} disabled={approvingId === tc.id}
-                                className="flex items-center gap-1 text-[10px] font-mono bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50">
-                                <ThumbsDown className="w-3 h-3" /> Reject
-                              </button>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Tags */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Tag className="w-3 h-3 text-blue-400 shrink-0" />
-                          {(tagsMap[tc.id] || []).map(tag => (
-                            <span key={tag} className="text-[9px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">#{tag}</span>
-                          ))}
-                          <input type="text" placeholder="Add tags..." value={tagInput[tc.id] || ''}
-                            onChange={(e) => setTagInput(prev => ({ ...prev, [tc.id]: e.target.value }))}
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(tc.id); } }}
-                            className="w-24 bg-slate-50 border border-slate-200 rounded px-2 py-0.5 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-300" />
-                          <button onClick={(e) => { e.stopPropagation(); handleSaveTags(tc.id); }}
-                            className="text-[9px] font-mono bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-600 hover:text-white transition-all">Save</button>
-                        </div>
-
-                        {/* Edit + AI Regen */}
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => setEditingTestCase(tc)}
-                            className="inline-flex items-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md text-slate-700 text-[10px] font-semibold transition-all">
-                            <Edit2 className="w-3 h-3" /> Edit
-                          </button>
-                          <div className="flex items-center gap-1">
-                            <input type="text" placeholder="AI feedback..."
-                              value={regenFeedback[tc.id] || ''}
-                              onChange={(e) => setRegenFeedback(prev => ({ ...prev, [tc.id]: e.target.value }))}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-32 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                            <button type="button"
-                              onClick={(e) => { e.stopPropagation(); handleRegenerate(tc, regenFeedback[tc.id]); }}
-                              disabled={regeneratingId === tc.id}
-                              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold disabled:opacity-50 transition-all">
-                              {regeneratingId === tc.id ? <><RefreshCw className="w-3 h-3 animate-spin" />Regenerating...</> : <><Sparkles className="w-3 h-3" />AI Regen</>}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
-
-            {/* REQ-16: Inline step editor modal */}
-            {editingStepsId && (() => {
-              return (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
-                    <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                      <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
-                        <Edit2 className="w-4 h-4 text-blue-500" /> Edit Steps &mdash; {editingStepsId}
-                      </h3>
-                      <button onClick={() => setEditingStepsId(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                        {editingSteps.map((step, idx) => (
-                          <div key={idx} className="flex gap-2 items-start">
-                            <span className="text-[10px] font-mono text-slate-400 mt-2.5 shrink-0">#{idx+1}</span>
-                            <input type="text" placeholder="Action" value={step.action}
-                              onChange={e => { const s = [...editingSteps]; s[idx] = {...s[idx], action: e.target.value}; setEditingSteps(s); }}
-                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                            <input type="text" placeholder="Expected result" value={step.expectedResult}
-                              onChange={e => { const s = [...editingSteps]; s[idx] = {...s[idx], expectedResult: e.target.value}; setEditingSteps(s); }}
-                              className="flex-1 border border-slate-200 rounded-lg p-1.5 text-[11px] text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                            <button onClick={() => setEditingSteps(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-rose-400 hover:text-rose-600 mt-1.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
-                          </div>
-                        ))}
-                        {editingSteps.length === 0 && <p className="text-center text-slate-400 text-[11px] py-4 font-mono">No steps. Add one below.</p>}
-                      </div>
-                      <button onClick={() => setEditingSteps(prev => [...prev, { action: '', expectedResult: '' }])}
-                        className="text-[11px] font-mono text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
-                        + Add Step
-                      </button>
-                      <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
-                        <button onClick={() => setEditingStepsId(null)} className="px-4 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-                        <button onClick={() => handleSaveSteps(editingStepsId!)} disabled={savingSteps}
-                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
-                          {savingSteps ? <><RefreshCw className="w-3 h-3 animate-spin" /> Saving...</> : 'Save Steps'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {filteredCases.length === 0 && (
-              <div className="glass-card border-dashed p-8 text-center text-slate-500">
-                <TableProperties className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <span className="text-sm font-bold block">No Test Scenarios Loaded</span>
-                <p className="text-xs text-slate-400 max-w-sm mt-1 mx-auto leading-normal">
-                  No active test cases corresponding to the selected testing type. Feel free to add quick manual situations on the side.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-      {/* Edit Scenario Modal Overlay */}
-      {editingTestCase && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setEditingTestCase(null)}>
-          <div className="glass-card-lg p-6 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-slate-150 pb-3 flex justify-between items-center text-left">
-              <div>
-                <h3 className="font-sans font-bold text-slate-950 text-sm">
-                  ✏ Edit Test Scenario Setup: {editingTestCase.id}
-                </h3>
-                <p className="text-[10px] text-slate-500 mt-0.5 hover:none">Modify parameters or custom sequence assertions dynamically.</p>
-              </div>
-              <button 
-                onClick={() => setEditingTestCase(null)}
-                className="text-slate-400 hover:text-slate-650 text-base font-bold font-mono px-1.5"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-3 text-left">
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Scenario Title</label>
-                <input
-                  type="text"
-                  value={editingTestCase.title}
-                  onChange={(e) => setEditingTestCase({ ...editingTestCase, title: e.target.value })}
-                  className="input-glass w-full text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Thorough Goal Description</label>
-                <textarea
-                  value={editingTestCase.description}
-                  onChange={(e) => setEditingTestCase({ ...editingTestCase, description: e.target.value })}
-                  rows={2}
-                  className="input-glass w-full text-xs leading-normal"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Priority</label>
-                  <select
-                    value={editingTestCase.priority}
-                    onChange={(e: any) => setEditingTestCase({ ...editingTestCase, priority: e.target.value })}
-                    className="input-glass w-full text-xs"
-                  >
-                    <option value="P0">P0 - Critical Focus</option>
-                    <option value="P1">P1 - Standard Flow</option>
-                    <option value="P2">P2 - Secondary Checks</option>
-                    <option value="P3">P3 - Trivial Specs</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Testing Type</label>
-                  <select
-                    value={editingTestCase.type}
-                    onChange={(e: any) => setEditingTestCase({ ...editingTestCase, type: e.target.value })}
-                    className="input-glass w-full text-xs"
-                  >
-                    <option value="Positive">Positive</option>
-                    <option value="Negative">Negative</option>
-                    <option value="Edge">Edge Case</option>
-                    <option value="Boundary">Boundary Check</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Automation Feasibility</label>
-                  <select
-                    value={editingTestCase.automationStatus}
-                    onChange={(e: any) => setEditingTestCase({ ...editingTestCase, automationStatus: e.target.value })}
-                    className="input-glass w-full text-xs"
-                  >
-                    <option value="Automatable">Automatable</option>
-                    <option value="Needs Manual">Needs Manual</option>
-                    <option value="Automated">Automated</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Confidence Rating (%)</label>
-                  <input
-                    type="number"
-                    value={editingTestCase.confidenceScore}
-                    onChange={(e) => setEditingTestCase({ ...editingTestCase, confidenceScore: Math.min(100, Math.max(0, Number(e.target.value))) })}
-                    className="input-glass w-full text-xs"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Preconditions</label>
-                <input
-                  type="text"
-                  value={editingTestCase.preconditions}
-                  onChange={(e) => setEditingTestCase({ ...editingTestCase, preconditions: e.target.value })}
-                  className="input-glass w-full text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Test Parameters / Mock Data</label>
-                <input
-                  type="text"
-                  value={editingTestCase.testData}
-                  onChange={(e) => setEditingTestCase({ ...editingTestCase, testData: e.target.value })}
-                  className="input-glass w-full text-xs"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500">Test Execution Steps (action | expected result)</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const steps = [...(editingTestCase.steps || [])];
-                      steps.push({ action: 'Proceed to next check state', expectedResult: 'State responds matches specifications.' });
-                      setEditingTestCase({ ...editingTestCase, steps });
-                    }}
-                    className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-sm hover:underline font-mono"
-                  >
-                    + Add Stage Step
-                  </button>
-                </div>
-                <div className="space-y-1.5 max-h-[140px] overflow-y-auto bg-slate-50 p-2 border border-slate-200 rounded-lg">
-                  {editingTestCase.steps?.map((step, idx) => (
-                    <div key={idx} className="flex gap-1 items-start">
-                      <span className="text-[10px] font-mono text-slate-400 mt-1">#{idx+1}</span>
-                      <input
-                        type="text"
-                        placeholder="Action"
-                        value={step.action}
-                        onChange={(e) => {
-                          const steps = [...editingTestCase.steps];
-                          steps[idx].action = e.target.value;
-                          setEditingTestCase({ ...editingTestCase, steps });
-                        }}
-                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-slate-800 focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Expected behavior"
-                        value={step.expectedResult}
-                        onChange={(e) => {
-                          const steps = [...editingTestCase.steps];
-                          steps[idx].expectedResult = e.target.value;
-                          setEditingTestCase({ ...editingTestCase, steps });
-                        }}
-                        className="flex-1 bg-white border border-slate-200 rounded p-1 text-[11px] text-blue-700 focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const steps = [...editingTestCase.steps];
-                          steps.splice(idx, 1);
-                          setEditingTestCase({ ...editingTestCase, steps });
-                        }}
-                        className="text-red-500 hover:text-red-700 font-bold text-xs px-1"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {(!editingTestCase.steps || editingTestCase.steps.length === 0) && (
-                    <div className="text-center text-slate-400 font-mono text-[10px] py-4">No testing steps configured. Click Add Stage step above.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2 justify-end border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                onClick={() => setEditingTestCase(null)}
-                className="bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-705 font-mono text-[11px] px-3.5 py-1.5 rounded-xl font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onUpdateTestCase) {
-                    onUpdateTestCase(editingTestCase);
-                  }
-                  // Also update local list
-                  setLocalTestCases(prev => prev.map(tc => tc.id === editingTestCase.id ? editingTestCase : tc));
-                  setEditingTestCase(null);
-                  setFeedback(`Scenario ${editingTestCase.id} updated and saved successfully!`);
-                  setTimeout(() => setFeedback(''), 3000);
-                }}
-                className="btn-primary font-mono text-[11px] px-4 py-1.5"
-              >
-                Save Settings
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── NEXT STEP CTA ─────────────────────────────────────────── */}
-      {localTestCases.length > 0 && (
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
-            <div>
-              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
-                {localTestCases.length} test case{localTestCases.length !== 1 ? 's' : ''} ready
-              </span>
-              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
-                Generate automation scripts for your test suite.
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={onNavigateToScripts}
-            style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
-          >
-            Script Generator <ArrowRight style={{width:14,height:14}} />
+      {/* Show existing scenarios if already generated (re-entered step) */}
+      {scenarios.length > 0 && !generatingScenarios && (
+        <div className="glass-card p-4">
+          <p className="text-xs text-slate-500 mb-2">Previously generated scenarios — click "Next: Review" to continue.</p>
+          <button onClick={() => setWizardStep('approve')} className="btn-primary flex items-center gap-2">
+            Next: Review Scenarios <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
     </div>
+  );
+
+  // ── STEP 3: Scenario Approval ─────────────────────────────────────────────
+
+  const renderApproveStep = () => (
+    <div className="space-y-4 animate-fadeInUp">
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="panel-title flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-green-500" />
+            Review & Approve Scenarios
+            <span className="chip">Step 3</span>
+          </h3>
+          <div className="flex gap-2">
+            <button onClick={approveAll} className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">
+              ✅ Approve All
+            </button>
+            <button onClick={rejectAll} className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium">
+              ❌ Reject All
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Approve the scenarios you want full test cases for. Rejected scenarios will be skipped.
+          <span className="ml-2 font-medium text-blue-600">{approvedScenarios.length} of {scenarios.length} approved</span>
+        </p>
+
+        {approvalFeedback && (
+          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 font-mono">
+            {approvalFeedback}
+          </div>
+        )}
+
+        <div className="space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin pr-1">
+          {scenarios.map((scenario, idx) => (
+            <div
+              key={scenario.id}
+              className={`p-3 rounded-xl border transition-all
+                ${scenario.approved === true  ? 'border-green-300 bg-green-50/60' :
+                  scenario.approved === false ? 'border-red-200 bg-red-50/40 opacity-60' :
+                                                'border-slate-200 bg-white/60'}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex flex-col gap-1 shrink-0 mt-0.5">
+                  <button
+                    onClick={() => toggleApproval(scenario.id, true)}
+                    className={`p-1 rounded-lg transition-all ${scenario.approved === true ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-green-100 hover:text-green-600'}`}
+                    title="Approve"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => toggleApproval(scenario.id, false)}
+                    className={`p-1 rounded-lg transition-all ${scenario.approved === false ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500'}`}
+                    title="Reject"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[10px] font-mono text-slate-400">#{idx + 1}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColor[scenario.type] || 'bg-slate-100 text-slate-600'}`}>
+                      {scenario.type}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${priorityColor[scenario.priority]}`}>
+                      {scenario.priority}
+                    </span>
+                    {scenario.approved === true  && <span className="text-[10px] text-green-600 font-medium">✅ Approved</span>}
+                    {scenario.approved === false && <span className="text-[10px] text-red-500 font-medium">❌ Rejected</span>}
+                    {scenario.approved === null  && <span className="text-[10px] text-slate-400">⏳ Pending</span>}
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800">{scenario.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{scenario.description}</p>
+                  {scenario.requirementRef && (
+                    <p className="text-[10px] font-mono text-blue-500 mt-1">
+                      <Link2 className="w-3 h-3 inline mr-1" />{scenario.requirementRef}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {detailsError && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+            <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />{detailsError}
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-2 justify-between">
+          <button onClick={() => setWizardStep('scenarios')} className="btn-ghost flex items-center gap-1.5">
+            ← Back
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setScenarios([]); setWizardStep('scenarios'); }}
+              className="btn-ghost flex items-center gap-1.5"
+              title="Re-generate scenarios"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Re-generate
+            </button>
+            <button
+              onClick={handleGenerateDetails}
+              disabled={!canGenerateDetails || generatingDetails}
+              className="btn-primary flex items-center gap-2 disabled:opacity-40"
+            >
+              {generatingDetails
+                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating Test Cases…</>
+                : <><Zap className="w-3.5 h-3.5" /> Generate Full Test Cases ({approvedScenarios.length})</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── STEP 4: Full TC Details ───────────────────────────────────────────────
+
+  const renderDetailsStep = () => (
+    <div className="space-y-4 animate-fadeInUp">
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="panel-title flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-blue-500" />
+            Generated Test Cases
+            <span className="badge badge-green">{generatedTCs.length} ready</span>
+          </h3>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowTmsPushPanel(v => !v)}
+              className="btn-ghost flex items-center gap-1.5 text-purple-600 border-purple-200 hover:bg-purple-50"
+            >
+              <Link2 className="w-3.5 h-3.5" /> Push to TMS
+            </button>
+            <button
+              onClick={handleSaveAllGenerated}
+              className="btn-primary flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Save All to Project
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Review the fully generated test cases below. Click "Save All to Project" to add them, or start over to generate more.
+        </p>
+
+        {/* TMS Push Panel */}
+        {showTmsPushPanel && (
+          <div className="mb-4 p-4 bg-purple-50/60 border border-purple-200 rounded-xl">
+            <h4 className="text-sm font-bold text-purple-800 mb-3 flex items-center gap-2">
+              <Link2 className="w-4 h-4" /> Push {generatedTCs.length} Test Cases to TMS
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-600 uppercase mb-1 block">TMS Type</label>
+                <select value={tmsPushConfig.tmsType} onChange={e => setTmsPushConfig(p => ({ ...p, tmsType: e.target.value }))}
+                  className="input-field text-xs w-full">
+                  <option value="jira">Jira</option>
+                  <option value="azure">Azure DevOps</option>
+                  <option value="testrail">TestRail</option>
+                  <option value="rally">Rally</option>
+                  <option value="alm">HP ALM</option>
+                  <option value="demo">Demo Mode</option>
+                </select>
+              </div>
+              {tmsPushConfig.tmsType !== 'demo' && (
+                <>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-600 uppercase mb-1 block">Base URL</label>
+                    <input value={tmsPushConfig.baseUrl} onChange={e => setTmsPushConfig(p => ({ ...p, baseUrl: e.target.value }))}
+                      placeholder="https://myorg.atlassian.net" className="input-field text-xs w-full" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-600 uppercase mb-1 block">Project Key</label>
+                    <input value={tmsPushConfig.projectKey} onChange={e => setTmsPushConfig(p => ({ ...p, projectKey: e.target.value }))}
+                      placeholder="PROJ" className="input-field text-xs w-full" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-600 uppercase mb-1 block">API Token</label>
+                    <input type="password" value={tmsPushConfig.token} onChange={e => setTmsPushConfig(p => ({ ...p, token: e.target.value }))}
+                      placeholder="Bearer token or PAT" className="input-field text-xs w-full" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-600 uppercase mb-1 block">Issue Type</label>
+                    <input value={tmsPushConfig.testCaseType} onChange={e => setTmsPushConfig(p => ({ ...p, testCaseType: e.target.value }))}
+                      placeholder="Test, Story, Task..." className="input-field text-xs w-full" />
+                  </div>
+                </>
+              )}
+            </div>
+            {tmsPushResult && (
+              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-xs">
+                <p className="font-bold text-green-700">✅ Pushed {tmsPushResult.pushed} test cases</p>
+                {tmsPushResult.failed > 0 && <p className="text-red-600">⚠️ {tmsPushResult.failed} failed</p>}
+                {tmsPushResult.urls.slice(0, 3).map((u, i) => (
+                  <a key={i} href={u} target="_blank" rel="noreferrer" className="block text-blue-600 underline truncate">{u}</a>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={handlePushToTMS} disabled={tmsPushing}
+                className="btn-primary text-xs flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700">
+                {tmsPushing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Pushing...</> : <><Link2 className="w-3.5 h-3.5" /> Push to TMS</>}
+              </button>
+              <button onClick={() => setShowTmsPushPanel(false)} className="btn-ghost text-xs">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* TC List */}
+          <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin pr-1">
+            {generatedTCs.map((tc, idx) => (
+              <div
+                key={tc.id}
+                onClick={() => setSelectedTC(tc)}
+                className={`p-3 rounded-xl border cursor-pointer transition-all
+                  ${selectedTC?.id === tc.id
+                    ? 'border-blue-400 bg-blue-50/60 glow-blue'
+                    : 'border-slate-200 bg-white/60 hover:border-blue-300'}`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">#{idx + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${priorityColor[tc.priority]}`}>{tc.priority}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${typeColor[tc.type]}`}>{tc.type}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800 truncate">{tc.title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{tc.description}</p>
+                    <p className="text-[10px] font-mono text-slate-400 mt-1">{tc.steps?.length || 0} steps</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* TC Detail Panel */}
+          {selectedTC ? (
+            <div className="p-4 bg-blue-50/40 border border-blue-200/60 rounded-xl text-xs space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
+              <div>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${priorityColor[selectedTC.priority]}`}>{selectedTC.priority}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${typeColor[selectedTC.type]}`}>{selectedTC.type}</span>
+                  <span className="text-[10px] font-mono text-slate-400">{selectedTC.id}</span>
+                </div>
+                <h4 className="font-bold text-slate-800 text-sm leading-snug">{selectedTC.title}</h4>
+                <p className="text-slate-600 mt-1">{selectedTC.description}</p>
+              </div>
+              {selectedTC.preconditions && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-1">Preconditions</p>
+                  <p className="text-slate-600 bg-white/60 p-2 rounded-lg border border-slate-200">{selectedTC.preconditions}</p>
+                </div>
+              )}
+              {selectedTC.steps?.length > 0 && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-2">Test Steps</p>
+                  <div className="space-y-1.5">
+                    {selectedTC.steps.map((step, i) => (
+                      <div key={i} className="p-2 bg-white/70 border border-slate-200 rounded-lg">
+                        <div className="flex gap-2">
+                          <span className="text-[10px] font-bold text-blue-500 w-5 shrink-0">{i + 1}.</span>
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-700">{step.action}</p>
+                            <p className="text-slate-500 mt-0.5"><span className="font-medium">Expected:</span> {step.expectedResult}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedTC.testData && (
+                <div>
+                  <p className="font-semibold text-slate-700 mb-1">Test Data</p>
+                  <pre className="text-slate-600 bg-white/60 p-2 rounded-lg border border-slate-200 whitespace-pre-wrap font-mono text-[10px]">{selectedTC.testData}</pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-48 bg-slate-50/60 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
+              Click a test case to view details
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex gap-2 justify-between">
+          <button onClick={() => setWizardStep('approve')} className="btn-ghost flex items-center gap-1.5">
+            ← Back to Scenarios
+          </button>
+          <button
+            onClick={() => { setWizardStep('source'); setScenarios([]); setGeneratedTCs([]); }}
+            className="btn-ghost flex items-center gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Start Over
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Existing TC List Panel ────────────────────────────────────────────────
+
+  const renderExistingTCList = () => (
+    <div className="glass-card p-5 mt-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="panel-title flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-slate-500" />
+          All Test Cases
+          <span className="chip">{filteredCases.length}</span>
+        </h3>
+        <div className="flex gap-2">
+          <button onClick={() => handleExport('csv')} className="btn-ghost text-xs flex items-center gap-1">
+            <Download className="w-3 h-3" /> CSV
+          </button>
+          <button onClick={() => handleExport('json')} className="btn-ghost text-xs flex items-center gap-1">
+            <FileJson className="w-3 h-3" /> JSON
+          </button>
+          <button
+            onClick={() => { setShowFeasibilityPanel(true); runFeasibilityAnalysis(); }}
+            className="btn-ghost text-xs flex items-center gap-1"
+          >
+            <Cpu className="w-3 h-3" /> Feasibility
+          </button>
+        </div>
+      </div>
+
+      {/* Category filter */}
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`text-xs px-2 py-0.5 rounded-full border font-medium transition-all
+              ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300'}`}
+          >
+            {cat === 'all' ? `All (${localTestCases.length})` : cat}
+          </button>
+        ))}
+      </div>
+
+      {filteredCases.length === 0 ? (
+        <div className="text-center py-10 text-slate-400 text-xs font-mono border-2 border-dashed border-slate-200 rounded-xl">
+          <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          No test cases yet. Use the wizard above to generate some!
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin pr-1">
+          {filteredCases.map(tc => (
+            <div
+              key={tc.id}
+              className="flex items-start gap-3 p-3 bg-white/60 border border-slate-200/80 rounded-xl hover:border-blue-300 hover:bg-blue-50/30 transition-all"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${priorityColor[tc.priority]}`}>{tc.priority}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${typeColor[tc.type]}`}>{tc.type}</span>
+                  {tc.automationStatus && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono
+                      ${tc.automationStatus === 'Automatable' ? 'bg-green-100 text-green-700' :
+                        tc.automationStatus === 'Automated'   ? 'bg-blue-100 text-blue-700' :
+                                                                 'bg-orange-100 text-orange-700'}`}>
+                      {tc.automationStatus}
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono text-slate-400">{tc.id}</span>
+                </div>
+                <p className="text-sm font-medium text-slate-800 truncate">{tc.title}</p>
+                {tc.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{tc.description}</p>}
+                <p className="text-[10px] font-mono text-slate-400 mt-0.5">{tc.steps?.length || 0} steps · confidence {tc.confidenceScore}%</p>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button
+                  onClick={() => { onTriggerRerun(tc.id); }}
+                  className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
+                  title="Re-run"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onApplyHeal(tc.id)}
+                  className="p-1 text-slate-400 hover:text-green-500 transition-colors"
+                  title="Heal"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Feasibility Modal ─────────────────────────────────────────────────────
+
+  const renderFeasibilityModal = () => {
+    if (!showFeasibilityPanel) return null;
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-purple-500" /> Automation Feasibility Analysis
+              <span className="chip">GAP-06</span>
+            </h3>
+            <button onClick={() => setShowFeasibilityPanel(false)} className="text-slate-400 hover:text-slate-700">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {feasibilityRunning ? (
+              <div className="text-center py-10">
+                <RefreshCw className="w-8 h-8 mx-auto text-purple-500 animate-spin mb-3" />
+                <p className="text-sm text-slate-600">Analyzing test cases for automation feasibility…</p>
+              </div>
+            ) : feasibilitySummary?.error ? (
+              <div className="text-red-600 text-sm p-3 bg-red-50 rounded-xl">{feasibilitySummary.error}</div>
+            ) : feasibilitySummary ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 bg-green-50 rounded-xl border border-green-200 text-center">
+                    <p className="text-xl font-bold text-green-700">{feasibilitySummary.automatable || 0}</p>
+                    <p className="text-xs text-green-600">Automatable</p>
+                  </div>
+                  <div className="p-3 bg-orange-50 rounded-xl border border-orange-200 text-center">
+                    <p className="text-xl font-bold text-orange-700">{feasibilitySummary.partial || 0}</p>
+                    <p className="text-xs text-orange-600">Partial</p>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-center">
+                    <p className="text-xl font-bold text-red-700">{feasibilitySummary.manual_only || 0}</p>
+                    <p className="text-xs text-red-600">Manual Only</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {feasibilityResults.map(r => (
+                    <div key={r.id} className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs flex items-center justify-between gap-2">
+                      <span className="font-mono text-slate-600">{r.id}</span>
+                      <span className="text-slate-700 flex-1 truncate">{r.title}</span>
+                      <span className={`px-2 py-0.5 rounded font-medium ${r.verdict === 'Automatable' ? 'bg-green-100 text-green-700' : r.verdict === 'Partial' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                        {r.verdict}
+                      </span>
+                      <span className="text-slate-400 font-mono">{r.confidence_score}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Main Render ───────────────────────────────────────────────────────────
+
+  return (
+    <div className="space-y-4 animate-fadeInUp">
+      {/* Global feedback toast */}
+      {feedback && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 bg-blue-600 text-white text-xs rounded-xl shadow-lg font-mono animate-fadeInUp">
+          {feedback}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="panel-title flex items-center gap-2 text-base">
+              <Bot className="w-5 h-5 text-blue-500" />
+              AI Test Case Generator
+              <span className="chip">REQ-01</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Generate test cases from requirements in 4 steps: source → scenarios → approve → full details
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTcViewMode(tcViewMode === 'wizard' ? 'list' : 'wizard')}
+              className="btn-ghost text-xs flex items-center gap-1.5"
+            >
+              {tcViewMode === 'wizard'
+                ? <><ClipboardList className="w-3.5 h-3.5" /> View All TCs</>
+                : <><Sparkles className="w-3.5 h-3.5" /> Generate New</>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {tcViewMode === 'wizard' ? (
+        <>
+          {/* Wizard step indicator */}
+          {renderStepIndicator()}
+
+          {/* Active step content */}
+          {wizardStep === 'source'    && renderSourceStep()}
+          {wizardStep === 'scenarios' && renderScenariosStep()}
+          {wizardStep === 'approve'   && renderApproveStep()}
+          {wizardStep === 'details'   && renderDetailsStep()}
+
+          {/* Always show existing TC list at the bottom */}
+          {renderExistingTCList()}
+        </>
+      ) : (
+        renderExistingTCList()
+      )}
+
+      {/* Feasibility modal */}
+      {renderFeasibilityModal()}
     </div>
   );
 }

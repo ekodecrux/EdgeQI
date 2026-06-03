@@ -61,6 +61,7 @@ import TraceabilityTab from './components/TraceabilityTab';
 // ModulePagesTab removed — module health absorbed into QA Dashboard
 import ScriptConverterTab from './components/ScriptConverterTab';
 import TestCaseGeneratorPage from './components/TestCaseGeneratorPage';
+import TestPlansTabComponent from './components/TestPlansTab';
 import ExecutionEnginePage from './components/ExecutionEnginePage';
 import AgenticOrchestrator from './components/AgenticOrchestrator';
 import AuthModal from './components/AuthModal';
@@ -118,171 +119,6 @@ function SidebarGroup({ label, children, defaultOpen = false }: {
           {children}
         </nav>
       )}
-    </div>
-  );
-}
-
-// ── REQ-30: TEST PLAN CRUD ────────────────────────────────────────────────────
-function TestPlansTab() {
-  const [plans, setPlans] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', milestone: '' });
-  const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState('');
-
-  const token = () => localStorage.getItem('iq_token');
-  const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/quality/test-plans', { headers: authH() });
-      const data = await res.json();
-      if (data.plans) setPlans(data.plans);
-    } catch { /* silent */ } finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const createPlan = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/quality/test-plans', {
-        method: 'POST', headers: authH(),
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      if (data.plan) { setPlans(prev => [data.plan, ...prev]); setShowForm(false); setForm({ name: '', description: '', milestone: '' }); setFeedback('Test plan created!'); setTimeout(() => setFeedback(''), 3000); }
-    } catch { /* silent */ } finally { setSaving(false); }
-  };
-
-  const deletePlan = async (id: string) => {
-    try {
-      await fetch(`/api/quality/test-plans/${id}`, { method: 'DELETE', headers: authH() });
-      setPlans(prev => prev.filter(p => p.id !== id));
-    } catch { /* silent */ }
-  };
-
-  const statusColors: Record<string,string> = { draft:'badge badge-slate', active:'badge badge-green', completed:'badge badge-blue', archived:'badge badge-slate' };
-
-  return (
-    <div className="space-y-5 animate-fadeInUp">
-      <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="panel-title flex items-center gap-2">
-              <TableProperties className="w-4 h-4 text-blue-500" /> Test Plans
-              <span className="chip">REQ-30</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Create and manage test execution plans with milestones and test case associations.</p>
-          </div>
-          <button onClick={() => setShowForm(v => !v)} className="btn-primary flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> New Plan
-          </button>
-        </div>
-        {feedback && <div className="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 font-mono">{feedback}</div>}
-        {showForm && (
-          <div className="mb-4 p-4 metal-surface rounded-xl space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Plan Name *</label>
-                <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Sprint 23 Regression"
-                  className="input-glass w-full" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Milestone</label>
-                <input value={form.milestone} onChange={e => setForm(f => ({...f, milestone: e.target.value}))} placeholder="v2.4.0 Release"
-                  className="input-glass w-full" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1">Description</label>
-              <textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} rows={2} placeholder="Scope and objectives..."
-                className="input-glass w-full" />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowForm(false)} className="btn-ghost">Cancel</button>
-              <button onClick={createPlan} disabled={saving || !form.name.trim()} className="btn-primary">
-                {saving ? 'Creating…' : 'Create Plan'}
-              </button>
-            </div>
-          </div>
-        )}
-        {loading ? (
-          <div className="text-center py-8 text-slate-400 text-xs font-mono">Loading test plans…</div>
-        ) : plans.length === 0 ? (
-          <div className="text-center py-8 text-slate-400 text-xs font-mono">No test plans yet. Click "New Plan" to create one.</div>
-        ) : (
-          <div className="space-y-2">
-            {plans.map(plan => (
-              <div key={plan.id} className="flex items-start gap-3 p-3 bg-white/60 border border-slate-200/80 rounded-xl hover:border-blue-300 hover:bg-blue-50/30 transition-all">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-900 text-sm">{plan.name}</span>
-                    <span className={statusColors[plan.status] || 'badge badge-slate'}>{plan.status}</span>
-                    {plan.milestone && <span className="chip">🏁 {plan.milestone}</span>}
-                  </div>
-                  {plan.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{plan.description}</p>}
-                  <p className="text-[10px] font-mono text-slate-400 mt-0.5">{plan.tcIds?.length || 0} test cases · Created {new Date(plan.createdAt).toLocaleDateString()}</p>
-                  {/* REQ-31/32: Milestone progress inline */}
-                  <PlanProgressPanel planId={plan.id} planName={plan.name} />
-                </div>
-                <button onClick={() => deletePlan(plan.id)} className="text-slate-400 hover:text-red-500 shrink-0 mt-0.5 transition-colors">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── REQ-31/32: TEST PLAN EXECUTION LINK + MILESTONE TRACKING ─────────────────
-function PlanProgressPanel({ planId, planName }: { planId: string; planName: string }) {
-  const [progress, setProgress] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const token = () => localStorage.getItem('iq_token');
-  const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const r = await fetch(`/api/quality/test-plans/${planId}/progress`, { headers: authH() });
-      const d = await r.json();
-      setProgress(d);
-    } catch { /* ignore */ }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [planId]);
-
-  const statusColor: Record<string,string> = {
-    completed: 'badge-green',
-    in_progress: 'badge-amber',
-    not_started: 'badge-slate',
-  };
-
-  if (loading) return <div className="text-xs text-slate-400 py-2">Loading progress…</div>;
-  if (!progress) return null;
-
-  return (
-    <div className="mt-3 p-3 bg-blue-50/60 border border-blue-200/60 rounded-xl text-xs space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="font-bold text-blue-700 text-[11px]">{planName} — Milestone Progress</span>
-        <span className={`badge ${statusColor[progress.milestoneStatus] || 'badge-slate'}`}>{progress.milestoneStatus?.replace('_',' ')}</span>
-      </div>
-      {progress.milestone && <div className="text-[10px] text-blue-600 font-mono">🏁 {progress.milestone}</div>}
-      <div className="progress-bar-track">
-        <div className="progress-bar-fill" style={{ width: `${progress.progress || 0}%` }} />
-      </div>
-      <div className="flex justify-between text-[10px] text-blue-500 font-mono">
-        <span>{progress.progress || 0}% complete</span>
-        <span>{progress.passed}/{progress.tcCount} TCs passed</span>
-      </div>
     </div>
   );
 }
@@ -494,7 +330,8 @@ export default function App() {
     'manual-execution' |
     'projects' |
     'rag-kb' |
-    'workflow-builder'
+    'workflow-builder' |
+    'defect-impact'
   >('agentic');
   
   // Sprint context — active sprint for current project
@@ -1135,6 +972,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'execution',        label: 'Run Tests',          icon: Cpu },
               { id: 'manual-execution', label: 'Manual Testing',     icon: CheckSquare },
               { id: 'defects',          label: 'Defects & Bugs',     icon: Crosshair },
+              { id: 'defect-impact',    label: 'Defect & Impact AI', icon: Crosshair },
               { id: 'performance',      label: 'Load & Performance', icon: Sliders },
               { id: 'security',         label: 'Security Scan',      icon: ShieldAlert },
               { id: 'dashboard',        label: 'Live Dashboard',     icon: TrendingUp },
@@ -1346,6 +1184,9 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
                 onNavigateToTestCases={() => setActiveTab('testcases')}
                 currentProjectId={currentProjectId}
                 currentSprintId={currentSprintId}
+                projects={dbProjects}
+                onCreateProject={() => setActiveTab('projects')}
+                onSelectProject={(id) => setCurrentProjectId(id)}
               />
             </div>
           )}
@@ -1362,6 +1203,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               />
               <TestCaseGeneratorPage
                 testCases={filteredTestCases}
+                requirements={filteredRequirements}
                 onTriggerRerun={handleRerunMockTestCase}
                 onApplyHeal={handleApplyHealMock}
                 onAddManualTestCase={(newCase) => setTestCases(prev => [{ ...newCase, projectId: currentProjectId }, ...prev])}
@@ -1477,7 +1319,12 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             </div>
           )}
 
-          {activeTab === 'test-plans' && <TestPlansTab />}
+          {activeTab === 'test-plans' && (
+            <TestPlansTabComponent
+              currentProjectId={currentProjectId}
+              currentSprintId={currentSprintId}
+            />
+          )}
           {activeTab === 'manual-execution' && <ManualExecutionTab />}
           {activeTab === 'llm-config' && <LLMConfigTab />}
           {activeTab === 'cicd' && <CICDTab />}
@@ -1505,7 +1352,31 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               currentProjectId={currentProjectId}
               onSelectProject={(id) => { setCurrentProjectId(id); }}
               onNavigateTo={(tab) => setActiveTab(tab as any)}
+              onProjectsChanged={reloadProjects}
             />
+          )}
+
+          {activeTab === 'defect-impact' && (
+            <div>
+              <ProjectContextBar
+                currentProjectId={currentProjectId} currentSprintId={currentSprintId}
+                projects={dbProjects} sprints={allDbSprints}
+                onChangeProject={handleContextBarProjectChange}
+                onChangeSprint={setCurrentSprintId}
+                onGoToProjectHub={() => setActiveTab('projects')}
+                moduleName="Defect & Impact AI"
+              />
+              <DefectPredictTab
+                defects={filteredDefectHotspots}
+                impactReports={impactReports}
+                onPredictHotspots={handlePredictHotspots}
+                onAnalyzeImpact={handleAnalyzeImpact}
+                isAnalyzing={isAnalyzingImpact}
+                currentProjectId={currentProjectId}
+                testCases={filteredTestCases}
+                onNavigateToExecution={() => setActiveTab('execution')}
+              />
+            </div>
           )}
           
           {activeTab === 'rag-kb' && (

@@ -39,6 +39,10 @@ interface RequirementsProps {
   onNavigateToTestCases?: () => void;
   currentProjectId?: string;
   currentSprintId?: string;
+  // Project selection props
+  projects?: { id: string; name: string }[];
+  onCreateProject?: () => void;
+  onSelectProject?: (id: string) => void;
 }
 
 export default function RequirementsTab({
@@ -50,6 +54,9 @@ export default function RequirementsTab({
   onNavigateToTestCases,
   currentProjectId,
   currentSprintId,
+  projects: _projects,
+  onCreateProject: _onCreateProject,
+  onSelectProject: _onSelectProject,
 }: RequirementsProps) {
   const [sourceType, setSourceType] = useState<'file' | 'text' | 'url' | 'voice' | 'image'>('text');
   const [imageFile, setImageFile] = useState<File | null>(null);

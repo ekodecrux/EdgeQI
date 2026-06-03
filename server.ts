@@ -706,6 +706,31 @@ async function crawlUrl(url: string): Promise<{ title: string; text: string; lin
 // ── REQ-03: URL/WEB-CRAWLER REQUIREMENT SOURCE (sourceType='url' triggers crawl) ────────
 // ── REQ-04: REQUIREMENTS TRACEABILITY — RTM generated per requirement/TC link ────────────
 // ── REQ-05: LLM-GENERATED TEST CASES FROM REQUIREMENTS ───────────────────────────────────
+// ── TC Wizard: fetch URL content for requirements source ──────────────────────
+app.post('/api/quality/requirements/fetch-url', requireAuth, async (req, res) => {
+  const { url } = req.body;
+  if (!url || !url.startsWith('http')) return res.status(400).json({ error: 'Valid URL required' });
+  try {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; IQStudio/1.0)' },
+      signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
+    } as any);
+    if (!resp.ok) return res.status(400).json({ error: `HTTP ${resp.status} from URL` });
+    const html = await resp.text();
+    // Strip HTML tags for plain text
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 8000);
+    res.json({ content: text, length: text.length });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 app.post("/api/quality/requirements/add", async (req, res) => {
   const { title, content, sourceType, projectId, crawlerSettings } = req.body;
   if (!content) {
@@ -4276,6 +4301,215 @@ Respond ONLY with valid JSON array:
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// ── NEW: SCENARIO GENERATION (Step 2 of TC wizard) ───────────────────────────
+app.post('/api/quality/testcases/generate-scenarios', requireAuth, async (req: any, res) => {
+  const { requirementsText, count = 8, types = ['Positive','Negative','Edge','Boundary'], projectId = '' } = req.body;
+  if (!requirementsText || requirementsText.trim().length < 10) {
+    return res.status(400).json({ error: 'requirementsText is required (min 10 chars)' });
+  }
+  const targetCount = Math.min(Math.max(Number(count) || 8, 2), 25);
+  const includeTypes = Array.isArray(types) ? types.join(', ') : 'Positive, Negative, Edge, Boundary';
+
+  try {
+    const llmCfg = getActiveLLMConfig();
+    if (!llmCfg) {
+      // Rule-based fallback: generate scaffolded scenarios
+      const fallbackScenarios = generateFallbackScenarios(requirementsText, targetCount, Array.isArray(types) ? types : ['Positive','Negative','Edge','Boundary']);
+      return res.json({ scenarios: fallbackScenarios, source: 'rule-based' });
+    }
+
+    const prompt = `You are a senior QA engineer. Analyze the following requirements and generate ${targetCount} test SCENARIOS (lightweight, no detailed steps yet).
+
+REQUIREMENTS:
+${requirementsText.substring(0, 4000)}
+
+INSTRUCTIONS:
+- Generate exactly ${targetCount} test scenarios covering types: ${includeTypes}
+- Each scenario should be a brief title + 1-2 sentence description
+- Assign priority: P0 (critical), P1 (high), P2 (medium), P3 (low)
+- Reference the relevant requirement section if possible
+- Do NOT generate full test steps — just titles and brief descriptions
+
+Respond ONLY with valid JSON array (no markdown, no code blocks):
+[
+  {
+    "id": "SCN-001",
+    "title": "Verify successful login with valid credentials",
+    "type": "Positive",
+    "priority": "P0",
+    "description": "User provides correct email and password and is redirected to dashboard",
+    "requirementRef": "Login module - valid credentials flow"
+  },
+  ...
+]`;
+
+    const apiRes = await callLLM(prompt, llmCfg, 2000);
+    const raw = (typeof apiRes === 'string' ? apiRes : apiRes?.choices?.[0]?.message?.content) || '[]';
+    const cleaned = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+    let scenarios: any[] = [];
+    try {
+      scenarios = JSON.parse(cleaned);
+      if (!Array.isArray(scenarios)) throw new Error('Not an array');
+    } catch {
+      scenarios = generateFallbackScenarios(requirementsText, targetCount, Array.isArray(types) ? types : ['Positive','Negative','Edge','Boundary']);
+    }
+    // Ensure all required fields
+    scenarios = scenarios.map((s: any, i: number) => ({
+      id: s.id || `SCN-${String(i + 1).padStart(3, '0')}`,
+      title: s.title || `Scenario ${i + 1}`,
+      type: s.type || 'Positive',
+      priority: s.priority || 'P2',
+      description: s.description || '',
+      requirementRef: s.requirementRef || '',
+    }));
+    addAudit('Scenarios Generated', req.user?.email || 'user', `Generated ${scenarios.length} scenarios for project ${projectId}`);
+    res.json({ scenarios, count: scenarios.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+function generateFallbackScenarios(requirementsText: string, count: number, types: string[]): any[] {
+  const words = requirementsText.split(/\s+/).filter(Boolean);
+  const subject = words.slice(0, 5).join(' ') || 'feature';
+  const typeList = types.length > 0 ? types : ['Positive', 'Negative', 'Edge', 'Boundary'];
+  const templates: Record<string, string[]> = {
+    Positive:  ['Verify successful {action} with valid input', 'Confirm {subject} works under normal conditions', 'Validate happy path for {action}'],
+    Negative:  ['Verify {action} fails gracefully with invalid input', 'Confirm error message shown for missing required fields', 'Test {subject} with empty/null values'],
+    Edge:      ['Test {action} at maximum allowed input length', 'Verify {subject} behavior with special characters', 'Test concurrent {action} operations'],
+    Boundary:  ['Verify {action} with minimum boundary value', 'Test {action} with maximum boundary value', 'Confirm {subject} at exact limit values'],
+  };
+  const scenarios: any[] = [];
+  for (let i = 0; i < count; i++) {
+    const type = typeList[i % typeList.length];
+    const tmpls = templates[type] || templates['Positive'];
+    const tmpl = tmpls[Math.floor(i / typeList.length) % tmpls.length];
+    const title = tmpl.replace('{action}', subject.substring(0, 20)).replace('{subject}', subject.substring(0, 20));
+    scenarios.push({
+      id: `SCN-${String(i + 1).padStart(3, '0')}`,
+      title,
+      type,
+      priority: i < count * 0.3 ? 'P0' : i < count * 0.6 ? 'P1' : i < count * 0.85 ? 'P2' : 'P3',
+      description: `${type} test case for: ${subject.substring(0, 60)}`,
+      requirementRef: '',
+    });
+  }
+  return scenarios;
+}
+
+// ── NEW: FULL TC DETAILS GENERATION (Step 4 of TC wizard) ────────────────────
+app.post('/api/quality/testcases/generate-details', requireAuth, async (req: any, res) => {
+  const { scenarios, requirementsText = '', projectId = '' } = req.body;
+  if (!Array.isArray(scenarios) || scenarios.length === 0) {
+    return res.status(400).json({ error: 'scenarios array is required' });
+  }
+
+  try {
+    const llmCfg = getActiveLLMConfig();
+    if (!llmCfg) {
+      // Rule-based fallback: scaffold full TCs from scenarios
+      const testCases = scenarios.map((s: any, i: number) => buildFallbackTC(s, projectId, i));
+      return res.json({ testCases, source: 'rule-based' });
+    }
+
+    const scenarioList = scenarios.map((s: any, i: number) =>
+      `${i + 1}. [${s.type}/${s.priority}] ${s.title}\n   Description: ${s.description || ''}`
+    ).join('\n');
+
+    const prompt = `You are a senior QA engineer. Generate FULL test case details for the following approved scenarios.
+
+REQUIREMENTS CONTEXT:
+${(requirementsText || '').substring(0, 2000)}
+
+APPROVED SCENARIOS:
+${scenarioList}
+
+For EACH scenario generate a complete test case with:
+- id: "TC-" + 3-digit number
+- title: scenario title (keep same)
+- description: expanded description
+- type: same as scenario type (Positive/Negative/Edge/Boundary)
+- priority: same as scenario priority (P0/P1/P2/P3)
+- preconditions: prerequisites (user logged in, test data setup, etc.)
+- steps: array of {action, expectedResult} objects (3-7 steps each)
+- testData: relevant test data values
+- automationStatus: "Automatable" | "Needs Manual" | "Automated"
+- confidenceScore: 70-95
+
+Respond ONLY with valid JSON array (no markdown):
+[
+  {
+    "id": "TC-001",
+    "title": "...",
+    "description": "...",
+    "type": "Positive",
+    "priority": "P0",
+    "preconditions": "User is on login page with valid account",
+    "steps": [
+      {"action": "Navigate to /login", "expectedResult": "Login page is displayed"},
+      {"action": "Enter valid email and password", "expectedResult": "Fields accept input"},
+      {"action": "Click Login button", "expectedResult": "User redirected to dashboard"}
+    ],
+    "testData": "email: test@example.com, password: Test@123",
+    "automationStatus": "Automatable",
+    "confidenceScore": 90
+  }
+]`;
+
+    const apiRes = await callLLM(prompt, llmCfg, 3000);
+    const raw = (typeof apiRes === 'string' ? apiRes : apiRes?.choices?.[0]?.message?.content) || '[]';
+    const cleaned = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+    let testCases: any[] = [];
+    try {
+      testCases = JSON.parse(cleaned);
+      if (!Array.isArray(testCases)) throw new Error('Not an array');
+    } catch {
+      testCases = scenarios.map((s: any, i: number) => buildFallbackTC(s, projectId, i));
+    }
+    // Ensure all fields + projectId
+    testCases = testCases.map((tc: any, i: number) => ({
+      id: tc.id || `TC-${String(Date.now()).slice(-4)}-${i}`,
+      title: tc.title || scenarios[i]?.title || `Test Case ${i + 1}`,
+      description: tc.description || '',
+      type: tc.type || scenarios[i]?.type || 'Positive',
+      priority: tc.priority || scenarios[i]?.priority || 'P2',
+      preconditions: tc.preconditions || '',
+      steps: Array.isArray(tc.steps) ? tc.steps : [{ action: 'Execute test', expectedResult: 'Feature behaves as expected' }],
+      testData: tc.testData || '',
+      automationStatus: tc.automationStatus || 'Automatable',
+      confidenceScore: tc.confidenceScore || 80,
+      projectId,
+      requirementId: '',
+    }));
+    addAudit('Test Cases Generated', req.user?.email || 'user', `Generated ${testCases.length} full TCs for project ${projectId}`);
+    res.json({ testCases, count: testCases.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+function buildFallbackTC(scenario: any, projectId: string, idx: number): any {
+  return {
+    id: `TC-${String(Date.now()).slice(-4)}-${idx}`,
+    title: scenario.title || `Test Case ${idx + 1}`,
+    description: scenario.description || '',
+    type: scenario.type || 'Positive',
+    priority: scenario.priority || 'P2',
+    preconditions: 'Application is running and accessible. Test user account exists.',
+    steps: [
+      { action: `Navigate to the relevant page/feature`, expectedResult: 'Page loads successfully' },
+      { action: `Set up test data: ${scenario.description?.substring(0, 60) || 'as required'}`, expectedResult: 'Test data is ready' },
+      { action: `Perform the primary test action`, expectedResult: 'System responds as expected per requirements' },
+      { action: `Verify the outcome`, expectedResult: scenario.type === 'Negative' ? 'Appropriate error message is displayed' : 'Success confirmation is shown' },
+    ],
+    testData: scenario.requirementRef ? `Ref: ${scenario.requirementRef}` : '',
+    automationStatus: 'Automatable',
+    confidenceScore: 75,
+    projectId,
+    requirementId: '',
+  };
+}
+
 // ── REQ-88: SLACK/WEBHOOK NOTIFICATION ON RUN COMPLETE ────────────────────────
 const notificationConfigs: Map<string, { url: string; events: string[]; enabled: boolean; label: string }> = new Map();
 notificationConfigs.set('default', { url: '', events: ['run_complete', 'run_failed'], enabled: false, label: 'Default Webhook' });
@@ -4352,16 +4586,28 @@ app.put('/api/auth/me/preferences', requireAuth, (req: any, res) => {
 // ── REQ-30: TEST PLAN CRUD ────────────────────────────────────────────────────
 type TestPlan = { id: string; name: string; description: string; tcIds: string[]; status: 'draft'|'active'|'completed'; milestone: string; createdAt: string; updatedAt: string; createdBy: string; progress: number };
 const testPlans: Map<string, TestPlan> = new Map();
-app.get('/api/quality/test-plans', requireAuth, (_req, res) => {
-  res.json({ plans: Array.from(testPlans.values()) });
+app.get('/api/quality/test-plans', requireAuth, (req, res) => {
+  const { projectId } = req.query as { projectId?: string };
+  let plans = Array.from(testPlans.values());
+  // Filter by projectId if provided
+  if (projectId && projectId !== 'ALL') {
+    plans = plans.filter(p => !(p as any).projectId || (p as any).projectId === projectId);
+  }
+  res.json({ plans });
 });
 app.post('/api/quality/test-plans', requireAuth, (req: any, res) => {
-  const { name, description = '', tcIds = [], milestone = '' } = req.body;
+  const { name, description = '', tcIds = [], milestone = '', projectId, sprintId } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   const id = `PLAN-${Date.now().toString(36).toUpperCase()}`;
-  const plan: TestPlan = { id, name, description, tcIds, status: 'draft', milestone, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: req.user?.name || 'unknown', progress: 0 };
+  const plan: TestPlan & { projectId?: string; sprintId?: string } = {
+    id, name, description, tcIds, status: 'draft', milestone,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    createdBy: req.user?.name || 'unknown', progress: 0,
+    ...(projectId ? { projectId } : {}),
+    ...(sprintId  ? { sprintId  } : {}),
+  };
   testPlans.set(id, plan);
-  addAudit('Test Plan Created', id, `Plan "${name}" created with ${tcIds.length} TCs`, 0);
+  addAudit('Test Plan Created', id, `Plan "${name}" created${projectId ? ` for project ${projectId}` : ''} with ${tcIds.length} TCs`, 0);
   res.json({ success: true, plan });
 });
 app.patch('/api/quality/test-plans/:id', requireAuth, (req, res) => {
@@ -4515,6 +4761,300 @@ app.patch('/api/quality/test-plans/:id/milestone', requireAuth, (req, res) => {
   const updated = { ...plan, milestone: milestone || plan.milestone, dueDate: dueDate || (plan as any).dueDate, updatedAt: new Date().toISOString() };
   testPlans.set(plan.id, updated as any);
   res.json({ success: true, plan: updated });
+});
+
+// ── AI CLASSIFY: classify text/paste failures ────────────────────────────────
+app.post('/api/quality/defects/classify-text', requireAuth, async (req: any, res) => {
+  const { text, projectId } = req.body;
+  const start = Date.now();
+  const lines = (text || '').split('\n').filter((l: string) => l.trim().length > 5);
+  const classifyLine = (line: string, idx: number): any => {
+    const lower = line.toLowerCase();
+    const isFlaky = /intermittent|retry|random|sometimes|flaky|occasional/.test(lower);
+    const isEnv = /timeout|connection|network|environment|config|ssl|certificate|proxy/.test(lower);
+    const isData = /data|setup|seed|fixture|null pointer|undefined|missing record|not found/.test(lower);
+    const isAuto = /xpath|selector|element not found|stale element|locator|webdriver|playwright/.test(lower);
+    const cat = isFlaky ? 'Flaky' : isEnv ? 'Environment' : isData ? 'DataSetup' : isAuto ? 'Automation' : 'Genuine';
+    const sev = lower.includes('critical') || lower.includes('blocker') ? 'Critical' : lower.includes('high') ? 'High' : 'Medium';
+    const mod = (line.match(/\|([^|]+)\|/) || [])[1]?.trim() || `Module-${idx + 1}`;
+    return { id: `clf-${Date.now()}-${idx}`, title: line.slice(0, 100).trim(), module: mod, severity: sev, category: cat, confidence: cat === 'Genuine' ? 85 : 80, failureReason: cat === 'Flaky' ? 'Intermittent failure' : cat === 'Environment' ? 'Env/config issue' : cat === 'DataSetup' ? 'Data issue' : cat === 'Automation' ? 'Automation bug' : 'Product defect', steps: 'Review failure log. ' + line.slice(0, 120), approved: null, tmsStatus: 'pending' };
+  };
+  if (lines.length === 0) return res.status(400).json({ error: 'No parseable lines found' });
+  const classified = lines.slice(0, 30).map(classifyLine);
+  addAudit('AI Defect Classify Text', 'Defects', `Classified ${classified.length} items`, Date.now() - start);
+  res.json({ classified, source: 'rule-based' });
+});
+
+// ── AI CLASSIFY: from items array or sample ───────────────────────────────────
+app.post('/api/quality/defects/ai-classify', requireAuth, async (req: any, res) => {
+  const { items = [], useSample = false, projectId } = req.body;
+  const start = Date.now();
+  const sampleItems = [
+    { id: 'TC-001', title: 'Login fails on mobile Safari — consistent', module: 'Authentication', status: 'FAIL', error: 'Timeout after 30s waiting for OTP input' },
+    { id: 'TC-007', title: 'Payment charge throws NullPointerException', module: 'Payment', status: 'FAIL', error: 'NullPointerException in ChargeService.java:124 — card token is null' },
+    { id: 'TC-012', title: 'Search results intermittently empty', module: 'Search', status: 'FAIL', error: 'Sometimes returns 0 results, retry passes — intermittent' },
+    { id: 'TC-018', title: 'Dashboard fails — DB connection timeout', module: 'Dashboard', status: 'FAIL', error: 'Connection refused: postgres:5432 — DB not available in CI' },
+    { id: 'TC-023', title: 'Registration email not sent — SMTP config missing', module: 'Registration', status: 'FAIL', error: 'SMTP host not configured in test environment' },
+    { id: 'TC-045', title: 'XPath selector broken after UI refactor', module: 'UI', status: 'FAIL', error: 'Element //div[@id="submit-btn"] not found — stale element reference' },
+    { id: 'TC-052', title: 'File upload exceeds size limit — genuine bug', module: 'File Upload', status: 'FAIL', error: '413 Payload Too Large — limit not enforced on backend' },
+    { id: 'TC-067', title: 'Invoice download missing line items', module: 'Billing', status: 'FAIL', error: 'Test data not seeded correctly — invoice_items table empty' },
+    { id: 'TC-071', title: 'Password reset link expires too quickly — bug', module: 'Auth', status: 'FAIL', error: 'Reset link expires in 5 min, requirement says 30 min' },
+    { id: 'TC-089', title: 'Order history CSV export ignores date filter', module: 'Orders', status: 'FAIL', error: 'Date range filter not applied to export SQL query' },
+  ];
+  const rawItems = useSample ? sampleItems : items;
+  if (rawItems.length === 0) return res.json({ classified: [], source: 'empty' });
+  const classifyItem = (item: any, idx: number): any => {
+    const text = `${item.title || ''} ${item.error || ''}`.toLowerCase();
+    const isFlaky = /intermittent|retry|sometimes|random|flaky/.test(text);
+    const isEnv = /connection refused|db not available|ci|smtp|config missing|not configured|ssl|proxy/.test(text);
+    const isData = /not seeded|test data|data not|seed|empty table/.test(text);
+    const isAuto = /xpath|stale element|selector|webdriver|playwright|locator/.test(text);
+    const cat = item.status === 'PASS' ? null : isFlaky ? 'Flaky' : isEnv ? 'Environment' : isData ? 'DataSetup' : isAuto ? 'Automation' : 'Genuine';
+    if (!cat) return null;
+    const sev: any = text.includes('null pointer') || text.includes('payment') ? 'Critical' : text.includes('auth') || text.includes('login') ? 'High' : 'Medium';
+    return { id: item.id || `clf-${idx}`, title: item.title || `Failure #${idx + 1}`, module: item.module || 'General', severity: sev, category: cat, confidence: cat === 'Genuine' ? 88 : cat === 'Flaky' ? 72 : cat === 'Environment' ? 92 : 85, failureReason: item.error || 'See test log', steps: `1. Execute: ${item.title}\n2. Observe: ${item.error || 'Test failed'}\n3. Check server logs`, tcId: item.id, approved: null, tmsStatus: 'pending' as const };
+  };
+  const classified = rawItems.map(classifyItem).filter(Boolean);
+  addAudit('AI Defect Classify', 'Defects', `Classified ${classified.length} items`, Date.now() - start);
+  res.json({ classified, source: 'rule-based' });
+});
+
+// ── TMS PULL: pull defects/bugs from TMS ─────────────────────────────────────
+app.post('/api/quality/defects/tms-pull', requireAuth, async (req: any, res) => {
+  const { tool = 'jira', url: tmsUrl, username, token, projectKey, projectId } = req.body;
+  if (!projectKey) return res.status(400).json({ error: 'projectKey required' });
+  const start = Date.now();
+  if (tool === 'jira' && tmsUrl && token) {
+    try {
+      const jql = `project=${encodeURIComponent(projectKey)} AND issuetype in (Bug,Defect) AND status not in (Done,Closed) ORDER BY priority DESC`;
+      const resp = await fetch(`${tmsUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=30&fields=summary,description,priority,status,labels`, { headers: { 'Authorization': `Basic ${Buffer.from(`${username||''}:${token}`).toString('base64')}`, 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) });
+      if (resp.ok) {
+        const data = await resp.json() as any;
+        const defects = (data.issues || []).map((issue: any) => ({ id: issue.key, title: `[${issue.key}] ${issue.fields?.summary}`, module: issue.fields?.labels?.[0] || 'General', severity: issue.fields?.priority?.name === 'Highest' ? 'Critical' : issue.fields?.priority?.name === 'High' ? 'High' : 'Medium', category: 'Genuine', confidence: 95, failureReason: issue.fields?.description?.content?.[0]?.content?.[0]?.text || issue.fields?.summary, steps: 'See Jira issue', approved: null, tmsStatus: 'pending', tcId: '' }));
+        addAudit('TMS Defect Pull', 'Integration', `Pulled ${defects.length} bugs from Jira`, Date.now() - start);
+        return res.json({ defects, source: 'live-jira' });
+      }
+    } catch (e: any) { console.warn('[TMS/Jira] Defect pull failed:', e.message); }
+  }
+  const demo = [
+    { id: `${projectKey}-BUG-101`, title: `[${projectKey}-101] Login fails on iOS Safari after 3 attempts`, module: 'Authentication', severity: 'High', category: 'Genuine', confidence: 92, failureReason: 'Session cookie not persisted on mobile Safari', steps: '1. Open Safari iOS\n2. Enter credentials\n3. Submit 3 times → spinner', approved: null, tmsStatus: 'pending', tcId: 'TC-001' },
+    { id: `${projectKey}-BUG-102`, title: `[${projectKey}-102] Payment gateway 500 on Amex cards`, module: 'Payment', severity: 'Critical', category: 'Genuine', confidence: 97, failureReason: 'Amex CVV regex fails — 4 digit vs 3 digit mismatch', steps: '1. Add Amex card\n2. Checkout → 500', approved: null, tmsStatus: 'pending', tcId: 'TC-007' },
+    { id: `${projectKey}-BUG-103`, title: `[${projectKey}-103] Search intermittently empty`, module: 'Search', severity: 'Medium', category: 'Flaky', confidence: 78, failureReason: 'Elasticsearch index not ready — timing issue in CI', steps: 'Intermittent — passes on retry', approved: null, tmsStatus: 'pending', tcId: 'TC-012' },
+    { id: `${projectKey}-BUG-104`, title: `[${projectKey}-104] Dashboard fails CI — DB connection`, module: 'Dashboard', severity: 'Medium', category: 'Environment', confidence: 90, failureReason: 'PostgreSQL not available in CI', steps: 'Consistent in CI, passes locally', approved: null, tmsStatus: 'pending', tcId: 'TC-018' },
+    { id: `${projectKey}-BUG-105`, title: `[${projectKey}-105] Export Excel missing date filter`, module: 'Reporting', severity: 'High', category: 'Genuine', confidence: 88, failureReason: 'Date range filter not applied to export query', steps: '1. Reports\n2. Set date filter\n3. Export → all records returned', approved: null, tmsStatus: 'pending', tcId: 'TC-035' },
+  ];
+  addAudit('TMS Defect Pull (Demo)', 'Integration', `Demo pulled ${demo.length} defects`, Date.now() - start);
+  res.json({ defects: demo, source: 'demo' });
+});
+
+// ── TMS PUSH: raise approved genuine defects in TMS ───────────────────────────
+app.post('/api/quality/defects/tms-push', requireAuth, async (req: any, res) => {
+  const { tool = 'jira', url: tmsUrl, username, token, projectKey, defects = [], projectId } = req.body;
+  if (!defects || defects.length === 0) return res.status(400).json({ error: 'No defects to push' });
+  const start = Date.now();
+  const resultItems: any[] = [];
+  if (tmsUrl && token && projectKey) {
+    if (tool === 'jira') {
+      const b64 = Buffer.from(`${username||''}:${token}`).toString('base64');
+      const hdrs = { 'Authorization': `Basic ${b64}`, 'Content-Type': 'application/json', 'Accept': 'application/json' };
+      for (const d of defects.slice(0, 20)) {
+        try {
+          const body = JSON.stringify({ fields: { project: { key: projectKey }, summary: d.title, description: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: `${d.failureReason}\n\nSteps:\n${d.steps}\n\nModule: ${d.module} | Confidence: ${d.confidence}% | TC: ${d.tcId||'N/A'}` }] }] }, issuetype: { name: 'Bug' }, priority: { name: d.severity === 'Critical' ? 'Highest' : d.severity === 'High' ? 'High' : 'Medium' }, labels: ['EDGE-QI', 'auto-raised'] } });
+          const resp = await fetch(`${tmsUrl}/rest/api/3/issue`, { method: 'POST', headers: hdrs, body, signal: AbortSignal.timeout(8000) });
+          if (resp.ok) { const data = await resp.json() as any; resultItems.push({ id: d.id, title: d.title, status: 'pushed', tmsKey: data.key, url: `${tmsUrl}/browse/${data.key}` }); }
+          else resultItems.push({ id: d.id, title: d.title, status: 'failed', error: `HTTP ${resp.status}` });
+        } catch (e: any) { resultItems.push({ id: d.id, title: d.title, status: 'failed', error: e.message }); }
+      }
+      const pushed = resultItems.filter(r => r.status === 'pushed').length;
+      addAudit('TMS Defect Push', 'Integration', `Pushed ${pushed}/${defects.length} to Jira`, Date.now() - start);
+      return res.json({ result: { pushed, failed: resultItems.filter(r => r.status !== 'pushed').length, items: resultItems }, source: 'live-jira' });
+    }
+    if (tool === 'azure') {
+      const b64 = Buffer.from(`:${token}`).toString('base64');
+      const hdrs = { 'Authorization': `Basic ${b64}`, 'Content-Type': 'application/json-patch+json' };
+      for (const d of defects.slice(0, 20)) {
+        try {
+          const body = JSON.stringify([{ op: 'add', path: '/fields/System.Title', value: d.title }, { op: 'add', path: '/fields/System.Description', value: `${d.failureReason}\nSteps:\n${d.steps}` }, { op: 'add', path: '/fields/Microsoft.VSTS.Common.Priority', value: d.severity === 'Critical' ? 1 : d.severity === 'High' ? 2 : 3 }]);
+          const resp = await fetch(`${tmsUrl}/${projectKey}/_apis/wit/workitems/$Bug?api-version=7.1`, { method: 'POST', headers: hdrs, body, signal: AbortSignal.timeout(8000) });
+          if (resp.ok) { const data = await resp.json() as any; resultItems.push({ id: d.id, title: d.title, status: 'pushed', tmsKey: `#${data.id}`, url: data._links?.html?.href }); }
+          else resultItems.push({ id: d.id, title: d.title, status: 'failed', error: `HTTP ${resp.status}` });
+        } catch (e: any) { resultItems.push({ id: d.id, title: d.title, status: 'failed', error: e.message }); }
+      }
+      const pushed = resultItems.filter(r => r.status === 'pushed').length;
+      addAudit('TMS Defect Push', 'Integration', `Pushed ${pushed}/${defects.length} to Azure`, Date.now() - start);
+      return res.json({ result: { pushed, failed: resultItems.filter(r => r.status !== 'pushed').length, items: resultItems }, source: 'live-azure' });
+    }
+  }
+  // Demo mode
+  await new Promise(r => setTimeout(r, 600));
+  const pushed = defects.slice(0, 20).map((d: any, i: number) => ({ id: d.id, title: d.title, status: 'pushed', tmsKey: `${projectKey||'PROJ'}-BUG-${500+i}`, url: `https://demo-${tool}.example.com/bug/${500+i}` }));
+  addAudit('TMS Defect Push (Demo)', 'Integration', `Demo pushed ${pushed.length} defects`, Date.now() - start);
+  res.json({ result: { pushed: pushed.length, failed: 0, items: pushed }, source: 'demo' });
+});
+
+// ── IMPACT ANALYSIS FULL: change req + defect history → impacted test suite ───
+app.post('/api/quality/impact/analyze-full', requireAuth, async (req: any, res) => {
+  const { changeTrigger, description = '', defectHistory = [], testCases = [], projectId } = req.body;
+  if (!changeTrigger) return res.status(400).json({ error: 'changeTrigger required' });
+  const start = Date.now();
+  const changeText = `${changeTrigger} ${description}`.toLowerCase();
+  const keywords = changeText.split(/\s+/).filter((w: string) => w.length > 4);
+  const scoreTc = (tc: any): number => {
+    const tcText = `${tc.title||''} ${tc.description||''} ${tc.module||''}`.toLowerCase();
+    const kwScore = keywords.filter((k: string) => tcText.includes(k)).length * 15;
+    const defScore = defectHistory.filter((d: any) => d.tcId === tc.id || d.module?.toLowerCase() === tc.module?.toLowerCase()).length * 25;
+    return Math.min(100, kwScore + defScore + (tc.priority === 'P0' ? 15 : tc.priority === 'P1' ? 10 : 0));
+  };
+  const llmConfig = getActiveLLMConfig();
+  if (llmConfig && testCases.length > 0) {
+    try {
+      const prompt = `Change: "${changeTrigger}". Defect modules: ${[...new Set(defectHistory.map((d: any) => d.module))].join(', ')}. Which test cases are impacted? Return JSON: [{ tcId, title, module, riskScore (0-100), reason }]. TCs: ${JSON.stringify(testCases.slice(0,40).map((tc: any)=>({id:tc.id,title:tc.title,module:tc.module,priority:tc.priority})))}`;
+      const llmResp = await callLLM(llmConfig, prompt);
+      const match = llmResp.match(/\[[\s\S]*\]/);
+      if (match) {
+        const suite = JSON.parse(match[0]).map((t: any) => ({ ...t, included: t.riskScore >= 60 }));
+        return res.json({ impactedSuite: suite, summary: `AI: ${suite.filter((t:any)=>t.riskScore>=60).length} high-risk TCs for "${changeTrigger}"`, source: 'llm' });
+      }
+    } catch (e: any) { console.warn('[Impact] LLM failed:', e.message); }
+  }
+  const impacted = testCases.map((tc: any) => { const score = scoreTc(tc); return { tcId: tc.id, title: tc.title, module: tc.module||'General', riskScore: score, reason: score > 50 ? 'Module overlaps with change + defect history' : `Keyword match: ${changeTrigger.split(' ').slice(0,3).join(' ')}`, included: score >= 40 }; }).filter((t: any) => t.riskScore > 0).sort((a: any,b: any)=>b.riskScore-a.riskScore).slice(0,30);
+  const demoSuite = impacted.length === 0 ? [
+    { tcId: 'TC-001', title: 'User login — happy path', module: 'Authentication', riskScore: 92, reason: 'Core auth — always include after auth changes', included: true },
+    { tcId: 'TC-007', title: 'Payment with saved card', module: 'Payment', riskScore: 88, reason: 'Payment flow affected by gateway change', included: true },
+    { tcId: 'TC-012', title: 'Search with filters', module: 'Search', riskScore: 65, reason: 'API contract may have changed', included: true },
+    { tcId: 'TC-018', title: 'Dashboard load performance', module: 'Dashboard', riskScore: 72, reason: 'Shared data layer affected', included: true },
+    { tcId: 'TC-023', title: 'New user registration', module: 'Registration', riskScore: 55, reason: 'Auth service dependency', included: false },
+    { tcId: 'TC-031', title: 'Order history pagination', module: 'Orders', riskScore: 40, reason: 'Indirect dependency via user context', included: false },
+  ] : impacted;
+  addAudit('Impact Analysis Full', 'Analysis', `Analyzed impact for: ${changeTrigger}`, Date.now() - start);
+  res.json({ impactedSuite: demoSuite, summary: `Rule-based: ${demoSuite.filter(t=>t.included).length} high-risk TCs across ${[...new Set(demoSuite.map(t=>t.module))].length} modules for "${changeTrigger}"`, source: 'rule-based' });
+});
+
+// ── EXECUTION QUEUE: send impact TCs to execution ─────────────────────────────
+app.post('/api/quality/execution/queue-impact', requireAuth, async (req: any, res) => {
+  const { testCaseIds = [], source = 'impact-analysis', projectId } = req.body;
+  if (testCaseIds.length === 0) return res.status(400).json({ error: 'No test cases to queue' });
+  addAudit('Impact Queue', 'Execution', `Queued ${testCaseIds.length} TCs from impact analysis`, 0);
+  res.json({ success: true, runId: `RUN-IMPACT-${Date.now()}`, queued: testCaseIds.length });
+});
+
+// ── TMS PUSH TEST CASES: unified route for all TMS types ─────────────────────
+app.post('/api/quality/integrations/tms/push-testcases', requireAuth, async (req: any, res) => {
+  const { tmsType = 'demo', baseUrl, projectKey, token: tmsToken, testCaseType = 'Test', testCases = [] } = req.body;
+  if (!testCases.length) return res.status(400).json({ error: 'No test cases provided' });
+  const start = Date.now();
+
+  // Demo mode — return mock success
+  if (tmsType === 'demo') {
+    const pushed = testCases.map((tc: any, i: number) => ({
+      id: `DEMO-TC-${Date.now()}-${i}`,
+      url: `https://demo.tms.local/tc/${Date.now()}-${i}`,
+      title: tc.title,
+    }));
+    addAudit('TMS Push', 'TestCases', `Demo: pushed ${pushed.length} TCs`, Date.now() - start);
+    return res.json({ pushed: pushed.length, failed: 0, urls: pushed.map((p: any) => p.url), items: pushed, source: 'demo' });
+  }
+
+  if (!baseUrl || !projectKey || !tmsToken) return res.status(400).json({ error: 'baseUrl, projectKey, token required' });
+
+  // Jira push
+  if (tmsType === 'jira') {
+    const results: any[] = []; let failCount = 0;
+    for (const tc of testCases.slice(0, 20)) {
+      try {
+        const r = await fetch(`${baseUrl}/rest/api/3/issue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${tmsToken}` },
+          body: JSON.stringify({
+            fields: {
+              project: { key: projectKey },
+              summary: tc.title,
+              description: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: `${tc.description || ''}\n\nSteps:\n${(tc.steps || []).map((s: any, i: number) => `${i+1}. ${s.action} → ${s.expectedResult}`).join('\n')}` }] }] },
+              issuetype: { name: testCaseType || 'Test' },
+            }
+          })
+        });
+        const d = await r.json();
+        if (d.key) results.push({ id: d.key, url: `${baseUrl}/browse/${d.key}`, title: tc.title });
+        else failCount++;
+      } catch { failCount++; }
+    }
+    addAudit('TMS Push', 'TestCases', `Jira: pushed ${results.length} TCs`, Date.now() - start);
+    return res.json({ pushed: results.length, failed: failCount, urls: results.map((r: any) => r.url), items: results });
+  }
+
+  // Azure DevOps push
+  if (tmsType === 'azure') {
+    const results: any[] = []; let failCount = 0;
+    for (const tc of testCases.slice(0, 20)) {
+      try {
+        const org = baseUrl.replace(/\/$/, '').split('/').pop();
+        const r = await fetch(`${baseUrl}/${projectKey}/_apis/wit/workitems/$Test%20Case?api-version=7.1`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json-patch+json', 'Authorization': `Basic ${Buffer.from(`:${tmsToken}`).toString('base64')}` },
+          body: JSON.stringify([{ op: 'add', path: '/fields/System.Title', value: tc.title }, { op: 'add', path: '/fields/System.Description', value: tc.description || '' }])
+        });
+        const d = await r.json();
+        if (d.id) results.push({ id: d.id, url: d._links?.html?.href || `${baseUrl}/${projectKey}/_workitems/edit/${d.id}`, title: tc.title });
+        else failCount++;
+      } catch { failCount++; }
+    }
+    addAudit('TMS Push', 'TestCases', `Azure: pushed ${results.length} TCs`, Date.now() - start);
+    return res.json({ pushed: results.length, failed: failCount, urls: results.map((r: any) => r.url), items: results });
+  }
+
+  // TestRail push
+  if (tmsType === 'testrail') {
+    const results: any[] = []; let failCount = 0;
+    for (const tc of testCases.slice(0, 20)) {
+      try {
+        const r = await fetch(`${baseUrl}/index.php?/api/v2/add_case/${projectKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${tmsToken}` },
+          body: JSON.stringify({ title: tc.title, custom_steps: tc.steps?.map((s: any) => s.action).join('\n') || '' })
+        });
+        const d = await r.json();
+        if (d.id) results.push({ id: d.id, url: `${baseUrl}/index.php?/cases/view/${d.id}`, title: tc.title });
+        else failCount++;
+      } catch { failCount++; }
+    }
+    addAudit('TMS Push', 'TestCases', `TestRail: pushed ${results.length} TCs`, Date.now() - start);
+    return res.json({ pushed: results.length, failed: failCount, urls: results.map((r: any) => r.url), items: results });
+  }
+
+  // Generic fallback
+  addAudit('TMS Push', 'TestCases', `${tmsType}: simulated push ${testCases.length} TCs`, Date.now() - start);
+  res.json({ pushed: testCases.length, failed: 0, urls: testCases.map((_: any, i: number) => `${baseUrl || 'https://tms.local'}/tc/${i+1}`), source: 'simulated' });
+});
+
+// ── TMS UNIFIED PULL-REQUIREMENTS ─────────────────────────────────────────────
+app.post('/api/quality/integrations/tms/pull-requirements', requireAuth, async (req: any, res) => {
+  const { tmsType = 'demo', baseUrl, projectKey, token: tmsToken, query } = req.body;
+  const start = Date.now();
+  if (tmsType === 'demo') {
+    const demoReqs = [
+      { id: 'REQ-001', title: 'User Login with SSO', description: 'Support SAML 2.0 SSO login for enterprise users', priority: 'High', module: 'Auth' },
+      { id: 'REQ-002', title: 'Dashboard Overview', description: 'Show KPI cards, recent activity, and trend charts', priority: 'Medium', module: 'Dashboard' },
+      { id: 'REQ-003', title: 'Export to PDF/Excel', description: 'Allow users to export test reports in PDF and Excel formats', priority: 'Low', module: 'Reports' },
+    ];
+    addAudit('TMS Pull Reqs', 'Requirements', `Demo: pulled ${demoReqs.length} requirements`, Date.now() - start);
+    return res.json({ requirements: demoReqs, total: demoReqs.length, source: 'demo' });
+  }
+  if (!baseUrl || !projectKey || !tmsToken) return res.status(400).json({ error: 'baseUrl, projectKey, token required' });
+
+  if (tmsType === 'jira') {
+    const jql = query || `project = "${projectKey}" AND issuetype = Story ORDER BY created DESC`;
+    const r = await fetch(`${baseUrl}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=50`, {
+      headers: { 'Authorization': `Basic ${tmsToken}`, 'Accept': 'application/json' }
+    }).catch(() => null);
+    if (!r || !r.ok) return res.status(502).json({ error: 'Failed to connect to Jira' });
+    const d = await r.json();
+    const reqs = (d.issues || []).map((i: any) => ({ id: i.key, title: i.fields.summary, description: i.fields.description?.content?.[0]?.content?.[0]?.text || '', priority: i.fields.priority?.name || 'Medium', module: i.fields.components?.[0]?.name || 'General' }));
+    addAudit('TMS Pull Reqs', 'Requirements', `Jira: pulled ${reqs.length} requirements`, Date.now() - start);
+    return res.json({ requirements: reqs, total: reqs.length });
+  }
+
+  res.json({ requirements: [], total: 0, source: tmsType });
 });
 
 // ── REQ-34: DEFECT LOGGING FROM FAILED TEST — auto-create defect on run failure ──────────
