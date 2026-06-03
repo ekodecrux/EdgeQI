@@ -242,7 +242,7 @@ export default function VoicePromptBar({
   // ─── Full mode ────────────────────────────────────────────────────────────
   return (
     <div className={`bg-white border rounded-xl shadow-sm overflow-hidden transition-all ${className}`}
-      style={{ borderColor: expanded ? '#b3ddf7' : '#dbe2ea' }}>
+      style={{ borderColor: expanded ? '#b3ddf7' : '#E2E8F0' }}>
 
       {/* Header bar */}
       <div
@@ -251,8 +251,8 @@ export default function VoicePromptBar({
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: '#1e96df' }} />
-          <span className="text-xs font-semibold" style={{ color: '#1f3965' }}>AI Prompt & Voice Input</span>
+          <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: '#5B6CFF' }} />
+          <span className="text-xs font-semibold" style={{ color: '#0F172A' }}>AI Prompt & Voice Input</span>
           {isListening && (
             <span className="flex items-center gap-1 text-[10px] text-red-600 animate-pulse font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />

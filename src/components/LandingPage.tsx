@@ -504,19 +504,19 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 ))}
               </div>
               {[
-                { t: 'EDGE QI Execution Engine v3.1', c: '#a6b4cd' },
-                { t: '> Running suite: checkout-flow (18 tests)', c: '#dbe2ea' },
+                { t: 'EDGE QI Execution Engine v3.1', c: '#94A3B8' },
+                { t: '> Running suite: checkout-flow (18 tests)', c: '#E2E8F0' },
                 { t: '', c: '' },
                 { t: '✓ TC-001  Login flow                [PASS]', c: '#36b37e' },
                 { t: '✓ TC-002  Add to cart               [PASS]', c: '#36b37e' },
                 { t: '⚠ TC-007  Payment form              [HEALING]', c: '#ea8804' },
-                { t: '  Locator stale: #pay-btn → .payment-submit', c: '#a6b4cd' },
+                { t: '  Locator stale: #pay-btn → .payment-submit', c: '#94A3B8' },
                 { t: '  AI fix applied in 340ms ✓', c: '#1da1f2' },
                 { t: '✓ TC-007  Payment form              [PASS]', c: '#36b37e' },
                 { t: '', c: '' },
                 { t: '✓ TC-018  Order confirmation        [PASS]', c: '#36b37e' },
                 { t: '', c: '' },
-                { t: '18/18 passed  •  1 self-healed  •  12.4s', c: '#dbe2ea' },
+                { t: '18/18 passed  •  1 self-healed  •  12.4s', c: '#E2E8F0' },
               ].map((line, i) => (
                 <div key={i} style={{ color: line.c, marginBottom: 3, lineHeight: '1.5' }}>
                   {line.t}
@@ -654,7 +654,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
           </div>
 
           <p style={{
-            marginTop: 24, fontSize: 13, color: '#6b82ab'
+            marginTop: 24, fontSize: 13, color: '#475569'
           }}>
             No credit card required · 14-day free trial · Cancel anytime
           </p>
@@ -691,7 +691,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </span>
           </div>
 
-          <p style={{ fontSize: 13, color: '#6b82ab' }}>
+          <p style={{ fontSize: 13, color: '#475569' }}>
             © 2026 EDGE QI — Edge Quality Intelligence
           </p>
 
@@ -699,7 +699,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             {['Privacy', 'Terms', 'Security', 'Status'].map(l => (
               <a key={l} href="#" style={{
                 fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-                fontSize: 13, color: '#6b82ab',
+                fontSize: 13, color: '#475569',
                 textDecoration: 'none'
               }}>{l}</a>
             ))}

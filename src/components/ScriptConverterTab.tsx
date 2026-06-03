@@ -479,14 +479,14 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
       
       {/* Intro Header */}
       {/* Page Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #E2E8F0'}}>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#0F172A 0%,#5B6CFF 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <RefreshCw style={{width:20,height:20,color:'#ffffff'}} />
           </div>
           <div>
-            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Script Converter</h1>
-            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Convert and migrate test scripts across frameworks</p>
+            <h1 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#0F172A',lineHeight:1,margin:0}}>Script Converter</h1>
+            <p style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,color:'#475569',margin:'3px 0 0'}}>Convert and migrate test scripts across frameworks</p>
           </div>
         </div>
       </div>

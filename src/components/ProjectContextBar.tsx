@@ -64,16 +64,16 @@ export default function ProjectContextBar({
   const projectSprints = sprints.filter(s => s.project_id === currentProjectId);
 
   const isAllProjects = currentProjectId === 'ALL' || !currentProjectId;
-  const color = activeProject?.color || '#1e96df';
+  const color = activeProject?.color || '#5B6CFF';
 
   const sprintStatusIcon = (s: string) => ({ active: '🟢', planning: '📋', completed: '✅', cancelled: '⏸' }[s] || '📋');
 
   return (
     <div style={{
-      fontFamily: '"Lato", Arial, sans-serif',
+      fontFamily: '"Inter", Arial, sans-serif',
       marginBottom: 20,
       borderRadius: 12,
-      border: `1.5px solid ${isAllProjects ? '#dbe2ea' : color + '40'}`,
+      border: `1.5px solid ${isAllProjects ? '#E2E8F0' : color + '40'}`,
       background: isAllProjects ? '#f8fafc' : color + '08',
       overflow: 'visible',
       position: 'relative',
@@ -86,11 +86,11 @@ export default function ProjectContextBar({
       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', flexWrap: 'wrap', gap: 10 }}>
 
         {/* Module label */}
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#a6b4cd', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>
           {moduleName}
         </div>
 
-        <div style={{ width: 1, height: 16, background: '#dbe2ea', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 16, background: '#E2E8F0', flexShrink: 0 }} />
 
         {/* Project selector */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -100,19 +100,19 @@ export default function ProjectContextBar({
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '5px 10px 5px 8px',
               borderRadius: 8,
-              border: `1px solid ${isAllProjects ? '#dbe2ea' : color + '50'}`,
+              border: `1px solid ${isAllProjects ? '#E2E8F0' : color + '50'}`,
               background: isAllProjects ? '#fff' : color + '12',
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: isAllProjects ? '#6b82ab' : '#1f3965',
+              color: isAllProjects ? '#475569' : '#0F172A',
               transition: 'all 0.15s',
             }}
           >
             {isAllProjects ? (
               <>
-                <FolderOpen style={{ width: 14, height: 14, color: '#6b82ab' }} />
-                <span style={{ color: '#6b82ab' }}>All Projects</span>
+                <FolderOpen style={{ width: 14, height: 14, color: '#475569' }} />
+                <span style={{ color: '#475569' }}>All Projects</span>
               </>
             ) : (
               <>
@@ -122,14 +122,14 @@ export default function ProjectContextBar({
                 </span>
               </>
             )}
-            <ChevronDown style={{ width: 13, height: 13, color: '#6b82ab', flexShrink: 0 }} />
+            <ChevronDown style={{ width: 13, height: 13, color: '#475569', flexShrink: 0 }} />
           </button>
 
           {/* Dropdown */}
           {showDropdown && (
             <div style={{
               position: 'absolute', top: '100%', left: 0, marginTop: 4,
-              background: '#fff', border: '1px solid #dbe2ea', borderRadius: 10,
+              background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10,
               boxShadow: '0 8px 24px rgba(31,57,101,0.14)',
               zIndex: 200, minWidth: 220, overflow: 'hidden',
             }}>
@@ -139,11 +139,11 @@ export default function ProjectContextBar({
                 style={{
                   width: '100%', padding: '9px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
                   background: isAllProjects ? '#f0f7ff' : '#fff', border: 'none', cursor: 'pointer',
-                  fontSize: 12, fontWeight: isAllProjects ? 700 : 500, color: isAllProjects ? '#1e96df' : '#1f3965',
+                  fontSize: 12, fontWeight: isAllProjects ? 700 : 500, color: isAllProjects ? '#5B6CFF' : '#0F172A',
                   borderBottom: '1px solid #f1f5f9',
                 }}
               >
-                <FolderOpen style={{ width: 14, height: 14, color: '#6b82ab' }} />
+                <FolderOpen style={{ width: 14, height: 14, color: '#475569' }} />
                 All Projects
               </button>
 
@@ -157,7 +157,7 @@ export default function ProjectContextBar({
                     background: currentProjectId === p.id ? p.color + '10' : '#fff',
                     border: 'none', cursor: 'pointer',
                     fontSize: 12, fontWeight: currentProjectId === p.id ? 700 : 500,
-                    color: currentProjectId === p.id ? p.color : '#1f3965',
+                    color: currentProjectId === p.id ? p.color : '#0F172A',
                     borderBottom: '1px solid #f1f5f9',
                     transition: 'background 0.12s',
                   }}
@@ -175,8 +175,8 @@ export default function ProjectContextBar({
                   style={{
                     width: '100%', padding: '9px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
                     background: '#f8fafc', border: 'none', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 600, color: '#1e96df',
-                    borderTop: '1px solid #dbe2ea',
+                    fontSize: 12, fontWeight: 600, color: '#5B6CFF',
+                    borderTop: '1px solid #E2E8F0',
                   }}
                 >
                   <Plus style={{ width: 13, height: 13 }} />
@@ -190,16 +190,16 @@ export default function ProjectContextBar({
         {/* Sprint selector — only when a specific project is selected */}
         {!isAllProjects && onChangeSprint && (
           <>
-            <div style={{ width: 1, height: 16, background: '#dbe2ea', flexShrink: 0 }} />
+            <div style={{ width: 1, height: 16, background: '#E2E8F0', flexShrink: 0 }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <select
                 value={currentSprintId}
                 onChange={e => onChangeSprint(e.target.value)}
                 style={{
-                  border: `1px solid ${activeSprint ? color + '50' : '#dbe2ea'}`,
+                  border: `1px solid ${activeSprint ? color + '50' : '#E2E8F0'}`,
                   borderRadius: 7, padding: '4px 10px',
                   fontSize: 12, fontWeight: 600,
-                  color: activeSprint ? '#1f3965' : '#6b82ab',
+                  color: activeSprint ? '#0F172A' : '#475569',
                   background: activeSprint ? color + '08' : '#fff',
                   cursor: 'pointer', outline: 'none',
                 }}
@@ -247,8 +247,8 @@ export default function ProjectContextBar({
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '4px 10px', borderRadius: 7,
-              border: '1px solid #dbe2ea', background: '#f8fafc',
-              fontSize: 11, fontWeight: 600, color: '#6b82ab',
+              border: '1px solid #E2E8F0', background: '#f8fafc',
+              fontSize: 11, fontWeight: 600, color: '#475569',
               cursor: 'pointer', flexShrink: 0, transition: 'all 0.12s',
             }}
           >

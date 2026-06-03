@@ -347,14 +347,14 @@ export default function RequirementsTab({
   return (
     <div className="space-y-6">
     {/* Page Header */}
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #dbe2ea'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #E2E8F0'}}>
       <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#0F172A 0%,#5B6CFF 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
           <FileText style={{width:20,height:20,color:'#ffffff'}} />
         </div>
         <div>
-          <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Requirements</h1>
-          <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Parse and track requirements · auto-generate test cases</p>
+          <h1 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#0F172A',lineHeight:1,margin:0}}>Requirements</h1>
+          <p style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,color:'#475569',margin:'3px 0 0'}}>Parse and track requirements · auto-generate test cases</p>
         </div>
       </div>
     </div>
@@ -580,7 +580,7 @@ export default function RequirementsTab({
       <div className="lg:col-span-5 glass-card p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h3 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:15,fontWeight:700,color:'#1f3965',display:'flex',alignItems:'center',gap:8,margin:0}}><Sparkles style={{width:16,height:16,color:'#1e96df'}} />Add Requirement</h3>
+            <h3 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:15,fontWeight:700,color:'#0F172A',display:'flex',alignItems:'center',gap:8,margin:0}}><Sparkles style={{width:16,height:16,color:'#5B6CFF'}} />Add Requirement</h3>
             <p className="text-xs text-slate-500 mt-1">Add requirements to auto-generate test cases.</p>
           </div>
           {/* REQ-15: Export buttons */}
@@ -1108,19 +1108,19 @@ export default function RequirementsTab({
       {requirements.length > 0 && (
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+            <CheckCircle style={{width:18,height:18,color:'#5B6CFF',flexShrink:0}} />
             <div>
-              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+              <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#0F172A'}}>
                 {requirements.length} requirement{requirements.length !== 1 ? 's' : ''} parsed · {testCases.length} test case{testCases.length !== 1 ? 's' : ''} generated
               </span>
-              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+              <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,color:'#475569',marginLeft:8}}>
                 Review and enrich your test cases next.
               </span>
             </div>
           </div>
           <button
             onClick={onNavigateToTestCases}
-            style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+            style={{background:'#5B6CFF',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
           >
             Test Cases <ArrowRight style={{width:14,height:14}} />
           </button>

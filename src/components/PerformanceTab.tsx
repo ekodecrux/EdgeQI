@@ -283,14 +283,14 @@ export function handleSummary(data) {
     <div className="space-y-4">
 
     {/* Page Header */}
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:16,borderBottom:'1px solid #dbe2ea'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:16,borderBottom:'1px solid #E2E8F0'}}>
       <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#0F172A 0%,#5B6CFF 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
           <Sliders style={{width:20,height:20,color:'#ffffff'}} />
         </div>
         <div>
-          <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Performance Testing</h1>
-          <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Load test your API endpoints and browser journeys</p>
+          <h1 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#0F172A',lineHeight:1,margin:0}}>Performance Testing</h1>
+          <p style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,color:'#475569',margin:'3px 0 0'}}>Load test your API endpoints and browser journeys</p>
         </div>
       </div>
       {/* GAP-13/14: Export buttons */}
@@ -345,9 +345,9 @@ export function handleSummary(data) {
 
     {/* Test case quick-pick */}
     {testCases.length > 0 && (
-      <div style={{background:'#f8fafc',border:'1px solid #dbe2ea',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <TableProperties style={{width:15,height:15,color:'#1e96df',flexShrink:0}} />
-        <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#1f3965'}}>From test cases:</span>
+      <div style={{background:'#f8fafc',border:'1px solid #E2E8F0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <TableProperties style={{width:15,height:15,color:'#5B6CFF',flexShrink:0}} />
+        <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#0F172A'}}>From test cases:</span>
         {testCases.slice(0, 6).map(tc => (
           <button
             key={tc.id}
@@ -355,7 +355,7 @@ export function handleSummary(data) {
               setTestType('API');
               setEndpointOrJourney(`GET /api/${tc.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 40)}`);
             }}
-            style={{background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:6,padding:'3px 10px',fontFamily:'"Lato",Arial,sans-serif',fontSize:11,color:'#1e96df',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis'}}
+            style={{background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:6,padding:'3px 10px',fontFamily:'"Inter",Arial,sans-serif',fontSize:11,color:'#5B6CFF',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis'}}
             title={tc.title}
           >
             {tc.id}
@@ -711,19 +711,19 @@ export function handleSummary(data) {
     {hasRunBefore && (
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+          <CheckCircle style={{width:18,height:18,color:'#5B6CFF',flexShrink:0}} />
           <div>
-            <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+            <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#0F172A'}}>
               {configs.length} performance run{configs.length !== 1 ? 's' : ''} recorded
             </span>
-            <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+            <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,color:'#475569',marginLeft:8}}>
               View results in the QA Dashboard.
             </span>
           </div>
         </div>
         <button
           onClick={onNavigateToDashboard}
-          style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+          style={{background:'#5B6CFF',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
         >
           QA Dashboard <ArrowRight style={{width:14,height:14}} />
         </button>

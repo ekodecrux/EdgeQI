@@ -301,24 +301,24 @@ export default function DashboardMetrics({
   return (
     <div className="space-y-6 animate-fadeInUp">
       {/* Page Header + Persona Selector */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #dbe2ea'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #E2E8F0'}}>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#0F172A 0%,#5B6CFF 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <TrendingUp style={{width:20,height:20,color:'#ffffff'}} />
           </div>
           <div>
-            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>QE Dashboard</h1>
-            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Quality metrics and coverage overview</p>
+            <h1 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#0F172A',lineHeight:1,margin:0}}>QE Dashboard</h1>
+            <p style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,color:'#475569',margin:'3px 0 0'}}>Quality metrics and coverage overview</p>
           </div>
         </div>
-        <div style={{display:'flex',gap:4,background:'#f2f4f8',padding:4,borderRadius:8,border:'1px solid #dbe2ea'}}>
+        <div style={{display:'flex',gap:4,background:'#F6F8FC',padding:4,borderRadius:8,border:'1px solid #E2E8F0'}}>
           {(['tactical','operational','strategic'] as const).map(p => (
             <button key={p} onClick={() => setPersona(p)} style={{
               padding:'6px 14px', borderRadius:6, fontSize:12,
-              fontFamily:'"Lato",Arial,sans-serif', fontWeight:600,
+              fontFamily:'"Inter",Arial,sans-serif', fontWeight:600,
               border:'none', cursor:'pointer',
-              background: persona === p ? '#1e96df' : 'transparent',
-              color: persona === p ? '#ffffff' : '#6b82ab',
+              background: persona === p ? '#5B6CFF' : 'transparent',
+              color: persona === p ? '#ffffff' : '#475569',
               transition:'all 0.15s'
             }}>
               {p === 'tactical' ? 'QA Lead' : p === 'operational' ? 'Engineer' : 'Director'}
@@ -330,11 +330,11 @@ export default function DashboardMetrics({
       {/* Quick action strip */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 16px'}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <Zap style={{width:16,height:16,color:'#1e96df'}} />
-          <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:14,fontWeight:600,color:'#1f3965'}}>Run full AI QA cycle</span>
-          <span style={{fontSize:12,color:'#6b82ab'}}>— requirements → tests → execution → report</span>
+          <Zap style={{width:16,height:16,color:'#5B6CFF'}} />
+          <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:14,fontWeight:600,color:'#0F172A'}}>Run full AI QA cycle</span>
+          <span style={{fontSize:12,color:'#475569'}}>— requirements → tests → execution → report</span>
         </div>
-        <button onClick={onNavigateToAgentic} style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+        <button onClick={onNavigateToAgentic} style={{background:'#5B6CFF',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
           Run Now <ArrowRight style={{width:14,height:14}} />
         </button>
       </div>
@@ -1094,7 +1094,7 @@ export default function DashboardMetrics({
             <Layers className="w-4 h-4 text-blue-500" />
             <h3 className="panel-title">Module Health</h3>
           </div>
-          <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:11,color:'#6b82ab'}}>Health · Risk · Automation · Bugs</span>
+          <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:11,color:'#475569'}}>Health · Risk · Automation · Bugs</span>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
           {modulesList.map(m => {
@@ -1103,22 +1103,22 @@ export default function DashboardMetrics({
             return (
               <div
                 key={m.name}
-                style={{background:healthBg,border:`1px solid #dbe2ea`,borderRadius:10,padding:'12px 14px',cursor:'pointer'}}
+                style={{background:healthBg,border:`1px solid #E2E8F0`,borderRadius:10,padding:'12px 14px',cursor:'pointer'}}
                 onClick={() => onNavigateToModule && onNavigateToModule(moduleNameToId[m.name] || 'auth')}
               >
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#1f3965'}}>{m.name}</span>
-                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:10,fontWeight:700,color:riskColor,background:riskColor+'18',border:`1px solid ${riskColor}44`,borderRadius:4,padding:'1px 6px'}}>{m.risk}</span>
+                  <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,fontWeight:700,color:'#0F172A'}}>{m.name}</span>
+                  <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:10,fontWeight:700,color:riskColor,background:riskColor+'18',border:`1px solid ${riskColor}44`,borderRadius:4,padding:'1px 6px'}}>{m.risk}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
-                  <div style={{flex:1,height:4,background:'#dbe2ea',borderRadius:2}}>
+                  <div style={{flex:1,height:4,background:'#E2E8F0',borderRadius:2}}>
                     <div style={{width:`${m.health}%`,height:4,background:m.health>=90?'#22c55e':m.health>=75?'#eab308':'#ef4444',borderRadius:2}} />
                   </div>
-                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:11,fontWeight:700,color:'#1f3965',minWidth:30}}>{m.health}%</span>
+                  <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:11,fontWeight:700,color:'#0F172A',minWidth:30}}>{m.health}%</span>
                 </div>
                 <div style={{display:'flex',gap:12}}>
-                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:10,color:'#6b82ab'}}>Auto: <b style={{color:'#1f3965'}}>{m.automation}</b></span>
-                  <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:10,color:'#6b82ab'}}>Bugs: <b style={{color:m.bugs>2?'#ef4444':'#1f3965'}}>{m.bugs}</b></span>
+                  <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:10,color:'#475569'}}>Auto: <b style={{color:'#0F172A'}}>{m.automation}</b></span>
+                  <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:10,color:'#475569'}}>Bugs: <b style={{color:m.bugs>2?'#ef4444':'#0F172A'}}>{m.bugs}</b></span>
                 </div>
               </div>
             );
@@ -1136,30 +1136,30 @@ export default function DashboardMetrics({
             </div>
             <button
               onClick={() => onNavigateTo && onNavigateTo('performance')}
-              style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#1e96df',background:'none',border:'none',cursor:'pointer',fontWeight:600}}
+              style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,color:'#5B6CFF',background:'none',border:'none',cursor:'pointer',fontWeight:600}}
             >
               Run new test →
             </button>
           </div>
           <div style={{overflowX:'auto'}}>
-            <table style={{width:'100%',borderCollapse:'collapse',fontFamily:'"Lato",Arial,sans-serif',fontSize:12}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontFamily:'"Inter",Arial,sans-serif',fontSize:12}}>
               <thead>
-                <tr style={{borderBottom:'1px solid #dbe2ea'}}>
+                <tr style={{borderBottom:'1px solid #E2E8F0'}}>
                   {['Type','Endpoint / Journey','VUsers','Avg ms','p95 ms','Error %','TPS'].map(h => (
-                    <th key={h} style={{padding:'6px 10px',textAlign:'left',color:'#6b82ab',fontWeight:600,fontSize:11,whiteSpace:'nowrap'}}>{h}</th>
+                    <th key={h} style={{padding:'6px 10px',textAlign:'left',color:'#475569',fontWeight:600,fontSize:11,whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {performanceConfigs.slice(0,5).map((cfg, i) => (
-                  <tr key={i} style={{borderBottom:'1px solid #f2f4f8'}}>
-                    <td style={{padding:'7px 10px',color:'#1f3965',fontWeight:600}}>{cfg.testType}</td>
-                    <td style={{padding:'7px 10px',color:'#6b82ab',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cfg.endpointOrJourney}</td>
-                    <td style={{padding:'7px 10px',color:'#1f3965'}}>{cfg.virtualUsers}</td>
-                    <td style={{padding:'7px 10px',color: (cfg.metrics?.avgResponseTimeMs||0)>500?'#ef4444':'#1f3965',fontWeight:600}}>{cfg.metrics?.avgResponseTimeMs ?? '—'}</td>
-                    <td style={{padding:'7px 10px',color:(cfg.metrics?.p95Ms||0)>1000?'#ef4444':'#1f3965'}}>{cfg.metrics?.p95Ms ?? '—'}</td>
+                  <tr key={i} style={{borderBottom:'1px solid #F6F8FC'}}>
+                    <td style={{padding:'7px 10px',color:'#0F172A',fontWeight:600}}>{cfg.testType}</td>
+                    <td style={{padding:'7px 10px',color:'#475569',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cfg.endpointOrJourney}</td>
+                    <td style={{padding:'7px 10px',color:'#0F172A'}}>{cfg.virtualUsers}</td>
+                    <td style={{padding:'7px 10px',color: (cfg.metrics?.avgResponseTimeMs||0)>500?'#ef4444':'#0F172A',fontWeight:600}}>{cfg.metrics?.avgResponseTimeMs ?? '—'}</td>
+                    <td style={{padding:'7px 10px',color:(cfg.metrics?.p95Ms||0)>1000?'#ef4444':'#0F172A'}}>{cfg.metrics?.p95Ms ?? '—'}</td>
                     <td style={{padding:'7px 10px',color:(cfg.metrics?.errorRate||0)>1?'#ef4444':'#22c55e',fontWeight:600}}>{cfg.metrics?.errorRate != null ? `${cfg.metrics.errorRate}%` : '—'}</td>
-                    <td style={{padding:'7px 10px',color:'#1f3965'}}>{cfg.metrics?.throughputTps ?? '—'}</td>
+                    <td style={{padding:'7px 10px',color:'#0F172A'}}>{cfg.metrics?.throughputTps ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

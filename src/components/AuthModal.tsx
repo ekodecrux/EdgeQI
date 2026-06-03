@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, User, Eye, EyeOff, Shield, CheckCircle } from 'lucide-react';
+import { Lock, Mail, User, Eye, EyeOff, Shield, CheckCircle, Zap } from 'lucide-react';
 
 interface AuthModalProps {
   onLogin: (user: { id: number; email: string; name: string; role: string }, token: string) => void;
@@ -43,7 +43,6 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
 
   const handleDemo = async () => {
     setLoading(true);
-    // Auto-create demo account if not exists
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -58,7 +57,6 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
         return;
       }
     } catch {}
-    // If already exists, log in
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -78,91 +76,168 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
     }
   };
 
+  const inputClass = {
+    width: '100%',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: 10,
+    padding: '10px 12px 10px 38px',
+    color: '#E2E8F0',
+    fontSize: 14,
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+    outline: 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxSizing: 'border-box' as const,
+  };
+
   return (
-    <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/40">
-              <Shield className="w-6 h-6 text-white" />
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 50,
+      background: 'rgba(10,14,26,0.96)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16,
+      fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+    }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+
+        {/* ── Logo / Header ──────────────────────────────────────────── */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 14,
+              background: 'linear-gradient(135deg, #5B6CFF 0%, #7C3AED 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(91,108,255,0.40)',
+            }}>
+              <Zap style={{ width: 24, height: 24, color: '#fff' }} />
             </div>
-            <div className="text-left">
-              <h1 className="text-2xl font-black text-white" style={{letterSpacing:"0.15em"}}>EDGE<span className="text-blue-400 ml-1.5">QI</span></h1>
-              <p className="text-xs text-blue-400 font-mono uppercase tracking-widest">Edge Quality Intelligence</p>
+            <div style={{ textAlign: 'left' }}>
+              <h1 style={{
+                fontSize: 22, fontWeight: 900, color: '#FFFFFF',
+                letterSpacing: '0.16em', margin: 0, lineHeight: 1,
+              }}>
+                EDGE<span style={{ color: '#818CF8' }}> QI</span>
+              </h1>
+              <p style={{
+                fontSize: 9, fontFamily: 'JetBrains Mono, monospace',
+                color: '#64748B', letterSpacing: '0.12em',
+                textTransform: 'uppercase', marginTop: 3,
+              }}>
+                Edge Quality Intelligence
+              </p>
             </div>
           </div>
-          <p className="text-slate-400 text-sm">
+          <p style={{ fontSize: 13, color: '#64748B', margin: 0 }}>
             {mode === 'login' ? 'Sign in to your workspace' : 'Create your account'}
           </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-slate-900 border border-slate-700/60 rounded-2xl p-8 shadow-2xl">
-          {/* Mode tabs */}
-          <div className="flex bg-slate-800 rounded-xl p-1 mb-6">
-            <button
-              onClick={() => { setMode('login'); setError(''); }}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === 'login' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setMode('register'); setError(''); }}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === 'register' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-            >
-              Register
-            </button>
+        {/* ── Card ───────────────────────────────────────────────────── */}
+        <div style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 20,
+          padding: 28,
+          boxShadow: '0 24px 64px rgba(0,0,0,0.50)',
+          backdropFilter: 'blur(20px)',
+        }}>
+
+          {/* Mode toggle */}
+          <div style={{
+            display: 'flex',
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: 12, padding: 4, marginBottom: 24,
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            {(['login', 'register'] as const).map(m => (
+              <button key={m}
+                onClick={() => { setMode(m); setError(''); }}
+                style={{
+                  flex: 1, padding: '8px 0',
+                  borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                  fontFamily: 'Inter, sans-serif',
+                  transition: 'all 0.18s ease',
+                  background: mode === m
+                    ? 'linear-gradient(135deg, #5B6CFF 0%, #7C3AED 100%)'
+                    : 'transparent',
+                  color: mode === m ? '#FFFFFF' : '#64748B',
+                  boxShadow: mode === m ? '0 4px 12px rgba(91,108,255,0.30)' : 'none',
+                }}>
+                {m === 'login' ? 'Sign In' : 'Register'}
+              </button>
+            ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Full Name (register only) */}
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', marginBottom: 6, letterSpacing: '0.04em' }}>
+                  FULL NAME
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <User style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: '#475569' }} />
                   <input
                     value={name} onChange={e => setName(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-600 rounded-xl py-2.5 pl-10 pr-4 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500"
-                    placeholder="e.g. Jane Smith" required
+                    style={inputClass} placeholder="e.g. Jane Smith" required
+                    onFocus={e => { e.currentTarget.style.borderColor = '#5B6CFF'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,108,255,0.14)'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = 'none'; }}
                   />
                 </div>
               </div>
             )}
 
+            {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', marginBottom: 6, letterSpacing: '0.04em' }}>
+                EMAIL
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: '#475569' }} />
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-xl py-2.5 pl-10 pr-4 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500"
-                  placeholder="you@company.com" required
+                  style={inputClass} placeholder="you@company.com" required
+                  onFocus={e => { e.currentTarget.style.borderColor = '#5B6CFF'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,108,255,0.14)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
               </div>
             </div>
 
+            {/* Password */}
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', marginBottom: 6, letterSpacing: '0.04em' }}>
+                PASSWORD
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: '#475569' }} />
                 <input
                   type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-xl py-2.5 pl-10 pr-10 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder-slate-500"
-                  placeholder="••••••••" required minLength={6}
+                  style={{ ...inputClass, paddingRight: 42 }} placeholder="••••••••" required minLength={6}
+                  onFocus={e => { e.currentTarget.style.borderColor = '#5B6CFF'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,108,255,0.14)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
-                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: 0 }}>
+                  {showPw ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
                 </button>
               </div>
             </div>
 
+            {/* Role (register only) */}
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Role</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', marginBottom: 6, letterSpacing: '0.04em' }}>
+                  ROLE
+                </label>
                 <select
                   value={role} onChange={e => setRole(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-xl py-2.5 px-3 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  style={{ ...inputClass, paddingLeft: 12, cursor: 'pointer' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = '#5B6CFF'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,108,255,0.14)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   <option value="qa_engineer">QA Engineer</option>
                   <option value="qa_lead">QA Lead / Test Manager</option>
@@ -174,46 +249,76 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
               </div>
             )}
 
+            {/* Error */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm">
+              <div style={{
+                background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: 10, padding: '10px 14px', color: '#FCA5A5', fontSize: 13,
+              }}>
                 {error}
               </div>
             )}
 
+            {/* Submit */}
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-60 shadow-lg shadow-indigo-500/20"
+              type="submit" disabled={loading}
+              style={{
+                width: '100%',
+                background: loading ? 'rgba(91,108,255,0.5)' : 'linear-gradient(135deg, #5B6CFF 0%, #7C3AED 100%)',
+                color: '#FFFFFF', border: 'none', borderRadius: 12,
+                padding: '12px 0', fontSize: 14, fontWeight: 700,
+                fontFamily: 'Inter, sans-serif',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: loading ? 'none' : '0 6px 20px rgba(91,108,255,0.38)',
+                transition: 'all 0.18s ease',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+              onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(91,108,255,0.48)'; } }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = loading ? 'none' : '0 6px 20px rgba(91,108,255,0.38)'; }}
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {mode === 'login' ? 'Signing in...' : 'Creating account...'}
-                </span>
+                <>
+                  <span style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                  {mode === 'login' ? 'Signing in…' : 'Creating account…'}
+                </>
               ) : (
                 mode === 'login' ? 'Sign In' : 'Create Account'
               )}
             </button>
           </form>
 
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-700" />
-            <span className="text-xs text-slate-500">or</span>
-            <div className="flex-1 h-px bg-slate-700" />
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <span style={{ fontSize: 11, color: '#475569' }}>or</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
           </div>
 
+          {/* Demo account */}
           <button
-            onClick={handleDemo}
-            disabled={loading}
-            className="mt-4 w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-medium py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+            onClick={handleDemo} disabled={loading}
+            style={{
+              width: '100%',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 12, padding: '11px 0',
+              color: '#94A3B8', fontSize: 13, fontWeight: 500,
+              fontFamily: 'Inter, sans-serif',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.18s ease',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+            onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#CBD5E1'; } }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#94A3B8'; }}
           >
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <CheckCircle style={{ width: 15, height: 15, color: '#10B981' }} />
             Continue with Demo Account
           </button>
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-4">
-          Secured with JWT · Data stored in SQLite · No external auth dependencies
+        {/* Footer note */}
+        <p style={{ textAlign: 'center', fontSize: 11, color: '#334155', marginTop: 16, fontFamily: 'JetBrains Mono, monospace' }}>
+          JWT secured · SQLite · No external auth
         </p>
       </div>
     </div>

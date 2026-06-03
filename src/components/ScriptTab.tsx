@@ -850,19 +850,19 @@ export default function ScriptTab({
       {scripts.length > 0 && (
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px',marginTop:8}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <CheckCircle style={{width:18,height:18,color:'#1e96df',flexShrink:0}} />
+            <CheckCircle style={{width:18,height:18,color:'#5B6CFF',flexShrink:0}} />
             <div>
-              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965'}}>
+              <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#0F172A'}}>
                 {scripts.length} script{scripts.length !== 1 ? 's' : ''} compiled
               </span>
-              <span style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:12,color:'#6b82ab',marginLeft:8}}>
+              <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,color:'#475569',marginLeft:8}}>
                 Run your test suite in the Execution Engine.
               </span>
             </div>
           </div>
           <button
             onClick={onNavigateToExecution}
-            style={{background:'#1e96df',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+            style={{background:'#5B6CFF',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
           >
             Execution Engine <ArrowRight style={{width:14,height:14}} />
           </button>

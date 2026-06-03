@@ -1010,14 +1010,14 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
                 <p className="truncate" style={{ fontSize: 9, color: '#64748B', fontFamily: 'Inter, sans-serif' }}>{authUser.role.replace('_', ' ')}</p>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => setShowLanding(true)} title="Home" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#6b82ab' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#a6b4cd')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#6b82ab')}>
+                <button onClick={() => setShowLanding(true)} title="Home" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#94A3B8')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}>
                   <Layers className="w-3 h-3" />
                 </button>
-                <button onClick={handleLogout} title="Sign out" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#6b82ab' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#ff5e5e')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#6b82ab')}>
+                <button onClick={handleLogout} title="Sign out" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}>
                   <LogOut className="w-3 h-3" />
                 </button>
               </div>

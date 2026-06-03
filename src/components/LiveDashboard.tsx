@@ -13,20 +13,20 @@ interface Props {
 }
 
 const COLORS = {
-  blue:   '#1e96df', navy: '#1f3965', green: '#27ae60', red: '#e74c3c',
+  blue:   '#5B6CFF', navy: '#0F172A', green: '#27ae60', red: '#e74c3c',
   orange: '#e67e22', yellow: '#f1c40f', purple: '#8b5cf6', teal: '#14b8a6',
 };
 
 function Metric({ label, value, sub, color, icon: Icon, onClick, trend, badge }: any) {
   return (
     <div onClick={onClick}
-      style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #dbe2ea', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s', position: 'relative', overflow: 'hidden' }}
+      style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', border: '1px solid #E2E8F0', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.15s', position: 'relative', overflow: 'hidden' }}
       onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLElement).style.borderColor = color || COLORS.blue; (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px ${color || COLORS.blue}20`; }}}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#dbe2ea'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#E2E8F0'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}>
       {/* background accent */}
       <div style={{ position: 'absolute', right: -10, top: -10, width: 60, height: 60, borderRadius: '50%', background: `${color || COLORS.blue}10` }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: '#6b82ab', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
         {Icon && <Icon style={{ width: 18, height: 18, color: color || COLORS.blue }} />}
       </div>
       <div style={{ fontSize: 30, fontWeight: 900, color: color || COLORS.navy, lineHeight: 1, marginBottom: 4 }}>{value ?? '—'}</div>
@@ -37,10 +37,10 @@ function Metric({ label, value, sub, color, icon: Icon, onClick, trend, badge }:
             {Math.abs(trend)}%
           </span>
         )}
-        {sub && <span style={{ fontSize: 11, color: '#a6b4cd' }}>{sub}</span>}
+        {sub && <span style={{ fontSize: 11, color: '#94A3B8' }}>{sub}</span>}
       </div>
       {badge && <div style={{ position: 'absolute', top: 10, right: 10, background: badge.color, color: '#fff', borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 800 }}>{badge.text}</div>}
-      {onClick && <div style={{ position: 'absolute', bottom: 12, right: 14, color: '#a6b4cd' }}><ArrowRight style={{ width: 12, height: 12 }} /></div>}
+      {onClick && <div style={{ position: 'absolute', bottom: 12, right: 14, color: '#94A3B8' }}><ArrowRight style={{ width: 12, height: 12 }} /></div>}
     </div>
   );
 }
@@ -70,7 +70,7 @@ function GaugeRing({ pct, color, size = 80, label }: { pct: number; color: strin
           {pct}%
         </text>
       </svg>
-      <span style={{ fontSize: 10, color: '#6b82ab', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+      <span style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
     </div>
   );
 }
@@ -121,10 +121,10 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
   const navigate = (tab: string) => onNavigateTo?.(tab);
 
   return (
-    <div style={{ padding: '0 0 48px', fontFamily: '"Lato", Arial, sans-serif' }}>
+    <div style={{ padding: '0 0 48px', fontFamily: '"Inter", Arial, sans-serif' }}>
 
       {/* ─── Header ─── */}
-      <div style={{ background: 'linear-gradient(135deg, #1f3965 0%, #1e3a8a 60%, #1e96df 100%)', borderRadius: 16, padding: '24px 28px', marginBottom: 24, color: '#fff', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1e3a8a 60%, #5B6CFF 100%)', borderRadius: 16, padding: '24px 28px', marginBottom: 24, color: '#fff', position: 'relative', overflow: 'hidden' }}>
         {/* Background pattern */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 80% 50%, rgba(30,150,223,0.3) 0%, transparent 50%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative' }}>
@@ -148,7 +148,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                 {([['lead', '🎯 Test Lead'], ['engineer', '⚙️ Engineer'], ['director', '📊 Director']] as const).map(([p, l]) => (
                   <button key={p} onClick={() => setPersona(p)}
                     style={{ padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                      background: persona === p ? '#fff' : 'transparent', color: persona === p ? '#1f3965' : 'rgba(255,255,255,0.8)' }}>
+                      background: persona === p ? '#fff' : 'transparent', color: persona === p ? '#0F172A' : 'rgba(255,255,255,0.8)' }}>
                     {l}
                   </button>
                 ))}
@@ -158,7 +158,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                 <Activity style={{ width: 13, height: 13 }} /> {autoRefresh ? 'Live' : 'Paused'}
               </button>
               <button onClick={load}
-                style={{ padding: '7px 14px', background: '#fff', color: '#1f3965', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                style={{ padding: '7px 14px', background: '#fff', color: '#0F172A', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
               </button>
             </div>
@@ -198,7 +198,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
       {loading && !data && (
         <div style={{ padding: 60, textAlign: 'center' }}>
           <Loader2 style={{ width: 32, height: 32, color: COLORS.blue, margin: '0 auto 12px', animation: 'spin 1s linear infinite' }} />
-          <p style={{ color: '#6b82ab', fontSize: 13 }}>Loading live metrics…</p>
+          <p style={{ color: '#475569', fontSize: 13 }}>Loading live metrics…</p>
         </div>
       )}
 
@@ -222,7 +222,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
           {persona === 'lead' && (
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
               {/* Pass Rate Trend */}
-              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <h4 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: COLORS.navy }}>📈 Pass Rate Trend</h4>
                   <button onClick={() => navigate('execution')} style={{ fontSize: 11, color: COLORS.blue, background: '#eaf5fd', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 700 }}>
@@ -239,12 +239,12 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                             <div style={{ width: '100%', background: isLast ? COLORS.blue : `${COLORS.blue}50`, borderRadius: '4px 4px 0 0', height: `${Math.max(4, ((t.pass_rate||0)/100)*90)}px`, position: 'relative' }}
                               title={`${t.label}: ${t.pass_rate}% pass rate`} />
-                            <span style={{ fontSize: 9, color: '#a6b4cd', transform: 'rotate(-45deg)', transformOrigin: 'right', whiteSpace: 'nowrap' }}>{t.label?.slice(-6)}</span>
+                            <span style={{ fontSize: 9, color: '#94A3B8', transform: 'rotate(-45deg)', transformOrigin: 'right', whiteSpace: 'nowrap' }}>{t.label?.slice(-6)}</span>
                           </div>
                         );
                       })}
                     </div>
-                    <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#6b82ab' }}>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#475569' }}>
                       <span>Total tests: {data.execution.last_run?.total_tests ?? 0}</span>
                       <span style={{ color: COLORS.green }}>✓ Passed: {data.execution.last_run?.passed ?? 0}</span>
                       <span style={{ color: COLORS.red }}>✗ Failed: {data.execution.last_run?.failed ?? 0}</span>
@@ -252,8 +252,8 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                   </>
                 ) : (
                   <div style={{ padding: '30px 0', textAlign: 'center' }}>
-                    <Play style={{ width: 28, height: 28, color: '#dbe2ea', margin: '0 auto 8px' }} />
-                    <p style={{ color: '#a6b4cd', fontSize: 13 }}>No execution runs yet. Run tests to see pass rate trend.</p>
+                    <Play style={{ width: 28, height: 28, color: '#E2E8F0', margin: '0 auto 8px' }} />
+                    <p style={{ color: '#94A3B8', fontSize: 13 }}>No execution runs yet. Run tests to see pass rate trend.</p>
                     <button onClick={() => navigate('execution')} style={{ marginTop: 8, fontSize: 12, background: COLORS.blue, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700 }}>
                       Start Execution →
                     </button>
@@ -262,7 +262,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
               </div>
 
               {/* Coverage Gauges */}
-              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                 <h4 style={{ margin: '0 0 20px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>🎯 Coverage</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
                   <GaugeRing pct={autoCoverage} color={autoCoverage >= 70 ? COLORS.green : COLORS.orange} label="Automated" />
@@ -277,7 +277,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               {/* Last Run Details */}
               {data.execution.last_run ? (
-                <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+                <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                   <h4 style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>⚡ Latest Test Run</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     {[
@@ -291,7 +291,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                       { l: 'Branch', v: data.execution.last_run.branch },
                     ].map(f => (
                       <div key={f.l} style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 12px' }}>
-                        <div style={{ fontSize: 9, color: '#a6b4cd', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>{f.l}</div>
+                        <div style={{ fontSize: 9, color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700, marginBottom: 2 }}>{f.l}</div>
                         <div style={{ fontSize: 14, fontWeight: 800, color: (f as any).color || COLORS.navy }}>{f.v ?? '—'}</div>
                       </div>
                     ))}
@@ -301,9 +301,9 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                   </button>
                 </div>
               ) : (
-                <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '40px 24px', textAlign: 'center' }}>
-                  <Play style={{ width: 32, height: 32, color: '#dbe2ea', margin: '0 auto 12px' }} />
-                  <p style={{ color: '#a6b4cd', fontSize: 13 }}>No runs yet</p>
+                <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '40px 24px', textAlign: 'center' }}>
+                  <Play style={{ width: 32, height: 32, color: '#E2E8F0', margin: '0 auto 12px' }} />
+                  <p style={{ color: '#94A3B8', fontSize: 13 }}>No runs yet</p>
                   <button onClick={() => navigate('execution')} style={{ marginTop: 8, fontSize: 12, background: COLORS.blue, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700 }}>
                     Run Tests →
                   </button>
@@ -311,7 +311,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
               )}
 
               {/* Open Defects by Severity */}
-              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                   <h4 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: COLORS.navy }}>🐛 Open Defects</h4>
                   <button onClick={() => navigate('defects')} style={{ fontSize: 11, color: COLORS.blue, background: '#eaf5fd', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 700 }}>Manage →</button>
@@ -344,7 +344,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
           {persona === 'director' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
               {/* Quality KPIs */}
-              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                 <h4 style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>🏆 Quality KPIs</h4>
                 {[
                   { label: 'Release Readiness', value: passRate >= 90 && data.defects.critical === 0 ? '✅ Ready' : '⚠️ Not Ready', color: passRate >= 90 && data.defects.critical === 0 ? COLORS.green : COLORS.orange },
@@ -354,30 +354,30 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                   { label: 'Total Test Assets', value: data.test_cases.total, color: COLORS.blue },
                 ].map(k => (
                   <div key={k.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: 12, color: '#6b82ab' }}>{k.label}</span>
+                    <span style={{ fontSize: 12, color: '#475569' }}>{k.label}</span>
                     <span style={{ fontSize: 13, fontWeight: 800, color: k.color }}>{k.value}</span>
                   </div>
                 ))}
               </div>
 
               {/* Defect Trend */}
-              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                 <h4 style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>📉 Defect Trend (14d)</h4>
                 {defectTrend.length > 0 ? (
                   <>
                     <SparkBar values={defectTrend} color={COLORS.red} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: '#a6b4cd' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: '#94A3B8' }}>
                       <span>14 days ago</span><span>Today</span>
                     </div>
-                    <div style={{ marginTop: 12, fontSize: 12, color: '#6b82ab' }}>
+                    <div style={{ marginTop: 12, fontSize: 12, color: '#475569' }}>
                       Avg defects/day: <strong style={{ color: COLORS.navy }}>{(defectTrend.reduce((a, b) => a + b, 0) / Math.max(defectTrend.length, 1)).toFixed(1)}</strong>
                     </div>
                   </>
-                ) : <p style={{ color: '#a6b4cd', fontSize: 12 }}>No defect trend data yet</p>}
+                ) : <p style={{ color: '#94A3B8', fontSize: 12 }}>No defect trend data yet</p>}
               </div>
 
               {/* Sprint Status */}
-              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
                 <h4 style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>🏃 Sprint Status</h4>
                 {data.sprint ? (
                   <>
@@ -389,14 +389,14 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                       ].map(f => (
                         <div key={f.l} style={{ flex: 1, background: '#f8fafc', borderRadius: 8, padding: 10, textAlign: 'center' }}>
                           <div style={{ fontSize: 16, fontWeight: 800, color: f.c }}>{f.v}</div>
-                          <div style={{ fontSize: 9, color: '#a6b4cd', textTransform: 'uppercase', fontWeight: 700 }}>{f.l}</div>
+                          <div style={{ fontSize: 9, color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700 }}>{f.l}</div>
                         </div>
                       ))}
                     </div>
                   </>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                    <p style={{ color: '#a6b4cd', fontSize: 12 }}>No active sprint</p>
+                    <p style={{ color: '#94A3B8', fontSize: 12 }}>No active sprint</p>
                     <button onClick={() => navigate('projects')} style={{ fontSize: 12, color: COLORS.blue, background: '#eaf5fd', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontWeight: 700 }}>
                       Create Sprint →
                     </button>
@@ -407,7 +407,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
           )}
 
           {/* ─── WORKFLOW STATUS ROW ─── */}
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px', marginBottom: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px', marginBottom: 16 }}>
             <h4 style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>🔄 STLC Progress</h4>
             <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto' }}>
               {[
@@ -424,17 +424,17 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                     onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                     <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                       background: step.done ? (step.count > 0 ? COLORS.blue : '#f1f5f9') : '#f1f5f9',
-                      border: `2px solid ${step.done && step.count > 0 ? COLORS.blue : '#dbe2ea'}`,
+                      border: `2px solid ${step.done && step.count > 0 ? COLORS.blue : '#E2E8F0'}`,
                       boxShadow: step.done && step.count > 0 ? `0 0 0 4px ${COLORS.blue}20` : 'none' }}>
                       {step.icon}
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: step.count > 0 ? COLORS.navy : '#a6b4cd' }}>{step.label}</div>
-                      <div style={{ fontSize: 13, fontWeight: 900, color: step.count > 0 ? COLORS.blue : '#a6b4cd' }}>{step.count}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: step.count > 0 ? COLORS.navy : '#94A3B8' }}>{step.label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: step.count > 0 ? COLORS.blue : '#94A3B8' }}>{step.count}</div>
                     </div>
                   </div>
                   {i < arr.length - 1 && (
-                    <div style={{ flex: 1, height: 2, background: arr[i].count > 0 && arr[i+1].count > 0 ? COLORS.blue : '#dbe2ea', minWidth: 20, alignSelf: 'flex-start', marginTop: 28 }} />
+                    <div style={{ flex: 1, height: 2, background: arr[i].count > 0 && arr[i+1].count > 0 ? COLORS.blue : '#E2E8F0', minWidth: 20, alignSelf: 'flex-start', marginTop: 28 }} />
                   )}
                 </React.Fragment>
               ))}
@@ -442,7 +442,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
           </div>
 
           {/* ─── QUICK ACTIONS ─── */}
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #dbe2ea', padding: '20px 24px' }}>
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E2E8F0', padding: '20px 24px' }}>
             <h4 style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 800, color: COLORS.navy }}>⚡ Quick Actions</h4>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {[
@@ -454,9 +454,9 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
                 { label: 'Security Scan', tab: 'security', icon: '🛡️', color: COLORS.teal },
               ].map(a => (
                 <button key={a.label} onClick={() => navigate(a.tab)}
-                  style={{ padding: '9px 16px', background: '#f8fafc', border: `1px solid #dbe2ea`, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: COLORS.navy, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
+                  style={{ padding: '9px 16px', background: '#f8fafc', border: `1px solid #E2E8F0`, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: COLORS.navy, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${a.color}15`; (e.currentTarget as HTMLElement).style.borderColor = a.color; (e.currentTarget as HTMLElement).style.color = a.color; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; (e.currentTarget as HTMLElement).style.borderColor = '#dbe2ea'; (e.currentTarget as HTMLElement).style.color = COLORS.navy; }}>
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; (e.currentTarget as HTMLElement).style.borderColor = '#E2E8F0'; (e.currentTarget as HTMLElement).style.color = COLORS.navy; }}>
                   <span>{a.icon}</span> {a.label}
                 </button>
               ))}

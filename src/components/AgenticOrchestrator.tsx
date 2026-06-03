@@ -359,14 +359,14 @@ export default function AgenticOrchestrator({
       
       {/* Intro Header */}
       {/* Page Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #dbe2ea'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #E2E8F0'}}>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#093158 0%,#1e96df 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:40,height:40,borderRadius:10,background:'linear-gradient(135deg,#0F172A 0%,#5B6CFF 100%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <Zap style={{width:20,height:20,color:'#ffffff'}} />
           </div>
           <div>
-            <h1 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#1f3965',lineHeight:1,margin:0}}>Auto Pipeline</h1>
-            <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Requirements → Tests → Scripts → Execution → Dashboard</p>
+            <h1 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:20,fontWeight:700,color:'#0F172A',lineHeight:1,margin:0}}>Auto Pipeline</h1>
+            <p style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,color:'#475569',margin:'3px 0 0'}}>Requirements → Tests → Scripts → Execution → Dashboard</p>
           </div>
         </div>
       </div>
@@ -377,7 +377,7 @@ export default function AgenticOrchestrator({
         {/* Step Progression Timeline */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#1f3965',display:'flex',alignItems:'center',gap:8,margin:0}}><Cpu style={{width:16,height:16,color:'#1e96df'}} />Pipeline</h3>
+            <h3 style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#0F172A',display:'flex',alignItems:'center',gap:8,margin:0}}><Cpu style={{width:16,height:16,color:'#5B6CFF'}} />Pipeline</h3>
 
             <div className="space-y-4 relative pl-3 border-l border-slate-100 mt-2">
               {stepsList.map(step => {
@@ -423,13 +423,13 @@ export default function AgenticOrchestrator({
                 disabled={orchestratorState === 'running'}
                 className="w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold uppercase flex items-center justify-center gap-2 transition-all shadow-md"
                 style={orchestratorState === 'running'
-                  ? {background:'#f2f4f8', color:'#6b82ab', border:'1px solid #dbe2ea', cursor:'not-allowed'}
-                  : {background:'#1e96df', color:'#ffffff', border:'none', cursor:'pointer'}
+                  ? {background:'#F6F8FC', color:'#475569', border:'1px solid #E2E8F0', cursor:'not-allowed'}
+                  : {background:'#5B6CFF', color:'#ffffff', border:'none', cursor:'pointer'}
                 }
               >
                 {orchestratorState === 'running' ? (
                   <>
-                    <span className="w-2 h-2 rounded-full animate-ping" style={{background:'#1e96df'}} />
+                    <span className="w-2 h-2 rounded-full animate-ping" style={{background:'#5B6CFF'}} />
                     Running Connected Cycle ({progress}%)
                   </>
                 ) : (
@@ -516,7 +516,7 @@ export default function AgenticOrchestrator({
                 )}
                 {orchestratorState === 'running' && (
                   <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-0.5 rounded border border-purple-900">
-                    <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{background:'#1e96df'}} />
+                    <span className="w-1.5 h-1.5 rounded-full animate-ping" style={{background:'#5B6CFF'}} />
                     <span style={{fontSize:10,fontFamily:'monospace',color:'#5bb8f5',textTransform:'uppercase',letterSpacing:'0.08em'}}>Running…</span>
                   </div>
                 )}
@@ -528,8 +528,8 @@ export default function AgenticOrchestrator({
               {logs.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center text-slate-600 text-xs py-16 space-y-2">
                   <Cpu className="w-10 h-10 text-slate-800 animate-pulse" />
-                  <p className="font-mono font-bold" style={{color:'#6b82ab'}}>Pipeline ready.</p>
-                  <p style={{fontSize:11,color:'#a6b4cd',marginTop:4}}>Click Run to start the full QA cycle.</p>
+                  <p className="font-mono font-bold" style={{color:'#475569'}}>Pipeline ready.</p>
+                  <p style={{fontSize:11,color:'#94A3B8',marginTop:4}}>Click Run to start the full QA cycle.</p>
                 </div>
               ) : (
                 <div className="space-y-1">

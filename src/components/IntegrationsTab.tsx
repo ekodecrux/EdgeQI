@@ -172,7 +172,7 @@ export default function IntegrationsTab({
   const renderCredForm = () => {
     const inp = (label: string, key: string, ph: string, type = 'text') => (
       <div key={key}>
-        <label style={{ display: 'block', fontSize: 11, color: '#6b82ab', marginBottom: 4, fontWeight: 600 }}>{label}</label>
+        <label style={{ display: 'block', fontSize: 11, color: '#475569', marginBottom: 4, fontWeight: 600 }}>{label}</label>
         <input
           type={type}
           value={c[key] || ''}
@@ -271,7 +271,7 @@ export default function IntegrationsTab({
                 <tr key={i} style={{ borderBottom: '1px solid #0f172a' }}>
                   {isPullReqs && (
                     <>
-                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.jiraKey || r.azureId || r.id?.split('-').slice(-1)[0] || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{r.jiraKey || r.azureId || r.id?.split('-').slice(-1)[0] || '—'}</td>
                       <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{(r.title || '').slice(0, 55)}{r.title?.length > 55 ? '…' : ''}</td>
                       <td style={{ padding: '7px 10px 7px 0' }}><span style={{ fontSize: 10, color: '#a78bfa', background: '#a78bfa15', borderRadius: 4, padding: '2px 6px' }}>{r.issueType || r.workItemType || 'Story'}</span></td>
                       <td style={{ padding: '7px 0', color: '#94a3b8' }}>{r.status || 'To Do'}</td>
@@ -279,7 +279,7 @@ export default function IntegrationsTab({
                   )}
                   {activeOp === 'pull-tcs' && (
                     <>
-                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.trId || r.jiraKey || r.id?.split('-').slice(-1)[0] || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{r.trId || r.jiraKey || r.id?.split('-').slice(-1)[0] || '—'}</td>
                       <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{(r.title || '').slice(0, 55)}{r.title?.length > 55 ? '…' : ''}</td>
                       <td style={{ padding: '7px 10px 7px 0' }}><span style={{ fontSize: 10, background: r.priority === 'P0' ? '#ef444420' : r.priority === 'P1' ? '#f59e0b20' : '#64748b20', color: r.priority === 'P0' ? '#ef4444' : r.priority === 'P1' ? '#f59e0b' : '#94a3b8', borderRadius: 4, padding: '2px 6px' }}>{r.priority || 'P2'}</span></td>
                       <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: '#10b981', background: '#10b98115', borderRadius: 4, padding: '2px 6px' }}>{r.automationStatus || 'Automatable'}</span></td>
@@ -287,8 +287,8 @@ export default function IntegrationsTab({
                   )}
                   {activeOp === 'push-tcs' && (
                     <>
-                      <td style={{ padding: '7px 10px 7px 0', color: '#94a3b8', fontFamily: 'monospace', fontSize: 10 }}>{r.tcId || '—'}</td>
-                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.jiraKey || r.trId || r.azureId || r.iqStudioId || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#94a3b8', fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: 10 }}>{r.tcId || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{r.jiraKey || r.trId || r.azureId || r.iqStudioId || '—'}</td>
                       <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{(r.title || '').slice(0, 45)}{(r.title || '').length > 45 ? '…' : ''}</td>
                       <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: r.status === 'created' ? '#10b981' : '#ef4444', background: r.status === 'created' ? '#10b98115' : '#ef444415', borderRadius: 4, padding: '2px 6px' }}>{r.status === 'created' ? '✓ Created' : '✗ Failed'}</span></td>
                     </>
@@ -296,7 +296,7 @@ export default function IntegrationsTab({
                   {isPushDefects && (
                     <>
                       <td style={{ padding: '7px 10px 7px 0', color: '#e2e8f0' }}>{r.module || '—'}</td>
-                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'monospace' }}>{r.jiraKey || `#${r.azureId}` || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#38bdf8', fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>{r.jiraKey || `#${r.azureId}` || '—'}</td>
                       <td style={{ padding: '7px 10px 7px 0' }}>{r.riskScore != null ? <span style={{ fontSize: 10, color: r.riskScore >= 80 ? '#ef4444' : r.riskScore >= 60 ? '#f59e0b' : '#94a3b8' }}>{r.riskScore}%</span> : '—'}</td>
                       <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: r.status === 'created' ? '#10b981' : '#ef4444', background: r.status === 'created' ? '#10b98115' : '#ef444415', borderRadius: 4, padding: '2px 6px' }}>{r.status === 'created' ? '✓ Created' : '✗ Failed'}</span></td>
                     </>
@@ -322,7 +322,7 @@ export default function IntegrationsTab({
           </div>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>TMS Integrations</h1>
-            <p style={{ fontSize: 12, color: '#6b82ab', margin: 0 }}>Bidirectional sync with Jira, TestRail, Azure DevOps, qTest, HP ALM</p>
+            <p style={{ fontSize: 12, color: '#475569', margin: 0 }}>Bidirectional sync with Jira, TestRail, Azure DevOps, qTest, HP ALM</p>
           </div>
         </div>
         {/* Live stats */}
@@ -426,7 +426,7 @@ export default function IntegrationsTab({
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>{opMeta.label}</div>
-              <div style={{ fontSize: 12, color: '#6b82ab' }}>{opMeta.desc}</div>
+              <div style={{ fontSize: 12, color: '#475569' }}>{opMeta.desc}</div>
             </div>
             {/* Context counts for push operations */}
             {activeOp === 'push-tcs' && (
@@ -492,7 +492,7 @@ export default function IntegrationsTab({
               <CheckCircle style={{ width: 18, height: 18, color: '#10b981', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>Data imported into EDGE QI</div>
-                <div style={{ fontSize: 11, color: '#6b82ab', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
                   {importedCount.reqs > 0 && `${importedCount.reqs} requirement${importedCount.reqs !== 1 ? 's' : ''} added to Requirements tab`}
                   {importedCount.reqs > 0 && importedCount.tcs > 0 && ' · '}
                   {importedCount.tcs > 0 && `${importedCount.tcs} test case${importedCount.tcs !== 1 ? 's' : ''} added to Test Cases tab`}

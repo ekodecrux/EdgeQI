@@ -14,12 +14,12 @@ export default function PageHeader({ icon: Icon, title, subtitle, badge, action 
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       paddingBottom: 20, marginBottom: 20,
-      borderBottom: '1px solid #dbe2ea'
+      borderBottom: '1px solid #E2E8F0'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{
           width: 40, height: 40, borderRadius: 10,
-          background: 'linear-gradient(135deg, #093158 0%, #1e96df 100%)',
+          background: 'linear-gradient(135deg, #0F172A 0%, #5B6CFF 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0
         }}>
@@ -28,14 +28,14 @@ export default function PageHeader({ icon: Icon, title, subtitle, badge, action 
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h1 style={{
-              fontFamily: '"Lato", Arial, sans-serif',
+              fontFamily: '"Inter", Arial, sans-serif',
               fontSize: 20, fontWeight: 700,
-              color: '#1f3965', lineHeight: 1, margin: 0
+              color: '#0F172A', lineHeight: 1, margin: 0
             }}>{title}</h1>
             {badge && (
               <span style={{
-                fontFamily: 'monospace', fontSize: 10, fontWeight: 700,
-                color: '#1e96df', background: '#eaf5fd',
+                fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: 10, fontWeight: 700,
+                color: '#5B6CFF', background: '#eaf5fd',
                 border: '1px solid #b0d9f5',
                 borderRadius: 99, padding: '2px 8px',
                 textTransform: 'uppercase', letterSpacing: '0.08em'
@@ -44,8 +44,8 @@ export default function PageHeader({ icon: Icon, title, subtitle, badge, action 
           </div>
           {subtitle && (
             <p style={{
-              fontFamily: '"Lato", Arial, sans-serif',
-              fontSize: 13, color: '#6b82ab',
+              fontFamily: '"Inter", Arial, sans-serif',
+              fontSize: 13, color: '#475569',
               margin: '3px 0 0', lineHeight: 1.4
             }}>{subtitle}</p>
           )}

@@ -280,20 +280,20 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg,#1f3965,#1e96df)' }}>
+            style={{ background: 'linear-gradient(135deg,#0F172A,#5B6CFF)' }}>
             <Brain className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 style={{ fontFamily: '"Lato",Arial,sans-serif', fontSize: 17, fontWeight: 800, color: '#1f3965', letterSpacing: '0.02em' }}>
+            <h2 style={{ fontFamily: '"Inter",Arial,sans-serif', fontSize: 17, fontWeight: 800, color: '#0F172A', letterSpacing: '0.02em' }}>
               RAG Knowledge Base
             </h2>
-            <p style={{ fontFamily: '"Lato",Arial,sans-serif', fontSize: 12, color: '#6b82ab' }}>
+            <p style={{ fontFamily: '"Inter",Arial,sans-serif', fontSize: 12, color: '#475569' }}>
               Project-scoped document intelligence · Any-size uploads · LLM-agnostic vector search
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs" style={{ background: '#eaf5fd', color: '#1e96df', border: '1px solid #b3ddf7' }}>
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs" style={{ background: '#eaf5fd', color: '#5B6CFF', border: '1px solid #b3ddf7' }}>
             {activeLLM ? (
               <><CheckCircle className="w-3.5 h-3.5" /><span>LLM: {activeLLM.provider}/{activeLLM.model}</span></>
             ) : (
@@ -310,7 +310,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Documents', value: totalDocs, icon: BookOpen, color: '#1e96df' },
+          { label: 'Documents', value: totalDocs, icon: BookOpen, color: '#5B6CFF' },
           { label: 'Total Content', value: formatBytes(docs.reduce((s,d) => s+d.size_bytes,0)), icon: HardDrive, color: '#7c3aed' },
           { label: 'Text Chunks', value: totalChunks.toLocaleString(), icon: Database, color: '#059669' },
           { label: 'LLM Providers', value: llmConfigs.length, icon: Brain, color: '#d97706' },
@@ -320,7 +320,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
               <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
             </div>
             <div>
-              <div className="text-lg font-bold" style={{ color: '#1f3965' }}>{stat.value}</div>
+              <div className="text-lg font-bold" style={{ color: '#0F172A' }}>{stat.value}</div>
               <div className="text-xs text-slate-500">{stat.label}</div>
             </div>
           </div>
@@ -347,8 +347,8 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
         <div className="bg-white border border-blue-200 rounded-xl p-5 shadow-sm space-y-4 animate-fadeInUp" style={{ borderColor: '#b3ddf7' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Upload className="w-4 h-4" style={{ color: '#1e96df' }} />
-              <span className="font-semibold text-sm" style={{ color: '#1f3965' }}>Add to Knowledge Base</span>
+              <Upload className="w-4 h-4" style={{ color: '#5B6CFF' }} />
+              <span className="font-semibold text-sm" style={{ color: '#0F172A' }}>Add to Knowledge Base</span>
               <span className="text-xs text-slate-500">— supports any document size</span>
             </div>
             <button onClick={() => setShowUploadPanel(false)} className="p-1 hover:bg-slate-100 rounded"><X className="w-4 h-4 text-slate-400" /></button>
@@ -469,7 +469,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
           {searchResults.length > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3" style={{ borderColor: '#b3ddf7' }}>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold" style={{ color: '#1f3965' }}>
+                <span className="text-sm font-semibold" style={{ color: '#0F172A' }}>
                   <Search className="w-3.5 h-3.5 inline mr-1" />
                   {searchResults.length} results for "{searchQuery}"
                 </span>
@@ -478,7 +478,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
               {searchResults.map(r => (
                 <div key={r.id} className="bg-white rounded-lg p-3 border border-slate-200 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold" style={{ color: '#1f3965' }}>{r.name}</span>
+                    <span className="text-sm font-semibold" style={{ color: '#0F172A' }}>{r.name}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Score: {r.score}</span>
                   </div>
                   {r.excerpts.map((ex, i) => (
@@ -595,8 +595,8 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
             <div className="xl:col-span-3 space-y-4">
               <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                  <MessageSquare className="w-4 h-4" style={{ color: '#1e96df' }} />
-                  <span className="font-semibold text-sm" style={{ color: '#1f3965' }}>Ask the Knowledge Base</span>
+                  <MessageSquare className="w-4 h-4" style={{ color: '#5B6CFF' }} />
+                  <span className="font-semibold text-sm" style={{ color: '#0F172A' }}>Ask the Knowledge Base</span>
                 </div>
                 {!activeLLM && (
                   <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2 text-xs text-amber-700">
@@ -626,8 +626,8 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
               {kbAnswer && (
                 <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm animate-fadeInUp space-y-3">
                   <div className="flex items-center gap-2">
-                    <Brain className="w-4 h-4" style={{ color: '#1e96df' }} />
-                    <span className="font-semibold text-sm" style={{ color: '#1f3965' }}>Answer</span>
+                    <Brain className="w-4 h-4" style={{ color: '#5B6CFF' }} />
+                    <span className="font-semibold text-sm" style={{ color: '#0F172A' }}>Answer</span>
                     {kbSources.length > 0 && (
                       <div className="flex gap-1 ml-auto flex-wrap">
                         {kbSources.map(s => (
@@ -711,7 +711,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
           {showLLMForm && (
             <div className="bg-white border border-blue-200 rounded-xl p-5 shadow-sm space-y-4 animate-fadeInUp" style={{ borderColor: '#b3ddf7' }}>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-sm" style={{ color: '#1f3965' }}>New LLM Provider Configuration</span>
+                <span className="font-semibold text-sm" style={{ color: '#0F172A' }}>New LLM Provider Configuration</span>
                 <button onClick={() => setShowLLMForm(false)}><X className="w-4 h-4 text-slate-400" /></button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -838,9 +838,9 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
 
           {/* Info box about internal LLMs */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3" style={{ borderColor: '#b3ddf7' }}>
-            <Globe className="w-5 h-5 shrink-0" style={{ color: '#1e96df' }} />
+            <Globe className="w-5 h-5 shrink-0" style={{ color: '#5B6CFF' }} />
             <div>
-              <p className="text-xs font-semibold" style={{ color: '#1f3965' }}>Customer-Deployable Vector Store</p>
+              <p className="text-xs font-semibold" style={{ color: '#0F172A' }}>Customer-Deployable Vector Store</p>
               <p className="text-xs text-slate-600 mt-1">
                 EDGE QI supports both public LLMs (OpenAI, Anthropic, Google) and customer-internal LLMs (Ollama, Azure OpenAI, any OpenAI-compatible endpoint).
                 Set <code className="bg-white px-1 rounded">base_url</code> to your internal server for full data privacy — no data leaves your network.
