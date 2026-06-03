@@ -4525,16 +4525,26 @@ app.patch('/api/quality/compliance/retention', requireAuth, (req, res) => {
 app.get('/api/quality/projects', requireAuth, (req, res) => {
   try {
     const projects = sqliteDb.prepare(`SELECT * FROM projects ORDER BY created_at DESC`).all();
-    // Attach stats per project
+    // safeCount — wraps column-specific SQL so missing columns never crash the route
+    const safeCount = (table: string, col: string, val: string): number => {
+      try { return (sqliteDb.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE ${col}=?`).get(val) as any)?.c ?? 0; }
+      catch { return 0; }
+    };
     const enriched = projects.map((p: any) => {
-      const tcCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_cases WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
-      const reqCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM requirements WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
-      const sprintCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM sprints WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
-      const runCount = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM run_versions WHERE project_id=?`).get(p.id) as any)?.c ?? 0;
-      const lastRun = sqliteDb.prepare(`SELECT pass_rate, created_at FROM run_versions WHERE project_id=? ORDER BY created_at DESC LIMIT 1`).get(p.id) as any;
-      return { ...p, stats: { tcCount, reqCount, sprintCount, runCount, lastPassRate: lastRun?.pass_rate ?? null, lastRunAt: lastRun?.created_at ?? null } };
+      const tcCount    = safeCount('test_cases',   'project_id', p.id);
+      const reqCount   = safeCount('requirements', 'project_id', p.id);
+      const sprintCount = safeCount('sprints',     'project_id', p.id);
+      const runCount   = safeCount('run_versions', 'project_id', p.id);
+      let lastPassRate: number | null = null;
+      let lastRunAt: string | null = null;
+      try {
+        const lastRun = sqliteDb.prepare(`SELECT pass_rate, created_at FROM run_versions WHERE project_id=? ORDER BY created_at DESC LIMIT 1`).get(p.id) as any;
+        lastPassRate = lastRun?.pass_rate ?? null;
+        lastRunAt = lastRun?.created_at ?? null;
+      } catch {}
+      return { ...p, stats: { tcCount, reqCount, sprintCount, runCount, lastPassRate, lastRunAt } };
     });
-    res.json(enriched);
+    res.json({ projects: enriched });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4549,7 +4559,7 @@ app.post('/api/quality/projects', requireAuth, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(pid, name, description, app_url, tech_stack, owner_email, status, color, icon);
     const created = sqliteDb.prepare(`SELECT * FROM projects WHERE id=?`).get(pid);
-    res.json(created);
+    res.json({ success: true, project: created });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4566,7 +4576,7 @@ app.patch('/api/quality/projects/:id', requireAuth, (req, res) => {
     values.push(id);
     sqliteDb.prepare(`UPDATE projects SET ${updates.join(',')} WHERE id=?`).run(...values);
     const updated = sqliteDb.prepare(`SELECT * FROM projects WHERE id=?`).get(id);
-    res.json(updated);
+    res.json({ success: true, project: updated });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4596,7 +4606,7 @@ app.get('/api/quality/sprints', requireAuth, (req, res) => {
       const lastRun = sqliteDb.prepare(`SELECT pass_rate FROM run_versions WHERE sprint_id=? ORDER BY created_at DESC LIMIT 1`).get(s.id) as any;
       return { ...s, runCount, lastPassRate: lastRun?.pass_rate ?? null };
     });
-    res.json(enriched);
+    res.json({ sprints: enriched });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4611,7 +4621,7 @@ app.post('/api/quality/sprints', requireAuth, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(sid, project_id, name, goal, start_date || null, end_date || null, status, velocity);
     const created = sqliteDb.prepare(`SELECT * FROM sprints WHERE id=?`).get(sid);
-    res.json(created);
+    res.json({ success: true, sprint: created });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4627,7 +4637,7 @@ app.patch('/api/quality/sprints/:id', requireAuth, (req, res) => {
     values.push(id);
     sqliteDb.prepare(`UPDATE sprints SET ${updates.join(',')} WHERE id=?`).run(...values);
     const updated = sqliteDb.prepare(`SELECT * FROM sprints WHERE id=?`).get(id);
-    res.json(updated);
+    res.json({ success: true, sprint: updated });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4653,7 +4663,7 @@ app.get('/api/quality/run-versions', requireAuth, (req, res) => {
     query += ` ORDER BY created_at DESC LIMIT ?`;
     params.push(Number(limit));
     const runs = sqliteDb.prepare(query).all(...params);
-    res.json(runs);
+    res.json({ runs });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4683,7 +4693,7 @@ app.post('/api/quality/run-versions', requireAuth, (req, res) => {
       sqliteDb.prepare(`UPDATE sprints SET velocity=? WHERE id=?`).run(Math.round(sprintRuns?.avg_pr ?? 0), sprint_id);
     }
     const created = sqliteDb.prepare(`SELECT * FROM run_versions WHERE id=?`).get(rid);
-    res.json(created);
+    res.json({ success: true, run: created });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
