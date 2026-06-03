@@ -28,6 +28,10 @@ export default function PerformanceTab({
   const [endpointOrJourney, setEndpointOrJourney] = useState('POST /api/v1/checkout/charge');
   const [virtualUsers, setVirtualUsers] = useState(250);
   const [durationSeconds, setDurationSeconds] = useState(60);
+  // Open source performance tool selector
+  const [perfTool, setPerfTool] = useState<'k6' | 'locust' | 'artillery'>('k6');
+  const [perfToolRunning, setPerfToolRunning] = useState(false);
+  const [perfToolResult, setPerfToolResult] = useState<any>(null);
   const [rampUpTimeSeconds, setRampUpTimeSeconds] = useState(10);
   const [rpsLimit, setRpsLimit] = useState(100);
 
@@ -111,6 +115,32 @@ export default function PerformanceTab({
 
   const handleRun = async () => {
     await onExecutePerformanceTest(testType, endpointOrJourney, virtualUsers, durationSeconds, rampUpTimeSeconds, rpsLimit);
+  };
+
+  const handlePerfToolRun = async () => {
+    if (perfToolRunning) return;
+    setPerfToolRunning(true);
+    setPerfToolResult(null);
+    const t = localStorage.getItem('iq_token') || '';
+    try {
+      const res = await fetch('/api/quality/performance/tool-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+        body: JSON.stringify({
+          tool: perfTool,
+          targetUrl: endpointOrJourney.startsWith('http') ? endpointOrJourney : `http://localhost:3000`,
+          virtualUsers: Math.min(virtualUsers, 50), // cap for sandbox
+          durationSeconds: Math.min(durationSeconds, 30),
+          rampUpSeconds: Math.min(rampUpTimeSeconds, 10)
+        })
+      });
+      const data = await res.json();
+      setPerfToolResult(data);
+    } catch (e: any) {
+      setPerfToolResult({ error: e.message });
+    } finally {
+      setPerfToolRunning(false);
+    }
   };
 
   // GAP-13/14: JMeter / k6 script export
@@ -477,6 +507,59 @@ export function handleSummary(data) {
           </div>
         </div>
 
+        {/* ── Open Source Performance Tool Selector ── */}
+        <div className="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-blue-500" />
+            <span className="text-[11px] font-mono font-bold text-slate-700 uppercase tracking-wider">Open Source Load Testing Tools</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { id: 'k6', label: 'k6', badge: 'v0.55', desc: 'Go-based, Grafana native', color: 'bg-purple-50 border-purple-200 text-purple-800' },
+              { id: 'locust', label: 'Locust', badge: 'v2.44', desc: 'Python, distributed', color: 'bg-green-50 border-green-200 text-green-800' },
+              { id: 'artillery', label: 'Artillery', badge: 'npm', desc: 'YAML config, Node.js', color: 'bg-orange-50 border-orange-200 text-orange-800' },
+            ] as const).map(tool => (
+              <button
+                key={tool.id}
+                onClick={() => setPerfTool(tool.id)}
+                className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+                  perfTool === tool.id ? 'ring-2 ring-offset-1 ring-blue-500 ' + tool.color : 'border-slate-200 text-slate-500 bg-white hover:border-slate-300'
+                }`}
+              >
+                <span className="font-extrabold">{tool.label}</span>
+                <span className="text-[9px] opacity-70">{tool.badge}</span>
+                <span className="text-[8px] opacity-50 text-center">{tool.desc}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handlePerfToolRun}
+              disabled={perfToolRunning || isExecuting}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-mono font-bold transition-all ${perfToolRunning ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'} disabled:opacity-60`}
+            >
+              {perfToolRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running {perfTool}...</> : <><Play className="w-3.5 h-3.5" /> Run {perfTool.toUpperCase()} Load Test</>}
+            </button>
+          </div>
+          {perfToolResult && !perfToolResult.error && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                <span className="bg-white border border-slate-200 rounded-lg px-2 py-1">⚡ {perfToolResult.toolVersion}</span>
+                <span className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-2 py-1">avg {perfToolResult.metrics?.avgResponseTimeMs}ms</span>
+                <span className="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-2 py-1">p95 {perfToolResult.metrics?.p95Ms}ms</span>
+                <span className="bg-purple-50 border border-purple-200 text-purple-700 rounded-lg px-2 py-1">{perfToolResult.metrics?.throughputTps} TPS</span>
+                <span className={`rounded-lg px-2 py-1 border ${(perfToolResult.metrics?.errorRate || 0) > 1 ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{perfToolResult.metrics?.errorRate}% err</span>
+              </div>
+              <div className="bg-slate-900 rounded-lg p-2 max-h-28 overflow-y-auto">
+                {(perfToolResult.logs || []).slice(-15).map((log: string, i: number) => (
+                  <div key={i} className="text-[9px] font-mono text-slate-300 leading-relaxed">{log}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {perfToolResult?.error && <p className="text-xs text-red-600 font-mono bg-red-50 border border-red-200 rounded-lg p-2">Error: {perfToolResult.error}</p>}
+        </div>
+
         <button
           onClick={handleRun}
           disabled={isExecuting}
@@ -494,7 +577,7 @@ export function handleSummary(data) {
           ) : (
             <>
               <Play className="w-4 h-4" />
-              Inject Concurrent Connections
+              Inject Concurrent Connections (AI Model)
             </>
           )}
         </button>

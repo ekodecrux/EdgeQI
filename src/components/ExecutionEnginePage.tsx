@@ -220,6 +220,10 @@ export default function ExecutionEnginePage({
   const [parallelWorkers, setParallelWorkers] = useState(3);
   const [parallelRunning, setParallelRunning] = useState(false);
   const [parallelResult, setParallelResult] = useState<any>(null);
+  // Open source tool selector
+  const [execTool, setExecTool] = useState<'playwright' | 'robot' | 'selenium' | 'cypress'>('playwright');
+  const [toolRunResult, setToolRunResult] = useState<any>(null);
+  const [toolRunning, setToolRunning] = useState(false);
 
   // SSE streaming state (REQ-55)
   const [sseRunId, setSseRunId] = useState('');
@@ -541,8 +545,8 @@ export default function ExecutionEnginePage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          testCaseIds: [], // empty = server generates demo IDs
-          framework: 'Playwright',
+          testCaseIds: [],
+          framework: execTool === 'playwright' ? 'Playwright' : execTool === 'robot' ? 'Robot Framework' : execTool === 'selenium' ? 'Selenium' : 'Cypress',
           browser: 'Chromium',
           workers: parallelWorkers
         })
@@ -556,6 +560,29 @@ export default function ExecutionEnginePage({
       setParallelResult({ error: e.message });
     } finally {
       setParallelRunning(false);
+    }
+  };
+
+  const handleToolRun = async () => {
+    if (toolRunning) return;
+    setToolRunning(true);
+    setToolRunResult(null);
+    const t = localStorage.getItem('iq_token') || '';
+    try {
+      const res = await fetch('/api/quality/execution/tool-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+        body: JSON.stringify({ tool: execTool, workers: parallelWorkers, targetUrl: '' })
+      });
+      const data = await res.json();
+      setToolRunResult(data);
+      if (data.runId) setSseRunId(data.runId);
+      setShowToast(`${execTool.toUpperCase()} run done: ${data.passed || 0}P / ${data.failed || 0}F in ${((data.durationMs || 0)/1000).toFixed(1)}s`);
+      setTimeout(() => setShowToast(null), 6000);
+    } catch (e: any) {
+      setToolRunResult({ error: e.message });
+    } finally {
+      setToolRunning(false);
     }
   };
 
@@ -1185,6 +1212,39 @@ export default function ExecutionEnginePage({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* ── Open Source Tool Selector ── */}
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1.5 font-bold">Test Automation Framework</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {([
+                  { id: 'playwright', label: 'Playwright', badge: 'v1.60', color: 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' },
+                  { id: 'robot', label: 'Robot Framework', badge: 'v7.4', color: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
+                  { id: 'selenium', label: 'Selenium+pytest', badge: 'v4.44', color: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
+                  { id: 'cypress', label: 'Cypress', badge: 'npx', color: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
+                ] as const).map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setExecTool(t.id)}
+                    className={`flex flex-col items-center gap-0.5 py-2 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+                      execTool === t.id
+                        ? 'ring-2 ring-offset-1 ring-blue-500 ' + t.color
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <span>{t.label}</span>
+                    <span className="text-[9px] opacity-60 font-normal">{t.badge}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400 font-mono mt-1">
+                {execTool === 'playwright' && '✓ Chromium browser cached · Real subprocess execution'}
+                {execTool === 'robot' && '✓ Robot Framework 7.4.2 installed · Keyword-driven tests'}
+                {execTool === 'selenium' && '✓ Selenium 4.44.0 + pytest 8.3.5 · Python test runner'}
+                {execTool === 'cypress' && '⚠ Cypress requires: npm install cypress in project'}
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-mono text-slate-600 mb-1">Worker Threads (max 5)</label>
@@ -1197,19 +1257,45 @@ export default function ExecutionEnginePage({
               </div>
               <div className="flex items-end">
                 <button
-                  onClick={handleParallelRun}
-                  disabled={parallelRunning}
+                  onClick={handleToolRun}
+                  disabled={toolRunning || parallelRunning}
                   className="btn-primary w-full py-2 px-4 text-xs flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  {parallelRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running...</> : <><Play className="w-3.5 h-3.5" /> Launch Parallel Run</>}
+                  {toolRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running {execTool}...</> : <><Play className="w-3.5 h-3.5" /> Run with {execTool === 'robot' ? 'Robot Framework' : execTool.charAt(0).toUpperCase() + execTool.slice(1)}</>}
                 </button>
               </div>
               <div className="flex items-end">
-                <p className="text-[10px] text-slate-500 font-mono leading-relaxed">
-                  Distributes test cases across {parallelWorkers} concurrent workers using Promise.all() bucketing for maximum throughput.
-                </p>
+                <button
+                  onClick={handleParallelRun}
+                  disabled={parallelRunning || toolRunning}
+                  className="w-full py-2 px-4 text-xs flex items-center justify-center gap-2 disabled:opacity-60 border border-blue-300 text-blue-700 rounded-xl hover:bg-blue-50 font-mono font-bold transition-all"
+                >
+                  {parallelRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Parallel...</> : <><Layers className="w-3.5 h-3.5" /> Parallel Run</>}
+                </button>
               </div>
             </div>
+
+            {/* Tool Run Result */}
+            {toolRunResult && !toolRunResult.error && (
+              <div className="space-y-2 pt-2 border-t border-green-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold text-slate-600">{toolRunResult.tool?.toUpperCase()} · {toolRunResult.toolVersion}</span>
+                  <span className="badge badge-green text-[9px]">{toolRunResult.passed || 0} passed</span>
+                  {(toolRunResult.failed || 0) > 0 && <span className="badge badge-red text-[9px]">{toolRunResult.failed} failed</span>}
+                  <span className="text-[10px] text-slate-400 font-mono">{((toolRunResult.durationMs || 0)/1000).toFixed(1)}s</span>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-2 max-h-32 overflow-y-auto">
+                  {(toolRunResult.logs || []).slice(-20).map((log: string, i: number) => (
+                    <div key={i} className="text-[9px] font-mono text-slate-300 leading-relaxed">{log}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {toolRunResult?.error && (
+              <p className="text-xs text-red-600 font-mono bg-red-50 border border-red-200 rounded-lg p-2">
+                Tool error: {toolRunResult.error}
+              </p>
+            )}
             {parallelResult && !parallelResult.error && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-blue-100">
                 {[

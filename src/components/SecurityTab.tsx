@@ -130,6 +130,10 @@ export default function SecurityTab({
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [lastScanCount, setLastScanCount] = useState<number | null>(null);
+  // Open source security tool selector
+  const [secTool, setSecTool] = useState<'semgrep' | 'trivy' | 'nikto' | 'zap'>('semgrep');
+  const [secToolRunning, setSecToolRunning] = useState(false);
+  const [secToolResult, setSecToolResult] = useState<any>(null);
 
   // GAP-16: Authenticated DAST fields
   const [showAuthFields, setShowAuthFields] = useState(false);
@@ -234,6 +238,39 @@ export default function SecurityTab({
       setScanError(`Scan request failed: ${err.message}`);
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  const handleSecToolRun = async () => {
+    if (secToolRunning) return;
+    setSecToolRunning(true);
+    setSecToolResult(null);
+    const token = localStorage.getItem('iq_token') || '';
+    try {
+      const res = await fetch('/api/quality/security/tool-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          tool: secTool,
+          targetUrl: scanMode === 'url' ? scanTarget : '',
+          targetPath: '.',
+          scanType: secTool === 'semgrep' ? 'SAST' : secTool === 'trivy' ? 'SCA' : 'DAST'
+        })
+      });
+      const data = await res.json();
+      setSecToolResult(data);
+      if (data.findings?.length > 0) {
+        setLocalVulns(prev => {
+          const deduped = data.findings.filter((v: any) => !prev.some((p: any) => p.id === v.id));
+          return [...deduped, ...prev];
+        });
+        setLastScanCount(data.totalFindings);
+        if (data.findings[0]?.id) setSelectedVulId(data.findings[0].id);
+      }
+    } catch (err: any) {
+      setSecToolResult({ error: err.message });
+    } finally {
+      setSecToolRunning(false);
     }
   };
 
@@ -457,10 +494,62 @@ export default function SecurityTab({
             {isScanning ? (
               <><RefreshCw className="w-4 h-4 animate-spin" /> Scanning Target...</>
             ) : (
-              <><Zap className="w-4 h-4" /> Launch {scanType} Scan</>
+              <><Zap className="w-4 h-4" /> Launch {scanType} Scan (AI)</>
             )}
           </button>
         </div>
+      </div>
+
+      {/* ── Open Source Security Tool Selector ── */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-rose-400" />
+          <span className="text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider">Open Source Security Scanners</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {([
+            { id: 'semgrep', label: 'Semgrep', badge: 'v1.164', desc: 'SAST · Code patterns', color: 'border-blue-500 text-blue-300 bg-blue-950' },
+            { id: 'trivy', label: 'Trivy', badge: 'v0.71', desc: 'SCA · CVE scanner', color: 'border-cyan-500 text-cyan-300 bg-cyan-950' },
+            { id: 'nikto', label: 'Nikto', badge: 'v2.x', desc: 'DAST · Web server', color: 'border-orange-500 text-orange-300 bg-orange-950' },
+            { id: 'zap', label: 'OWASP ZAP', badge: 'sim', desc: 'DAST · Active scan', color: 'border-rose-500 text-rose-300 bg-rose-950' },
+          ] as const).map(tool => (
+            <button
+              key={tool.id}
+              onClick={() => setSecTool(tool.id)}
+              className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+                secTool === tool.id ? 'ring-2 ring-offset-1 ring-white/30 opacity-100 ' + tool.color : 'border-slate-600 text-slate-400 bg-slate-800 hover:border-slate-500'
+              }`}
+            >
+              <span className="font-extrabold">{tool.label}</span>
+              <span className="text-[9px] opacity-70">{tool.badge}</span>
+              <span className="text-[8px] opacity-50 text-center">{tool.desc}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSecToolRun}
+            disabled={secToolRunning || isScanning}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-mono font-bold transition-all ${secToolRunning ? 'bg-slate-700 text-slate-300 border border-slate-600' : 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm'} disabled:opacity-60`}
+          >
+            {secToolRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running {secTool}...</> : <><ShieldAlert className="w-3.5 h-3.5" /> Run {secTool === 'zap' ? 'OWASP ZAP' : secTool.charAt(0).toUpperCase() + secTool.slice(1)} Scan</>}
+          </button>
+        </div>
+        {secToolResult && !secToolResult.error && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+              <span className="bg-slate-700 border border-slate-600 text-slate-300 rounded-lg px-2 py-1">🔍 {secToolResult.toolVersion}</span>
+              <span className={`rounded-lg px-2 py-1 border ${(secToolResult.totalFindings || 0) > 0 ? 'bg-rose-900 border-rose-700 text-rose-300' : 'bg-green-900 border-green-700 text-green-300'}`}>{secToolResult.totalFindings || 0} findings</span>
+              <span className="bg-slate-700 border border-slate-600 text-slate-400 rounded-lg px-2 py-1">{((secToolResult.durationMs || 0)/1000).toFixed(1)}s</span>
+            </div>
+            <div className="bg-black/50 rounded-lg p-2 max-h-28 overflow-y-auto">
+              {(secToolResult.logs || []).slice(-15).map((log: string, i: number) => (
+                <div key={i} className="text-[9px] font-mono text-slate-400 leading-relaxed">{log}</div>
+              ))}
+            </div>
+          </div>
+        )}
+        {secToolResult?.error && <p className="text-xs text-red-400 font-mono bg-red-950 border border-red-800 rounded-lg p-2">Error: {secToolResult.error}</p>}
       </div>
 
       {/* Target input */}
