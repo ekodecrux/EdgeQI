@@ -76,6 +76,7 @@ import RAGKnowledgeBase from './components/RAGKnowledgeBase';
 import VoicePromptBar from './components/VoicePromptBar';
 import ProjectContextBar from './components/ProjectContextBar';
 import AIAssistantPanel from './components/AIAssistantPanel';
+import WorkflowBuilder from './components/WorkflowBuilder';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
 function SidebarItem({ id, label, Icon, active, onClick }: {
@@ -492,7 +493,8 @@ export default function App() {
     'test-plans' |
     'manual-execution' |
     'projects' |
-    'rag-kb'
+    'rag-kb' |
+    'workflow-builder'
   >('agentic');
   
   // Sprint context — active sprint for current project
@@ -1143,6 +1145,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           <SidebarGroup label="Settings & Integrations">
             {[
               { id: 'integrations', label: 'Connect Tools',     icon: Link },
+              { id: 'workflow-builder', label: 'Workflow Builder', icon: GitBranch },
               { id: 'cicd',         label: 'CI/CD Pipeline',    icon: GitBranch },
               { id: 'scheduler',    label: 'Scheduled Runs',    icon: Clock },
               { id: 'analytics',    label: 'AI Insights',       icon: BarChart3 },
@@ -1490,6 +1493,12 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {activeTab === 'feedback' && <FeedbackTemplatesTab />}
           {activeTab === 'scheduler' && <SchedulerTab />}
           {activeTab === 'analytics' && <AnalyticsTab />}
+          {activeTab === 'workflow-builder' && (
+            <WorkflowBuilder
+              currentProjectId={currentProjectId}
+              currentSprintId={currentSprintId}
+            />
+          )}
           
           {activeTab === 'projects' && (
             <ProjectHub
