@@ -311,7 +311,7 @@ export default function ExecutionEnginePage({
   const loadAutoDefects = async () => {
     setDefectsLoading(true);
     try {
-      const token = localStorage.getItem('iq_token') || localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token') || localStorage.getItem('iq_token');
       const r = await fetch('/api/quality/defects/from-run', { headers: { Authorization: `Bearer ${token}` } });
       if (r.ok) { const d = await r.json(); setAutoDefects(d.defects || []); }
     } finally { setDefectsLoading(false); }
@@ -321,7 +321,7 @@ export default function ExecutionEnginePage({
     if (!logDefectRunId) return;
     setLoggingDefect(true);
     try {
-      const token = localStorage.getItem('iq_token') || localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token') || localStorage.getItem('iq_token');
       const r = await fetch('/api/quality/defects/from-run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

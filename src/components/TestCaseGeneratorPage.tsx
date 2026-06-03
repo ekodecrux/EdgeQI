@@ -216,7 +216,7 @@ export default function TestCaseGeneratorPage({
   const handleApprove = async (tc: TestCase, action: 'approve' | 'reject') => {
     setApprovingId(tc.id);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch(`/api/quality/testcases/${tc.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -239,7 +239,7 @@ export default function TestCaseGeneratorPage({
     const raw = tagInput[tcId] || '';
     const tags = raw.split(',').map(t => t.trim()).filter(Boolean);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       await fetch(`/api/quality/testcases/${tcId}/tags`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -254,7 +254,7 @@ export default function TestCaseGeneratorPage({
   const handleSaveSteps = async (tcId: string) => {
     setSavingSteps(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch(`/api/quality/testcases/${tcId}/steps`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -278,7 +278,7 @@ export default function TestCaseGeneratorPage({
     if (bulkSelected.size === 0) return;
     setBulkUpdating(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/testcases/bulk-priority', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },

@@ -135,7 +135,7 @@ export default function ProjectHub({ currentProjectId, onSelectProject, onNaviga
   const [sprintForm, setSprintForm] = useState({ name: '', goal: '', start_date: '', end_date: '', project_id: currentProjectId, status: 'planning' });
   const [saving, setSaving] = useState(false);
   const [filterProject, setFilterProject] = useState(currentProjectId || 'ALL');
-  const token = () => localStorage.getItem('iqstudio_token') || '';
+  const token = () => localStorage.getItem('iq_token') || '';
 
   useEffect(() => { loadAll(); }, []);
   useEffect(() => { setFilterProject(currentProjectId || 'ALL'); }, [currentProjectId]);

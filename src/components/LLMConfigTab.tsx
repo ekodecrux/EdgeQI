@@ -513,7 +513,7 @@ function UserPreferencesPanel() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  const token = () => localStorage.getItem('iqstudio_token');
+  const token = () => localStorage.getItem('iq_token');
   const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
 
   useEffect(() => {
@@ -593,7 +593,7 @@ function ApiDocsPanel() {
   const loadDocs = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/docs', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.routes) setRoutes(data.routes);
@@ -651,7 +651,7 @@ function CompliancePanel() {
   const [activeSection, setActiveSection] = useState<'audit'|'retention'|'perf'>('audit');
   const [actorFilter, setActorFilter] = useState('');
 
-  const token = () => localStorage.getItem('iqstudio_token') || localStorage.getItem('iq_token');
+  const token = () => localStorage.getItem('iq_token') || localStorage.getItem('iq_token');
   const authH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` });
 
   const loadAudit = async () => {

@@ -10,7 +10,7 @@ export default function CICDTab() {
   const loadPipelines = async () => {
     setPipelineLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/cicd/pipeline-status', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.pipelines) setPipelineStatus(data.pipelines);
@@ -20,7 +20,7 @@ export default function CICDTab() {
   const addPipeline = async () => {
     if (!newPipeline.name.trim()) return;
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/cicd/pipeline-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -39,7 +39,7 @@ export default function CICDTab() {
   const loadNotifConfigs = async () => {
     setNotifLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/notifications/config', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.configs) setNotifConfigs(data.configs);
@@ -49,7 +49,7 @@ export default function CICDTab() {
   const addNotifConfig = async () => {
     if (!newNotif.url.trim()) return;
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/notifications/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -62,7 +62,7 @@ export default function CICDTab() {
 
   const toggleNotif = async (id: string, enabled: boolean) => {
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       await fetch(`/api/quality/notifications/config/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },

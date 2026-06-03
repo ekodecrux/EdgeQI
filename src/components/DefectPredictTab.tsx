@@ -94,7 +94,7 @@ export default function DefectPredictTab({
   const loadClusters = async () => {
     setClustersLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const r = await fetch('/api/quality/defects/clusters', { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
       setClusters(d.clusters || []);
@@ -104,7 +104,7 @@ export default function DefectPredictTab({
 
   const handleAddCluster = async () => {
     if (!newClusterLabel || !newClusterPattern) return;
-    const token = localStorage.getItem('iqstudio_token');
+    const token = localStorage.getItem('iq_token');
     const r = await fetch('/api/quality/defects/clusters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -118,7 +118,7 @@ export default function DefectPredictTab({
     if (!triageTitle && !triageDesc) return;
     setTriaging(true); setTriageResult(null);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const r = await fetch('/api/quality/defects/triage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

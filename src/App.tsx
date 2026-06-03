@@ -131,7 +131,7 @@ function TestPlansTab() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState('');
 
-  const token = () => localStorage.getItem('iqstudio_token');
+  const token = () => localStorage.getItem('iq_token');
   const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
 
   const load = async () => {
@@ -245,7 +245,7 @@ function TestPlansTab() {
 function PlanProgressPanel({ planId, planName }: { planId: string; planName: string }) {
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const token = () => localStorage.getItem('iqstudio_token');
+  const token = () => localStorage.getItem('iq_token');
   const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
 
   const load = async () => {
@@ -296,7 +296,7 @@ function ManualExecutionTab() {
   const [selectedRun, setSelectedRun] = useState<any>(null);
   const [feedback, setFeedback] = useState('');
 
-  const token = () => localStorage.getItem('iqstudio_token');
+  const token = () => localStorage.getItem('iq_token');
   const authH = () => ({ 'Content-Type': 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) });
 
   const load = async () => {

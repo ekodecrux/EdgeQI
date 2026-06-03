@@ -67,7 +67,7 @@ export default function DashboardMetrics({
   const loadSla = async () => {
     setSlaLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/health/sla', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       setSlaData(data);
@@ -103,7 +103,7 @@ export default function DashboardMetrics({
   const loadAlertLog = async () => {
     setAlertLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/alerts', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.alerts) setAlertLog(data.alerts);
@@ -111,7 +111,7 @@ export default function DashboardMetrics({
   };
   const acknowledgeAlert = async (id: string) => {
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       await fetch(`/api/quality/alerts/${id}/acknowledge`, {
         method: 'PATCH',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
@@ -133,7 +133,7 @@ export default function DashboardMetrics({
   const [showWidgetConfig, setShowWidgetConfig] = useState(false);
   const saveWidgetConfig = async () => {
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       await fetch('/api/quality/dashboard/widgets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -149,7 +149,7 @@ export default function DashboardMetrics({
   const loadBundleSize = async () => {
     setBundleLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/health/bundle-size', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.results) setBundleData(data.results);
