@@ -2333,6 +2333,86 @@ app.get("/api/quality/stats", (req, res) => {
   res.json({ success: true, stats });
 });
 
+// ── TOOL STATUS: returns version and availability of all installed open source tools ──
+app.get("/api/quality/tools/status", async (req, res) => {
+  const { execFile } = await import('child_process');
+  const fsM = await import('fs');
+  const pathM = await import('path');
+  const util = await import('util');
+  const execP = util.promisify(execFile);
+
+  const check = async (cmd: string, args: string[], versionParser?: (o: string) => string) => {
+    try {
+      const { stdout, stderr } = await execP(cmd, args, { timeout: 5000 });
+      const out = (stdout + stderr).trim().split('\n')[0];
+      return { available: true, version: versionParser ? versionParser(out) : out.slice(0, 80) };
+    } catch (e: any) {
+      // Some tools (like robot --version) exit with non-zero but still print version
+      const out = ((e.stdout || '') + (e.stderr || '')).trim().split('\n')[0];
+      if (out && out.length > 2) {
+        return { available: true, version: versionParser ? versionParser(out) : out.slice(0, 80) };
+      }
+      return { available: false, version: null, error: e.message?.slice(0, 100) };
+    }
+  };
+
+  const playwrightBin = pathM.join(process.cwd(), 'node_modules/.bin/playwright');
+  const trivyBin = '/usr/local/bin/trivy';
+  const k6Bin = '/usr/local/bin/k6';
+  const niktoScript = '/home/user/nikto/program/nikto.pl';
+
+  const [playwright, robotFramework, selenium, pytest, k6, locust, semgrep, trivy, nikto] = await Promise.all([
+    fsM.existsSync(playwrightBin)
+      ? check(playwrightBin, ['--version'])
+      : Promise.resolve({ available: false, version: null, error: 'node_modules/.bin/playwright not found' }),
+    check('python3', ['-m', 'robot', '--version']),
+    check('python3', ['-c', 'import selenium; print("selenium", selenium.__version__)']),
+    check('python3', ['-m', 'pytest', '--version'], o => o.replace('pytest', '').trim().split(' ')[0]),
+    fsM.existsSync(k6Bin)
+      ? check(k6Bin, ['version'], o => o.replace('k6 ', ''))
+      : Promise.resolve({ available: false, version: null, error: '/usr/local/bin/k6 not found' }),
+    check('python3', ['-c', 'import locust; print(locust.__version__)']),
+    check('semgrep', ['--version'], o => o.trim()),
+    fsM.existsSync(trivyBin)
+      ? check(trivyBin, ['--version'], o => o.replace('Version: ', 'v'))
+      : Promise.resolve({ available: false, version: null, error: '/usr/local/bin/trivy not found' }),
+    fsM.existsSync(niktoScript)
+      ? Promise.resolve({ available: true, version: 'Nikto 2.x (perl)', note: 'Perl modules may be needed' })
+      : Promise.resolve({ available: false, version: null, error: 'nikto.pl not at /home/user/nikto/program' }),
+  ]);
+
+  // Check Playwright browsers
+  const playwrightBrowsersPath = '/home/user/.cache/ms-playwright';
+  const chromiumAvailable = fsM.existsSync(playwrightBrowsersPath) && 
+    fsM.readdirSync(playwrightBrowsersPath).some((d: string) => d.startsWith('chromium'));
+
+  const tools = {
+    execution: [
+      { id: 'playwright', name: 'Playwright', category: 'Execution', ...playwright, browsers: chromiumAvailable ? ['chromium'] : [] },
+      { id: 'robot', name: 'Robot Framework', category: 'Execution', ...robotFramework },
+      { id: 'selenium', name: 'Selenium + pytest', category: 'Execution', ...selenium, pytest: pytest.version },
+      { id: 'cypress', name: 'Cypress', category: 'Execution', available: fsM.existsSync(pathM.join(process.cwd(), 'node_modules/.bin/cypress')), version: 'via npm', note: 'Run: npm install cypress' },
+    ],
+    performance: [
+      { id: 'k6', name: 'k6', category: 'Performance', ...k6 },
+      { id: 'locust', name: 'Locust', category: 'Performance', ...locust },
+      { id: 'artillery', name: 'Artillery', category: 'Performance', available: fsM.existsSync(pathM.join(process.cwd(), 'node_modules/.bin/artillery')), version: 'via npm', note: 'Run: npm install artillery' },
+    ],
+    security: [
+      { id: 'semgrep', name: 'Semgrep SAST', category: 'Security', ...semgrep },
+      { id: 'trivy', name: 'Trivy SCA', category: 'Security', ...trivy },
+      { id: 'nikto', name: 'Nikto DAST', category: 'Security', ...nikto },
+      { id: 'zap', name: 'OWASP ZAP DAST', category: 'Security', available: false, version: null, note: 'Java required — use ZAP Docker image' },
+    ],
+  };
+
+  const totalAvailable = [...tools.execution, ...tools.performance, ...tools.security].filter(t => t.available).length;
+  const totalTools = tools.execution.length + tools.performance.length + tools.security.length;
+
+  res.json({ success: true, tools, summary: { totalAvailable, totalTools, readyPercent: Math.round(totalAvailable / totalTools * 100) } });
+});
+
+
 const DB_PATH_INFO = path.join(process.cwd(), 'data', 'iqstudio.db');
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2872,7 +2952,11 @@ app.post("/api/quality/security/tool-run", async (req, res) => {
       const scanTarget = targetUrl || process.cwd();
       const scanMode = targetUrl.startsWith('http') ? 'repo' : 'fs';
       logs.push(`[${new Date().toISOString()}] ${toolVersion} — SCA ${scanMode} scan on ${scanTarget}`);
-      const trivyArgs = [scanMode, '--format', 'json', '--output', resultFile, '--timeout', '60s', '--skip-db-update', scanTarget];
+      // Check if Trivy DB exists, skip-db-update only if already cached
+      const trivyCacheDir = '/home/user/.cache/trivy';
+      const dbExists = fsM.existsSync(trivyCacheDir + '/db/metadata.json') || fsM.existsSync(trivyCacheDir + '/db/trivy.db');
+      const trivyArgs = [scanMode, '--format', 'json', '--output', resultFile, '--timeout', '120s',
+        ...(dbExists ? ['--skip-db-update'] : []), scanTarget];
       const exitCode = await new Promise<number>(resolve => {
         const p = spawn(trivyBin, trivyArgs, { cwd: tmpDir, timeout: 90000, env: { ...process.env, TRIVY_NO_PROGRESS: 'true' } });
         p.stdout.on('data', (d: any) => { const line = d.toString().trim(); if (line) logs.push(`[Trivy] ${line.slice(0,300)}`); });
