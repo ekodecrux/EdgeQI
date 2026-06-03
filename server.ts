@@ -5415,12 +5415,189 @@ app.post('/api/quality/rag-kb/query', requireAuth, async (req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// ── GAP-18-20: Context-aware AI Assistant endpoint ───────────────────────────
+app.post('/api/quality/ai/assistant', requireAuth, async (req, res) => {
+  try {
+    const { message, module, projectId, sprintId, history = [], context = {} } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
+
+    const cfg = getActiveLLMConfig();
+
+    // Build context-aware system prompt
+    const systemPrompt = `You are EDGE QI AI Copilot — an expert software quality engineer embedded in a test management platform.
+Current context:
+- Module: ${module || 'unknown'}
+- Project: ${projectId || 'ALL'}
+- Sprint: ${sprintId || 'none'}
+- Platform: EDGE QI (STLC-aware QA platform)
+
+You specialize in:
+- STLC (Software Testing Life Cycle) best practices
+- Test case design, coverage analysis, and automation feasibility
+- Defect classification, root cause analysis, and regression strategy
+- Performance testing (JMeter, k6, Playwright)
+- Security testing (OWASP, DAST, SAST, compliance: PCI-DSS, HIPAA, SOC2, GDPR)
+- Robot Framework, Playwright, Cypress, Selenium test generation
+- AI-driven quality metrics and release readiness assessment
+
+Respond concisely and practically. Use **bold** for key terms. Keep answers under 300 words unless code is requested.`;
+
+    const conversationHistory = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-8).map((m: any) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message }
+    ];
+
+    if (cfg) {
+      try {
+        const aiRes = await fetch(`${cfg.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+          body: JSON.stringify({ model: cfg.model, messages: conversationHistory, max_tokens: 600, temperature: 0.7 }),
+        });
+        const aiData = await aiRes.json() as any;
+        const reply = aiData.choices?.[0]?.message?.content;
+        if (reply) return res.json({ reply, module, model: cfg.model });
+      } catch { /* fallthrough to generateAI */ }
+    }
+
+    // Fallback: generateAI
+    const reply = await generateAI(
+      `You are EDGE QI AI Copilot in module: ${module}. Project: ${projectId}.\n\nUser question: ${message}\n\nRecent context: ${JSON.stringify(context).slice(0, 500)}\n\nProvide a concise, expert quality engineering answer.`,
+      false
+    );
+    res.json({ reply: reply || 'I am here to help! Please check your LLM configuration in Settings for full AI capabilities.', module });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GAP-14: AI Performance Recommendations endpoint ──────────────────────────
+app.post('/api/quality/performance/ai-recommendations', requireAuth, async (req, res) => {
+  try {
+    const { endpoint, virtualUsers, durationSeconds, scenarioType, metrics = {} } = req.body;
+    const cfg = getActiveLLMConfig();
+
+    const prompt = `You are a performance engineering expert. Analyze this load test configuration and provide 4-6 specific, actionable optimization recommendations.
+
+Load Test Config:
+- Endpoint: ${endpoint}
+- Virtual Users: ${virtualUsers}
+- Duration: ${durationSeconds}s
+- Scenario: ${scenarioType || 'steady'}
+
+Current Metrics:
+- Avg Response Time: ${metrics.avgResponseTimeMs || 'N/A'}ms
+- P95 Response Time: ${metrics.p95Ms || 'N/A'}ms
+- Error Rate: ${metrics.errorRate || 0}%
+- TPS: ${metrics.throughputTps || 'N/A'}
+- CPU: ${metrics.cpuUtilization || 'N/A'}%
+- Memory: ${metrics.memoryUtilization || 'N/A'}%
+
+Provide recommendations as a JSON array of strings. Each recommendation should be 1-2 sentences, specific and actionable. Focus on: database optimization, caching, connection pooling, infrastructure scaling, code-level fixes.
+
+Return ONLY valid JSON: {"recommendations": ["rec1", "rec2", ...]}`;
+
+    const result = await generateAI(prompt, true);
+    let recommendations: string[] = [];
+
+    try {
+      const parsed = typeof result === 'string' ? JSON.parse(result) : result;
+      recommendations = parsed.recommendations || [];
+    } catch {
+      // Fallback recommendations based on metrics
+      recommendations = generateFallbackPerfRecs(metrics, virtualUsers, endpoint);
+    }
+
+    if (recommendations.length === 0) {
+      recommendations = generateFallbackPerfRecs(metrics, virtualUsers, endpoint);
+    }
+
+    res.json({ recommendations, generated_at: new Date().toISOString() });
+  } catch (e: any) { res.status(500).json({ error: e.message, recommendations: [] }); }
+});
+
+function generateFallbackPerfRecs(metrics: any, virtualUsers: number, endpoint: string): string[] {
+  const recs: string[] = [];
+  const avgMs = metrics.avgResponseTimeMs || 0;
+  const p95Ms = metrics.p95Ms || 0;
+  const errRate = metrics.errorRate || 0;
+  const cpu = metrics.cpuUtilization || 0;
+  const mem = metrics.memoryUtilization || 0;
+
+  if (p95Ms > 500) recs.push(`P95 latency of ${p95Ms}ms exceeds the 500ms target — profile the ${endpoint} handler for N+1 query patterns and add SELECT field projections to reduce payload size.`);
+  if (errRate > 1) recs.push(`Error rate of ${errRate}% at ${virtualUsers} VUs indicates connection pool exhaustion — increase pg/mysql pool size to at least ${Math.round(virtualUsers * 0.4)} connections.`);
+  if (cpu > 70) recs.push(`CPU utilization at ${cpu}% suggests compute-bound operations — move heavy transformations to worker threads and consider horizontal scaling with a load balancer.`);
+  if (mem > 80) recs.push(`Memory utilization at ${mem}% risks OOM events under sustained load — audit for memory leaks using clinic.js flame and check for unbounded in-memory caches.`);
+  if (avgMs > 200) recs.push(`Average response time of ${avgMs}ms can be reduced by adding Redis cache on frequently-read endpoints with a 60-second TTL — target sub-100ms for cached responses.`);
+  recs.push(`For the ${scenarioType || 'steady'} scenario, ensure your database has appropriate indexes on columns used in WHERE clauses of the ${endpoint} query path.`);
+  if (recs.length < 3) recs.push(`Consider implementing circuit breakers for downstream dependencies to prevent cascading failures at ${virtualUsers} VUs peak load.`);
+
+  return recs;
+}
+
 // ── NFR-11: GRACEFUL SHUTDOWN ─────────────────────────────────────────────────
 // Serve Vite middleware on top of the endpoints
 async function startServer() {
   if (process.env.DISABLE_HMR === 'true') {
     // Force set NODE_ENV to production simulation to protect HMR triggers if requested
   }
+
+  // GAP-18-20: AI Assistant Panel chat endpoint
+  app.post('/api/quality/ai-assistant/chat', requireAuth, async (req: any, res: any) => {
+    try {
+      const { messages = [], system = '', module = 'default', projectId } = req.body;
+      const cfg = getActiveLLMConfig();
+
+      if (!cfg) {
+        // Contextual fallback responses
+        const last = messages[messages.length - 1]?.content || '';
+        const q = last.toLowerCase();
+        let reply = '';
+
+        if (q.includes('robot') || q.includes('framework')) {
+          reply = '**Robot Framework** uses keyword-driven syntax.\n\nKey libraries:\n• **SeleniumLibrary** — browser automation\n• **RequestsLibrary** — REST API testing\n• **DatabaseLibrary** — DB assertions\n\nConfigure an LLM provider in AI Model Config for full AI-powered responses.';
+        } else if (q.includes('playwright') || q.includes('flak')) {
+          reply = '**Fixing flaky Playwright tests:**\n• Use `waitForSelector` instead of `waitForTimeout`\n• Prefer `getByRole`, `getByTestId` selectors\n• Add `await expect(locator).toBeVisible()` before interactions\n• Set `retries: 2` in playwright.config.ts';
+        } else if (q.includes('p99') || q.includes('latenc') || q.includes('bottleneck')) {
+          reply = '**P99 spikes usually indicate:**\n• Database slow queries — check `EXPLAIN ANALYZE`\n• Connection pool exhaustion — increase pool size\n• GC pauses — tune memory settings\n• Cold starts on serverless functions';
+        } else if (q.includes('owasp') || q.includes('sql inject') || q.includes('xss')) {
+          reply = '**OWASP Top API priorities:**\n• **Broken Object Auth** — validate ownership per request\n• **Injection** — use parameterized queries only\n• **Broken Auth** — short-lived JWTs + refresh rotation\n• **SSRF** — allowlist external URLs';
+        } else if (q.includes('hipaa') || q.includes('pci') || q.includes('compliance')) {
+          reply = '**Compliance priorities:**\n• **HIPAA** — encrypt PHI at rest + in transit, audit all access\n• **PCI-DSS** — no store CVV, TLS 1.2+, pen-test quarterly\n• **GDPR** — right to erasure, data minimization, DPA\n• **SOC2** — access controls, incident response, monitoring';
+        } else {
+          reply = `I'm your QA AI assistant for the **${module}** module.\n\nI can help with test strategy, automation scripts, performance analysis, and security guidance.\n\n*Configure an LLM provider in **Settings → AI Model Config** for full AI capabilities.*`;
+        }
+        return res.json({ reply });
+      }
+
+      // Build conversation for LLM
+      const systemPrompt = system || `You are an expert QA/testing AI assistant embedded in IQ Studio (Edge QI platform). Module: ${module}. Project: ${projectId || 'N/A'}. Be concise, practical, and specific to testing/QA. Use markdown with **bold** and bullet lists.`;
+
+      const conversationHistory = messages.map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content
+      }));
+
+      const prompt = conversationHistory[conversationHistory.length - 1]?.content || '';
+      const history = conversationHistory.slice(0, -1);
+
+      // Use callLLM with the conversation context
+      let reply = '';
+      try {
+        const fullPrompt = history.length > 0
+          ? `${systemPrompt}\n\n${history.map((m: any) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n')}\n\nUser: ${prompt}\nAssistant:`
+          : prompt;
+
+        const result = await callLLM(fullPrompt, cfg, 800);
+        reply = typeof result === 'string' ? result : result?.choices?.[0]?.message?.content || result?.content || String(result);
+      } catch (llmErr: any) {
+        reply = `I encountered an error processing your request. Please try again.\n\nError: ${llmErr.message}`;
+      }
+
+      res.json({ reply: reply.trim() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message, reply: 'Sorry, an error occurred. Please try again.' });
+    }
+  });
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

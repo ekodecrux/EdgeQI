@@ -75,6 +75,7 @@ import ProjectHub from './components/ProjectHub';
 import RAGKnowledgeBase from './components/RAGKnowledgeBase';
 import VoicePromptBar from './components/VoicePromptBar';
 import ProjectContextBar from './components/ProjectContextBar';
+import AIAssistantPanel from './components/AIAssistantPanel';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
 function SidebarItem({ id, label, Icon, active, onClick }: {
@@ -1562,6 +1563,13 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         onSendMessage={handleSendAssistantMessage}
         isOpen={chatbotOpen}
         onClose={() => setChatbotOpen(false)}
+      />
+
+      {/* GAP-18-20: AI Assistant Panel — context-aware copilot on every page */}
+      <AIAssistantPanel
+        currentModule={activeTab}
+        currentProjectId={currentProjectId}
+        currentSprintId={currentSprintId}
       />
     </div>
   );

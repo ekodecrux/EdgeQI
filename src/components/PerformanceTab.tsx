@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle, RefreshCw, History, ArrowRight, CheckCircle, TableProperties } from 'lucide-react';
+import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle, RefreshCw, History, ArrowRight, CheckCircle, TableProperties, Download, Sparkles, Zap, FileCode } from 'lucide-react';
 import { PerformanceConfig, TestCase } from '../types';
 
 interface PerformanceProps {
@@ -53,13 +53,55 @@ export default function PerformanceTab({
     ]
   };
 
+  // GAP-11/12: AI Perf Recommendations from API
+  const [aiRecs, setAiRecs] = useState<string[]>(activeMetric.aiRecommendations || []);
+  const [aiRecsLoading, setAiRecsLoading] = useState(false);
+  const [aiRecsError, setAiRecsError] = useState<string | null>(null);
+
+  const loadAiRecommendations = async () => {
+    setAiRecsLoading(true);
+    setAiRecsError(null);
+    try {
+      const token = localStorage.getItem('iq_token');
+      const metrics = activeMetric.metrics || {};
+      const res = await fetch('/api/quality/performance/ai-recommendations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          endpoint: activeMetric.endpointOrJourney,
+          virtualUsers: activeMetric.virtualUsers,
+          metrics,
+          testType: activeMetric.testType
+        })
+      });
+      const data = await res.json();
+      if (data.recommendations && data.recommendations.length > 0) {
+        setAiRecs(data.recommendations);
+      } else if (data.error) {
+        setAiRecsError(data.error);
+      }
+    } catch (e: any) {
+      setAiRecsError('Failed to load AI recommendations: ' + e.message);
+      // Fall back to hardcoded
+      setAiRecs(activeMetric.aiRecommendations || []);
+    } finally {
+      setAiRecsLoading(false);
+    }
+  };
+
+  // Load AI recs on mount
+  useEffect(() => { loadAiRecommendations(); }, []);
+
   // REQ-69: Performance history trend
   const [perfHistory, setPerfHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const loadPerfHistory = async () => {
     setHistoryLoading(true);
     try {
-      const token = localStorage.getItem('iqstudio_token');
+      const token = localStorage.getItem('iq_token');
       const res = await fetch('/api/quality/performance/history', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.history) setPerfHistory(data.history);
@@ -71,12 +113,169 @@ export default function PerformanceTab({
     await onExecutePerformanceTest(testType, endpointOrJourney, virtualUsers, durationSeconds, rampUpTimeSeconds, rpsLimit);
   };
 
-  // Build endpoint suggestions from test cases
-  const tcEndpoints = testCases
-    .filter(tc => tc.title || tc.description)
-    .slice(0, 10)
-    .map(tc => tc.testData ? (() => { try { const d = JSON.parse(tc.testData); return d.endpoint || d.url || null; } catch { return null; } })() : null)
-    .filter(Boolean) as string[];
+  // GAP-13/14: JMeter / k6 script export
+  const [exportFormat, setExportFormat] = useState<'jmeter' | 'k6'>('k6');
+  const [exportScript, setExportScript] = useState('');
+  const [exportVisible, setExportVisible] = useState(false);
+
+  const generateJMeterXml = () => {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="${endpointOrJourney}" enabled="true">
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+    </TestPlan>
+    <hashTree>
+      <!-- Thread Group: ${virtualUsers} VUs, ${durationSeconds}s -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Load Test - ${endpointOrJourney}" enabled="true">
+        <intProp name="ThreadGroup.num_threads">${virtualUsers}</intProp>
+        <intProp name="ThreadGroup.ramp_time">${rampUpTimeSeconds}</intProp>
+        <longProp name="ThreadGroup.duration">${durationSeconds}</longProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController">
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+          <intProp name="LoopController.loops">-1</intProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="${endpointOrJourney}" enabled="true">
+          <stringProp name="HTTPSampler.domain">staging.api.io</stringProp>
+          <stringProp name="HTTPSampler.port">443</stringProp>
+          <stringProp name="HTTPSampler.protocol">https</stringProp>
+          <stringProp name="HTTPSampler.path">${endpointOrJourney.replace(/^(GET|POST|PUT|DELETE|PATCH)\s+/, '')}</stringProp>
+          <stringProp name="HTTPSampler.method">${endpointOrJourney.split(' ')[0] || 'GET'}</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP Headers" enabled="true">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="Content-Type" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+              <elementProp name="Authorization" elementType="Header">
+                <stringProp name="Header.name">Authorization</stringProp>
+                <stringProp name="Header.value">Bearer \${TEST_TOKEN}</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <!-- Assertions -->
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200" enabled="true">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp>200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+        <!-- Summary Report -->
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true"/>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>`;
+  };
+
+  const generateK6Script = () => {
+    const method = endpointOrJourney.split(' ')[0] || 'GET';
+    const path = endpointOrJourney.replace(/^(GET|POST|PUT|DELETE|PATCH)\s+/, '');
+    return `import http from 'k6/http';
+import { check, sleep, group } from 'k6';
+import { Rate, Trend, Counter } from 'k6/metrics';
+
+/**
+ * k6 Load Test Script — Generated by IQ Studio
+ * Target: ${endpointOrJourney}
+ * Generated: ${new Date().toLocaleDateString()}
+ */
+
+// Custom metrics
+const errorRate = new Rate('error_rate');
+const reqDuration = new Trend('req_duration', true);
+const requestCount = new Counter('requests_total');
+
+export const options = {
+  stages: [
+    // Ramp-up: 0 → ${virtualUsers} VUs in ${rampUpTimeSeconds}s
+    { duration: '${rampUpTimeSeconds}s', target: ${virtualUsers} },
+    // Sustained load: ${virtualUsers} VUs for ${Math.max(durationSeconds - rampUpTimeSeconds * 2, 10)}s
+    { duration: '${Math.max(durationSeconds - rampUpTimeSeconds * 2, 10)}s', target: ${virtualUsers} },
+    // Ramp-down: ${virtualUsers} → 0 VUs in ${rampUpTimeSeconds}s
+    { duration: '${rampUpTimeSeconds}s', target: 0 },
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<500', 'p(99)<1000'],
+    http_req_failed: ['rate<0.05'],
+    error_rate: ['rate<0.05'],
+  },
+};
+
+const BASE_URL = __ENV.BASE_URL || 'https://staging.api.io';
+const TOKEN = __ENV.TEST_TOKEN || '';
+
+const headers = {
+  'Content-Type': 'application/json',
+  'Authorization': \`Bearer \${TOKEN}\`,
+};
+
+export default function () {
+  group('${endpointOrJourney}', () => {
+    const res = http.${method.toLowerCase() === 'post' ? 'post' : method.toLowerCase() === 'put' ? 'put' : method.toLowerCase() === 'delete' ? 'del' : 'get'}(
+      \`\${BASE_URL}${path}\`,
+      ${method === 'POST' || method === 'PUT' ? "JSON.stringify({ /* payload */ })," : "null,"}
+      { headers }
+    );
+
+    const ok = check(res, {
+      'status is 200': (r) => r.status === 200,
+      'response time < 500ms': (r) => r.timings.duration < 500,
+      'has response body': (r) => r.body && r.body.length > 0,
+    });
+
+    errorRate.add(!ok);
+    reqDuration.add(res.timings.duration);
+    requestCount.add(1);
+
+    if (!ok) {
+      console.error(\`[FAIL] \${res.status} - \${res.body?.slice(0, 200)}\`);
+    }
+  });
+
+  sleep(1);
+}
+
+export function handleSummary(data) {
+  return {
+    'stdout': JSON.stringify({
+      avg_duration: data.metrics.http_req_duration?.values?.avg,
+      p95_duration: data.metrics.http_req_duration?.values?.['p(95)'],
+      error_rate: data.metrics.http_req_failed?.values?.rate,
+      requests_total: data.metrics.http_reqs?.values?.count,
+    }, null, 2),
+  };
+}`;
+  };
+
+  const handleExport = (fmt: 'jmeter' | 'k6') => {
+    setExportFormat(fmt);
+    const script = fmt === 'jmeter' ? generateJMeterXml() : generateK6Script();
+    setExportScript(script);
+    setExportVisible(true);
+  };
+
+  const downloadExport = () => {
+    const filename = exportFormat === 'jmeter' ? 'load-test.jmx' : 'load-test.k6.js';
+    const blob = new Blob([exportScript], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const hasRunBefore = configs.length > 0;
 
@@ -94,9 +293,57 @@ export default function PerformanceTab({
           <p style={{fontFamily:'"Lato",Arial,sans-serif',fontSize:13,color:'#6b82ab',margin:'3px 0 0'}}>Load test your API endpoints and browser journeys</p>
         </div>
       </div>
+      {/* GAP-13/14: Export buttons */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-mono text-slate-400">Export:</span>
+        <button
+          onClick={() => handleExport('jmeter')}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition-all"
+          title="Export as Apache JMeter .jmx"
+        >
+          <FileCode className="w-3.5 h-3.5" /> JMeter
+        </button>
+        <button
+          onClick={() => handleExport('k6')}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100 transition-all"
+          title="Export as k6 script"
+        >
+          <Zap className="w-3.5 h-3.5" /> k6
+        </button>
+      </div>
     </div>
 
-    {/* Test case quick-pick — prefill endpoint from existing TCs */}
+    {/* GAP-13/14: Export Script Panel */}
+    {exportVisible && exportScript && (
+      <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+        <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileCode className="w-4 h-4 text-orange-400" />
+            <span className="text-xs font-mono font-bold text-slate-200">
+              {exportFormat === 'jmeter' ? 'load-test.jmx' : 'load-test.k6.js'}
+            </span>
+            <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
+              {exportFormat === 'jmeter' ? 'Apache JMeter' : 'Grafana k6'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={downloadExport}
+              className="flex items-center gap-1 text-slate-400 hover:text-slate-200 text-xs font-mono bg-slate-800 px-2 py-1 rounded border border-slate-700">
+              <Download className="w-3.5 h-3.5" /> Download
+            </button>
+            <button onClick={() => setExportVisible(false)}
+              className="text-slate-500 hover:text-slate-300 text-xs font-mono px-2 py-1">
+              ✕ Close
+            </button>
+          </div>
+        </div>
+        <div className="p-4 font-mono text-[11px] text-slate-300 overflow-auto max-h-[280px] leading-relaxed text-left">
+          <pre><code>{exportScript}</code></pre>
+        </div>
+      </div>
+    )}
+
+    {/* Test case quick-pick */}
     {testCases.length > 0 && (
       <div style={{background:'#f8fafc',border:'1px solid #dbe2ea',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <TableProperties style={{width:15,height:15,color:'#1e96df',flexShrink:0}} />
@@ -169,7 +416,7 @@ export default function PerformanceTab({
             />
           </div>
 
-          {/* Slasher: VUs quantity slider */}
+          {/* VUs slider */}
           <div>
             <div className="flex justify-between text-xs font-mono uppercase text-slate-550 mb-1">
               <span>Concurrent Virtual Users</span>
@@ -186,7 +433,7 @@ export default function PerformanceTab({
             />
           </div>
 
-          {/* Slasher: RPS limit slider */}
+          {/* RPS limit slider */}
           <div>
             <div className="flex justify-between text-xs font-mono uppercase text-slate-550 mb-1">
               <span>RPS Threshold Boundary</span>
@@ -203,7 +450,7 @@ export default function PerformanceTab({
             />
           </div>
 
-          {/* Slasher: Duration of test run */}
+          {/* Duration/ramp */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-505 mb-1">Run Duration (Sec)</label>
@@ -251,6 +498,18 @@ export default function PerformanceTab({
             </>
           )}
         </button>
+
+        {/* Quick export buttons (also in header, duplicated here for convenience) */}
+        <div className="flex gap-2 pt-1">
+          <button onClick={() => handleExport('jmeter')}
+            className="flex-1 flex items-center justify-center gap-1 text-xs font-mono py-1.5 bg-orange-50 border border-orange-200 text-orange-700 rounded-lg hover:bg-orange-100 transition-all font-bold">
+            <Download className="w-3 h-3" /> JMeter .jmx
+          </button>
+          <button onClick={() => handleExport('k6')}
+            className="flex-1 flex items-center justify-center gap-1 text-xs font-mono py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 transition-all font-bold">
+            <Download className="w-3 h-3" /> k6 script
+          </button>
+        </div>
       </div>
 
       {/* Real-time Response Times Charts & Diagnostics */}
@@ -292,7 +551,7 @@ export default function PerformanceTab({
             </div>
           )}
 
-          {/* Interactive SVG graphical response metrics */}
+          {/* SVG graphical response metrics */}
           <div className="metal-surface rounded-xl p-4 space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
@@ -301,14 +560,13 @@ export default function PerformanceTab({
               <span className="text-[9px] font-mono text-slate-400">Duration: {activeMetric.durationSeconds}s</span>
             </div>
 
-            {/* Real time series SVG chart */}
             {activeMetric.timeSeries && activeMetric.timeSeries.length > 1 ? (() => {
               const ts = activeMetric.timeSeries!;
-              const maxLatency = Math.max(...ts.map(p => p.latencyMs));
-              const maxRps = Math.max(...ts.map(p => p.rps));
+              const maxLatency = Math.max(...ts.map((p: any) => p.latencyMs));
+              const maxRps = Math.max(...ts.map((p: any) => p.rps));
               const W = 100, H = 30;
-              const latencyPts = ts.map((p, i) => `${(i / (ts.length - 1)) * W},${H - (p.latencyMs / maxLatency) * H}`).join(' ');
-              const rpsPts = ts.map((p, i) => `${(i / (ts.length - 1)) * W},${H - (p.rps / maxRps) * H}`).join(' ');
+              const latencyPts = ts.map((p: any, i: number) => `${(i / (ts.length - 1)) * W},${H - (p.latencyMs / maxLatency) * H}`).join(' ');
+              const rpsPts = ts.map((p: any, i: number) => `${(i / (ts.length - 1)) * W},${H - (p.rps / maxRps) * H}`).join(' ');
               const latencyFill = `${latencyPts} ${W},${H} 0,${H}`;
               return (
                 <div className="space-y-1">
@@ -319,16 +577,9 @@ export default function PerformanceTab({
                           <stop offset="0%" stopColor="#2563eb" stopOpacity="0.3" />
                           <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
                         </linearGradient>
-                        <linearGradient id="rpsGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#1d4ed8" stopOpacity="0.2" />
-                          <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0" />
-                        </linearGradient>
                       </defs>
-                      {/* Latency fill area */}
                       <polygon points={latencyFill} fill="url(#latGrad)" />
-                      {/* Latency line */}
                       <polyline points={latencyPts} fill="none" stroke="#2563eb" strokeWidth="1.5" />
-                      {/* RPS line */}
                       <polyline points={rpsPts} fill="none" stroke="#1d4ed8" strokeWidth="1" strokeDasharray="2,1" />
                     </svg>
                   </div>
@@ -340,10 +591,8 @@ export default function PerformanceTab({
                       <span className="w-3 h-0.5 bg-blue-800 inline-block border-dashed" /> RPS — peak {maxRps.toFixed(0)}/s
                     </span>
                   </div>
-
-                  {/* Mini data table: first/mid/last datapoints */}
                   <div className="grid grid-cols-3 gap-2 pt-1">
-                    {[ts[0], ts[Math.floor(ts.length / 2)], ts[ts.length - 1]].map((p, i) => (
+                    {[ts[0], ts[Math.floor(ts.length / 2)], ts[ts.length - 1]].map((p: any, i: number) => (
                       <div key={i} className="bg-white border border-slate-200 rounded-lg p-2 text-[10px] font-mono text-center">
                         <span className="text-slate-400 block text-[9px]">t={p.time}s</span>
                         <span className="text-blue-600 font-bold block">{p.latencyMs}ms</span>
@@ -354,7 +603,6 @@ export default function PerformanceTab({
                 </div>
               );
             })() : (
-              /* Fallback static chart when no real data yet */
               <div className="h-28 w-full relative flex items-end">
                 <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
                   <path d="M 0 30 Q 15 24 30 18 T 50 12 T 75 8 T 100 4" fill="none" stroke="#2563eb" strokeWidth="1.5" />
@@ -414,24 +662,47 @@ export default function PerformanceTab({
             )}
           </div>
 
-          {/* Active AI Tuning diagnostics recommendations */}
-          {activeMetric.aiRecommendations && (
-            <div className="space-y-2 pt-2 border-t border-slate-200">
+          {/* GAP-11/12: AI Perf Recommendations Panel (API-driven) */}
+          <div className="space-y-2 pt-2 border-t border-slate-200">
+            <div className="flex items-center justify-between">
               <h4 className="text-xs font-mono font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Cpu className="w-4 h-4 text-blue-500" />
-                AI Bottleneck diagnostics
+                <Sparkles className="w-4 h-4 text-blue-500" />
+                AI Performance Recommendations
               </h4>
+              <button
+                onClick={loadAiRecommendations}
+                disabled={aiRecsLoading}
+                className="flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-300 px-2 py-0.5 rounded-lg transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${aiRecsLoading ? 'animate-spin' : ''}`} />
+                {aiRecsLoading ? 'Analyzing...' : 'Refresh'}
+              </button>
+            </div>
 
+            {aiRecsError && (
+              <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 font-mono">
+                ⚠ {aiRecsError} — Showing cached recommendations.
+              </div>
+            )}
+
+            {aiRecsLoading ? (
+              <div className="flex items-center gap-2 py-4 justify-center text-slate-400 text-xs font-mono">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Calling AI to analyze bottlenecks…
+              </div>
+            ) : (
               <div className="space-y-2">
-                {activeMetric.aiRecommendations.map((tip, idx) => (
-                  <div key={idx} className="metal-surface rounded-xl p-3 text-xs text-slate-700 leading-relaxed">
-                    <span className="font-bold text-blue-600 mr-1">R-{idx + 1}:</span>
-                    {tip}
+                {aiRecs.map((tip, idx) => (
+                  <div key={idx} className="metal-surface rounded-xl p-3 text-xs text-slate-700 leading-relaxed flex items-start gap-2">
+                    <span className="font-bold text-blue-600 flex-shrink-0">R-{idx + 1}:</span>
+                    <span>{tip}</span>
                   </div>
                 ))}
+                {aiRecs.length === 0 && (
+                  <p className="text-[11px] text-slate-400 font-mono text-center py-3">No recommendations. Run a load test to generate AI insights.</p>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
