@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build:server": "esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx",
+    "build:railway": "npm run build:server",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

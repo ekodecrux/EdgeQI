@@ -16,7 +16,7 @@ import rateLimit from "express-rate-limit";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
 // ── NFR-07: HTTP Security Headers (helmet) ────────────────────────────────────
 app.use(helmet({
