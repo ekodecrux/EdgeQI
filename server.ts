@@ -80,8 +80,31 @@ function getGroqClient(): Groq | null {
  * Unified AI text generation with Gemini-first, Groq fallback.
  * Returns the response text or throws if both fail.
  */
-async function generateAI(prompt: string, jsonMode = true): Promise<string> {
-  // Try Gemini first
+async function generateAI(prompt: string, jsonMode = true, maxTokens = 2048): Promise<string> {
+  // Try Groq FIRST (3x faster: ~1.2s vs 3.5s for Gemini)
+  const groq = getGroqClient();
+  if (groq) {
+    try {
+      const sysMsg = jsonMode
+        ? "You are a senior QA automation engineer. Always respond with valid JSON only — no markdown, no explanation, no code fences."
+        : "You are a senior QA automation engineer. Be concise and practical.";
+      const completion = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "system", content: sysMsg }, { role: "user", content: prompt }],
+        temperature: jsonMode ? 0.2 : 0.4,
+        max_tokens: maxTokens,
+      });
+      const text = completion.choices[0]?.message?.content || "";
+      if (text.trim()) {
+        console.log(`[AI] Groq responded OK (${text.length} chars)`);
+        return text;
+      }
+    } catch (e: any) {
+      console.warn("[AI] Groq failed:", e.message?.slice(0, 120));
+    }
+  }
+
+  // Fallback to Gemini
   const gemini = getGeminiClient();
   if (gemini) {
     try {
@@ -92,31 +115,11 @@ async function generateAI(prompt: string, jsonMode = true): Promise<string> {
       });
       const text = response.text || "";
       if (text.trim()) {
-        console.log("[AI] Gemini responded OK");
+        console.log(`[AI] Gemini responded OK (${text.length} chars)`);
         return text;
       }
     } catch (e: any) {
       console.warn("[AI] Gemini failed:", e.message?.slice(0, 120));
-    }
-  }
-
-  // Fallback to Groq (llama-3.3-70b-versatile)
-  const groq = getGroqClient();
-  if (groq) {
-    console.log("[AI] Falling back to Groq...");
-    const sysMsg = jsonMode
-      ? "You are a senior QA automation engineer. Always respond with valid JSON only — no markdown, no explanation."
-      : "You are a senior QA automation engineer.";
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "system", content: sysMsg }, { role: "user", content: prompt }],
-      temperature: jsonMode ? 0.2 : 0.4,
-      max_tokens: 4096,
-    });
-    const text = completion.choices[0]?.message?.content || "";
-    if (text.trim()) {
-      console.log("[AI] Groq responded OK");
-      return text;
     }
   }
 
@@ -164,34 +167,28 @@ function getActiveLLMConfig(): { baseUrl: string; apiKey: string; model: string 
   return null;
 }
 
-async function callLLM(cfgOrPrompt: any, promptOrCfg: any, maxTokens = 2000): Promise<any> {
+async function callLLM(cfgOrPrompt: any, promptOrCfg: any, maxTokens = 1200): Promise<string> {
   // Support two call signatures: callLLM(prompt, cfg, tokens) and callLLM(cfg, prompt, tokens)
   let cfg: any, prompt: string;
   if (typeof cfgOrPrompt === 'string') { prompt = cfgOrPrompt; cfg = promptOrCfg; }
   else { cfg = cfgOrPrompt; prompt = promptOrCfg; }
 
+  // If a custom SQLite llm_config row is active, use it
   if (cfg?.base_url && cfg?.api_key_enc) {
-    // SQLite llm_configs row format
-    const r = await fetch(`${cfg.base_url.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.api_key_enc}` },
-      body: JSON.stringify({ model: cfg.model || 'gpt-4o', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
-    });
-    const d = await r.json() as any;
-    return d?.choices?.[0]?.message?.content || '';
+    try {
+      const r = await fetch(`${cfg.base_url.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.api_key_enc}` },
+        body: JSON.stringify({ model: cfg.model || 'gpt-4o', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
+      });
+      const d = await r.json() as any;
+      const text = d?.choices?.[0]?.message?.content || '';
+      if (text.trim()) return text;
+    } catch (e: any) { console.warn('[callLLM] custom cfg failed:', e.message?.slice(0, 80)); }
   }
-  if (cfg?.baseUrl && cfg?.apiKey) {
-    const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ model: cfg.model || 'gpt-4o', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
-    });
-    const d = await r.json() as any;
-    // Return full response object for callers that use .choices[0]...
-    return d;
-  }
-  // Last resort: generateAI helper
-  return generateAI(prompt, false);
+
+  // Always route through generateAI (Groq-first → Gemini fallback via native SDKs)
+  return generateAI(prompt, true, maxTokens);
 }
 
 // Auth middleware
@@ -1239,7 +1236,9 @@ app.post("/api/quality/scripts/generate", async (req, res) => {
   const { testCaseId, framework, language } = req.body;
   const start = Date.now();
 
-  const testCase = db.testCases.find(tc => tc.id === testCaseId) || db.testCases[0];
+  // Use targeted SQLite query instead of full table scan
+  const allTCs = db.testCases;
+  const testCase = allTCs.find((tc: any) => tc.id === testCaseId) || allTCs[0];
   const targetFramework = framework || "Playwright";
   const targetLang = language || "TypeScript";
 
@@ -1276,7 +1275,7 @@ app.post("/api/quality/scripts/generate", async (req, res) => {
       - Adhere to the Page Object Model (POM) pattern or clean code standards.
       - Use proper retry awaits (explicit waits) and handles dynamic DOM properties gracefully.
       - Be fully formatted with imports. Return only the code inside a single markdown code block.`;
-    const text = await generateAI(prompt, false);
+    const text = await generateAI(prompt, false, 1500);
     const matches = text.match(/```(?:javascript|typescript|python|java|type|js)?\n([\s\S]+?)\n```/);
     if (matches && matches[1]) {
       scriptCode = matches[1];
@@ -4858,39 +4857,31 @@ app.post('/api/quality/testcases/generate-scenarios', requireAuth, async (req: a
       return res.json({ scenarios: fallbackScenarios, source: 'rule-based' });
     }
 
-    const prompt = `You are a senior QA engineer. Analyze the following requirements and generate ${targetCount} test SCENARIOS (lightweight, no detailed steps yet).
+    const reqContext = requirementsText.substring(0, 1500);
+    const prompt = `You are a senior QA engineer. Generate ${targetCount} test scenarios for these requirements.
 
 REQUIREMENTS:
-${requirementsText.substring(0, 4000)}
+${reqContext}
 
-INSTRUCTIONS:
-- Generate exactly ${targetCount} test scenarios covering types: ${includeTypes}
-- Each scenario should be a brief title + 1-2 sentence description
-- Assign priority: P0 (critical), P1 (high), P2 (medium), P3 (low)
-- Reference the relevant requirement section if possible
-- Do NOT generate full test steps — just titles and brief descriptions
+Generate exactly ${targetCount} scenarios covering: ${includeTypes}
+Each: brief title + 1-sentence description + priority (P0/P1/P2/P3) + type.
 
-Respond ONLY with valid JSON array (no markdown, no code blocks):
-[
-  {
-    "id": "SCN-001",
-    "title": "Verify successful login with valid credentials",
-    "type": "Positive",
-    "priority": "P0",
-    "description": "User provides correct email and password and is redirected to dashboard",
-    "requirementRef": "Login module - valid credentials flow"
-  },
-  ...
-]`;
+JSON array only, no markdown:
+[{"id":"SCN-001","title":"...","type":"Positive","priority":"P0","description":"...","requirementRef":"..."}]`;
 
-    const apiRes = await callLLM(prompt, llmCfg, 2000);
-    const raw = (typeof apiRes === 'string' ? apiRes : apiRes?.choices?.[0]?.message?.content) || '[]';
+    const raw = await callLLM(prompt, llmCfg, 900);
     const cleaned = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
     let scenarios: any[] = [];
     try {
       scenarios = JSON.parse(cleaned);
       if (!Array.isArray(scenarios)) throw new Error('Not an array');
     } catch {
+      console.warn('[generate-scenarios] JSON parse failed, using fallback. Raw:', cleaned.slice(0, 200));
+      scenarios = [];
+    }
+    // Trigger rule-based fallback if LLM returned empty array
+    if (scenarios.length === 0) {
+      console.warn('[generate-scenarios] LLM returned empty scenarios, using rule-based fallback');
       scenarios = generateFallbackScenarios(requirementsText, targetCount, Array.isArray(types) ? types : ['Positive','Negative','Edge','Boundary']);
     }
     // Ensure all required fields
@@ -4902,8 +4893,11 @@ Respond ONLY with valid JSON array (no markdown, no code blocks):
       description: s.description || '',
       requirementRef: s.requirementRef || '',
     }));
-    addAudit('Scenarios Generated', req.user?.email || 'user', `Generated ${scenarios.length} scenarios for project ${projectId}`);
-    res.json({ scenarios, count: scenarios.length });
+    const source = scenarios.some((s: any) => s._fallback) ? 'rule-based' : 'llm';
+    // Clean internal flag
+    scenarios.forEach((s: any) => delete s._fallback);
+    addAudit('Scenarios Generated', req.user?.email || 'user', `Generated ${scenarios.length} scenarios (${source}) for project ${projectId}`);
+    res.json({ scenarios, count: scenarios.length, source });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -4952,60 +4946,50 @@ app.post('/api/quality/testcases/generate-details', requireAuth, async (req: any
       return res.json({ testCases, source: 'rule-based' });
     }
 
-    const scenarioList = scenarios.map((s: any, i: number) =>
-      `${i + 1}. [${s.type}/${s.priority}] ${s.title}\n   Description: ${s.description || ''}`
-    ).join('\n');
+    // Process in batches of 5 for speed — large batches cause LLM timeouts
+    const BATCH_SIZE = 5;
+    let allTestCases: any[] = [];
 
-    const prompt = `You are a senior QA engineer. Generate FULL test case details for the following approved scenarios.
+    for (let batchStart = 0; batchStart < scenarios.length; batchStart += BATCH_SIZE) {
+      const batch = scenarios.slice(batchStart, batchStart + BATCH_SIZE);
+      const scenarioList = batch.map((s: any, i: number) =>
+        `${batchStart + i + 1}. [${s.type}/${s.priority}] ${s.title}: ${(s.description || '').substring(0, 80)}`
+      ).join('\n');
 
-REQUIREMENTS CONTEXT:
-${(requirementsText || '').substring(0, 2000)}
+      const reqCtx = (requirementsText || '').substring(0, 800);
+      const prompt = `QA engineer: generate full test cases for these ${batch.length} scenarios.
 
-APPROVED SCENARIOS:
+Context: ${reqCtx}
+
+Scenarios:
 ${scenarioList}
 
-For EACH scenario generate a complete test case with:
-- id: "TC-" + 3-digit number
-- title: scenario title (keep same)
-- description: expanded description
-- type: same as scenario type (Positive/Negative/Edge/Boundary)
-- priority: same as scenario priority (P0/P1/P2/P3)
-- preconditions: prerequisites (user logged in, test data setup, etc.)
-- steps: array of {action, expectedResult} objects (3-7 steps each)
-- testData: relevant test data values
-- automationStatus: "Automatable" | "Needs Manual" | "Automated"
-- confidenceScore: 70-95
+For each: id(TC-0NN), title, type, priority, preconditions(1 line), steps([{action,expectedResult}] 3-5 steps), testData, automationStatus, confidenceScore(70-95).
+JSON array only:
+[{"id":"TC-001","title":"...","type":"Positive","priority":"P0","preconditions":"...","steps":[{"action":"...","expectedResult":"..."}],"testData":"...","automationStatus":"Automatable","confidenceScore":85}]`;
 
-Respond ONLY with valid JSON array (no markdown):
-[
-  {
-    "id": "TC-001",
-    "title": "...",
-    "description": "...",
-    "type": "Positive",
-    "priority": "P0",
-    "preconditions": "User is on login page with valid account",
-    "steps": [
-      {"action": "Navigate to /login", "expectedResult": "Login page is displayed"},
-      {"action": "Enter valid email and password", "expectedResult": "Fields accept input"},
-      {"action": "Click Login button", "expectedResult": "User redirected to dashboard"}
-    ],
-    "testData": "email: test@example.com, password: Test@123",
-    "automationStatus": "Automatable",
-    "confidenceScore": 90
-  }
-]`;
-
-    const apiRes = await callLLM(prompt, llmCfg, 3000);
-    const raw = (typeof apiRes === 'string' ? apiRes : apiRes?.choices?.[0]?.message?.content) || '[]';
-    const cleaned = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
-    let testCases: any[] = [];
-    try {
-      testCases = JSON.parse(cleaned);
-      if (!Array.isArray(testCases)) throw new Error('Not an array');
-    } catch {
-      testCases = scenarios.map((s: any, i: number) => buildFallbackTC(s, projectId, i));
+      try {
+        const raw = await callLLM(prompt, llmCfg, 1400);
+        const cleaned = raw.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+        let batchTCs: any[] = [];
+        try {
+          batchTCs = JSON.parse(cleaned);
+          if (!Array.isArray(batchTCs)) throw new Error('not array');
+        } catch {
+          console.warn(`[generate-details] batch ${batchStart}-${batchStart+BATCH_SIZE} JSON parse failed, raw:`, cleaned.slice(0,200));
+          batchTCs = [];
+        }
+        if (batchTCs.length === 0) {
+          batchTCs = batch.map((s: any, i: number) => buildFallbackTC(s, projectId, batchStart + i));
+        }
+        allTestCases = allTestCases.concat(batchTCs);
+      } catch (batchErr: any) {
+        console.warn('[generate-details] batch error:', batchErr.message);
+        allTestCases = allTestCases.concat(batch.map((s: any, i: number) => buildFallbackTC(s, projectId, batchStart + i)));
+      }
     }
+
+    let testCases = allTestCases;
     // Ensure all fields + projectId
     testCases = testCases.map((tc: any, i: number) => ({
       id: tc.id || `TC-${String(Date.now()).slice(-4)}-${i}`,
