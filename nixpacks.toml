@@ -1,19 +1,12 @@
+# Railway Nixpacks config — needed for better-sqlite3 native compilation
 [phases.setup]
-nixPkgs = ["nodejs_20", "python312", "perl", "curl", "git"]
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake", "pkg-config"]
 
 [phases.install]
-cmds = [
-  "npm ci --omit=dev",
-  "pip3 install robotframework selenium pytest locust requests pytest-json-report semgrep --quiet || true",
-  "curl -fsSL https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz | tar xz -C /tmp && mv /tmp/k6-v0.55.0-linux-amd64/k6 /usr/local/bin/k6 || true",
-  "curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.71.0/trivy_0.71.0_Linux-64bit.tar.gz | tar xz -C /tmp && mv /tmp/trivy /usr/local/bin/trivy || true",
-  "git clone --depth 1 https://github.com/sullo/nikto /opt/nikto || true"
-]
+cmds = ["npm ci"]
 
 [phases.build]
-cmds = [
-  "npx esbuild server.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx"
-]
+cmds = ["npm run build:railway"]
 
 [start]
 cmd = "node dist/server.cjs"
