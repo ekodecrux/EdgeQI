@@ -8,7 +8,7 @@
     "build": "echo 'Skipping full vite build — using pre-built public/ assets for CF worker'",
     "build:server": "esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx",
     "build:railway": "npm run build:server",
-    "build:cf": "npx wrangler deploy --dry-run --outdir dist-worker 2>/dev/null || true",
+    "build:cf": "npx esbuild src/index.tsx --bundle --platform=browser --target=es2022 --format=esm --outfile=_worker.js --minify",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
