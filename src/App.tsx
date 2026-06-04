@@ -91,7 +91,7 @@ function SidebarItem({ id, label, Icon, active, onClick }: {
       className={`sidebar-item${active ? ' active' : ''}`}
       title={label}
     >
-      <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0`} style={{ color: active ? 'var(--sidebar-active-text, #818CF8)' : 'rgba(148,163,184,0.7)' }} />
+      <Icon className={`w-3.5 h-3.5 sidebar-icon shrink-0`} style={{ color: active ? '#A5B4FC' : 'rgba(200,211,230,0.8)' }} />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -111,7 +111,7 @@ function SidebarGroup({ label, children, defaultOpen = false }: {
         <span className="sidebar-section-label" style={{ margin: 0, letterSpacing: '0.08em', fontSize: 10, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' }}>{label}</span>
         <svg
           className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          style={{ color: 'rgba(166,180,205,0.4)', flexShrink: 0 }}
+          style={{ color: 'rgba(166,180,205,0.75)', flexShrink: 0 }}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -941,7 +941,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             </div>
             <div>
               <p className="text-[15px] font-black text-white leading-tight" style={{ letterSpacing: '0.18em', fontFamily: 'Inter, sans-serif' }}>EDGE<span style={{ color: '#818CF8' }} className="ml-1">QI</span></p>
-              <p style={{ fontSize: 8, fontFamily: 'JetBrains Mono, monospace', color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>Quality Intelligence</p>
+              <p style={{ fontSize: 8, fontFamily: 'JetBrains Mono, monospace', color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>Quality Intelligence</p>
             </div>
           </div>
         </div>
@@ -1008,7 +1008,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               </div>
               <div className="flex-1 min-w-0">
                 <p className="truncate font-semibold" style={{ fontSize: 11, color: '#E2E8F0', fontFamily: 'Inter, sans-serif' }}>{authUser.name}</p>
-                <p className="truncate" style={{ fontSize: 9, color: '#64748B', fontFamily: 'Inter, sans-serif' }}>{authUser.role.replace('_', ' ')}</p>
+                <p className="truncate" style={{ fontSize: 9, color: '#94A3B8', fontFamily: 'Inter, sans-serif' }}>{authUser.role.replace('_', ' ')}</p>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => setShowLanding(true)} title="Home" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
@@ -1028,7 +1028,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               <span style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(166,180,205,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>← Home Page</span>
             </button>
           )}
-          <div className="flex items-center justify-between mt-1.5 px-0.5" style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#334155' }}>
+          <div className="flex items-center justify-between mt-1.5 px-0.5" style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#64748B' }}>
             <span>EDGE QI · v3.0</span>
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />LIVE</span>
           </div>
