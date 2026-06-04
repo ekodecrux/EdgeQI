@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode, CheckCircle2, Search, Globe, Code, X, Zap, Download, Package, ArrowRight, CheckCircle, TableProperties, Lock, User, Key, FileText, BarChart2 } from 'lucide-react';
 
 // GAP-15: Fixed token — use iq_token (not iqstudio_token)
@@ -132,9 +132,37 @@ export default function SecurityTab({
   const [scanError, setScanError] = useState<string | null>(null);
   const [lastScanCount, setLastScanCount] = useState<number | null>(null);
   // Open source security tool selector
-  const [secTool, setSecTool] = useState<'semgrep' | 'trivy' | 'nikto' | 'zap'>('semgrep');
+  const [secTool, setSecTool] = useState<'semgrep' | 'trivy' | 'nikto' | 'zap' | 'auto'>('auto');
   const [secToolRunning, setSecToolRunning] = useState(false);
   const [secToolResult, setSecToolResult] = useState<any>(null);
+  // Tool availability
+  const [secToolsAvail, setSecToolsAvail] = useState<Record<string, boolean>>({});
+  const [secToolsLoaded, setSecToolsLoaded] = useState(false);
+
+  // Load tool availability on mount and auto-select first available security tool
+  useEffect(() => {
+    async function loadSecToolsStatus() {
+      try {
+        const token = localStorage.getItem('iq_token') || '';
+        const res = await fetch(`${(window as any).__API_BASE__ || ''}/api/quality/tools/status`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        if (data.tools?.security) {
+          const avail: Record<string, boolean> = {};
+          data.tools.security.forEach((t: any) => { avail[t.id] = t.available; });
+          setSecToolsAvail(avail);
+          setSecToolsLoaded(true);
+          // Auto-select priority: Semgrep (SAST) → Trivy (SCA) → Nikto (DAST) → ZAP (simulated)
+          const priority: Array<'semgrep' | 'trivy' | 'nikto' | 'zap'> = ['semgrep', 'trivy', 'nikto', 'zap'];
+          const first = priority.find(id => avail[id]);
+          if (first) setSecTool(first);
+          // ZAP always available (simulation), so if nothing real is found it falls to zap
+        }
+      } catch (_) { /* stay on auto */ }
+    }
+    loadSecToolsStatus();
+  }, []);
 
   // GAP-16: Authenticated DAST fields
   const [showAuthFields, setShowAuthFields] = useState(false);
@@ -255,7 +283,7 @@ export default function SecurityTab({
           tool: secTool,
           targetUrl: scanMode === 'url' ? scanTarget : '',
           targetPath: '.',
-          scanType: secTool === 'semgrep' ? 'SAST' : secTool === 'trivy' ? 'SCA' : 'DAST'
+          scanType: secTool === 'auto' ? 'SAST' : secTool === 'semgrep' ? 'SAST' : secTool === 'trivy' ? 'SCA' : 'DAST'
         })
       });
       const data = await res.json();
@@ -507,25 +535,46 @@ export default function SecurityTab({
           <ShieldAlert className="w-4 h-4 text-rose-400" />
           <span className="text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider">Open Source Security Scanners</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {/* Auto button */}
+          <button
+            onClick={() => setSecTool('auto')}
+            className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+              secTool === 'auto' ? 'ring-2 ring-offset-1 ring-indigo-400 border-indigo-500 text-indigo-300 bg-indigo-950' : 'border-slate-600 text-slate-400 bg-slate-800 hover:border-slate-500'
+            }`}
+          >
+            <span className="font-extrabold">⚡ Auto</span>
+            <span className="text-[9px] opacity-70">smart pick</span>
+            <span className="text-[8px] opacity-50 text-center">SAST→SCA→DAST</span>
+          </button>
           {([
             { id: 'semgrep', label: 'Semgrep', badge: 'v1.164', desc: 'SAST · Code patterns', color: 'border-blue-500 text-blue-300 bg-blue-950' },
             { id: 'trivy', label: 'Trivy', badge: 'v0.71', desc: 'SCA · CVE scanner', color: 'border-cyan-500 text-cyan-300 bg-cyan-950' },
             { id: 'nikto', label: 'Nikto', badge: 'v2.x', desc: 'DAST · Web server', color: 'border-orange-500 text-orange-300 bg-orange-950' },
             { id: 'zap', label: 'OWASP ZAP', badge: 'sim', desc: 'DAST · Active scan', color: 'border-rose-500 text-rose-300 bg-rose-950' },
-          ] as const).map(tool => (
-            <button
-              key={tool.id}
-              onClick={() => setSecTool(tool.id)}
-              className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
-                secTool === tool.id ? 'ring-2 ring-offset-1 ring-white/30 opacity-100 ' + tool.color : 'border-slate-600 text-slate-400 bg-slate-800 hover:border-slate-500'
-              }`}
-            >
-              <span className="font-extrabold">{tool.label}</span>
-              <span className="text-[9px] opacity-70">{tool.badge}</span>
-              <span className="text-[8px] opacity-50 text-center">{tool.desc}</span>
-            </button>
-          ))}
+          ] as const).map(tool => {
+            const isAvail = !secToolsLoaded || secToolsAvail[tool.id] !== false || tool.id === 'zap';
+            const availIcon = tool.id === 'zap'
+              ? '💻'
+              : secToolsLoaded ? (secToolsAvail[tool.id] ? '✅' : '❌') : '⏳';
+            return (
+              <button
+                key={tool.id}
+                onClick={() => setSecTool(tool.id)}
+                className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+                  secTool === tool.id
+                    ? 'ring-2 ring-offset-1 ring-white/30 opacity-100 ' + tool.color
+                    : isAvail
+                      ? 'border-slate-600 text-slate-400 bg-slate-800 hover:border-slate-500'
+                      : 'border-slate-700 text-slate-600 bg-slate-800 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <span className="font-extrabold">{availIcon} {tool.label}</span>
+                <span className="text-[9px] opacity-70">{tool.badge}</span>
+                <span className="text-[8px] opacity-50 text-center">{tool.desc}</span>
+              </button>
+            );
+          })}
         </div>
         <div className="flex gap-2">
           <button
@@ -533,7 +582,10 @@ export default function SecurityTab({
             disabled={secToolRunning || isScanning}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-mono font-bold transition-all ${secToolRunning ? 'bg-slate-700 text-slate-300 border border-slate-600' : 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm'} disabled:opacity-60`}
           >
-            {secToolRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running {secTool}...</> : <><ShieldAlert className="w-3.5 h-3.5" /> Run {secTool === 'zap' ? 'OWASP ZAP' : secTool.charAt(0).toUpperCase() + secTool.slice(1)} Scan</>}
+            {secToolRunning
+              ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> {secTool === 'auto' ? 'Auto-selecting scanner...' : `Running ${secTool}...`}</>
+              : <><ShieldAlert className="w-3.5 h-3.5" /> {secTool === 'auto' ? '⚡ Auto-Run Security Scan' : `Run ${secTool === 'zap' ? 'OWASP ZAP' : secTool.charAt(0).toUpperCase() + secTool.slice(1)} Scan`}</>
+            }
           </button>
         </div>
         {secToolResult && !secToolResult.error && (

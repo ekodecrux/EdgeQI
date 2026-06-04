@@ -222,9 +222,12 @@ export default function ExecutionEnginePage({
   const [parallelRunning, setParallelRunning] = useState(false);
   const [parallelResult, setParallelResult] = useState<any>(null);
   // Open source tool selector
-  const [execTool, setExecTool] = useState<'playwright' | 'robot' | 'selenium' | 'cypress'>('playwright');
+  const [execTool, setExecTool] = useState<'playwright' | 'robot' | 'selenium' | 'cypress' | 'auto'>('auto');
   const [toolRunResult, setToolRunResult] = useState<any>(null);
   const [toolRunning, setToolRunning] = useState(false);
+  // Tool availability from /api/quality/tools/status
+  const [toolsAvailability, setToolsAvailability] = useState<Record<string, boolean>>({});
+  const [toolsStatusLoaded, setToolsStatusLoaded] = useState(false);
 
   // SSE streaming state (REQ-55)
   const [sseRunId, setSseRunId] = useState('');
@@ -389,6 +392,33 @@ export default function ExecutionEnginePage({
         String(r.failed).includes(historySearch)
       )
     : history;
+
+  // Load tool availability on mount and auto-select first available execution tool
+  useEffect(() => {
+    async function loadToolsStatus() {
+      try {
+        const token = localStorage.getItem('iq_token') || '';
+        const res = await fetch(apiUrl('/api/quality/tools/status'), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        if (data.tools?.execution) {
+          const avail: Record<string, boolean> = {};
+          data.tools.execution.forEach((t: any) => { avail[t.id] = t.available; });
+          // Also include perf and security tools for shared availability map
+          [...(data.tools.performance || []), ...(data.tools.security || [])].forEach((t: any) => { avail[t.id] = t.available; });
+          setToolsAvailability(avail);
+          setToolsStatusLoaded(true);
+          // Auto-select: Playwright → Selenium → Robot → Cypress
+          const priority: Array<'playwright' | 'robot' | 'selenium' | 'cypress'> = ['playwright', 'selenium', 'robot', 'cypress'];
+          const first = priority.find(id => avail[id]);
+          if (first) setExecTool(first);
+          // Keep 'auto' only if none are individually detected available
+        }
+      } catch (_) { /* silently ignore — stay on 'auto' fallback */ }
+    }
+    loadToolsStatus();
+  }, []);
 
   // Load run history from API on mount
   useEffect(() => {
@@ -578,7 +608,8 @@ export default function ExecutionEnginePage({
       const data = await res.json();
       setToolRunResult(data);
       if (data.runId) setSseRunId(data.runId);
-      setShowToast(`${execTool.toUpperCase()} run done: ${data.passed || 0}P / ${data.failed || 0}F in ${((data.durationMs || 0)/1000).toFixed(1)}s`);
+      const usedTool = data.tool || execTool;
+      setShowToast(`${usedTool.toUpperCase()} run done: ${data.passed || 0}P / ${data.failed || 0}F in ${((data.durationMs || 0)/1000).toFixed(1)}s`);
       setTimeout(() => setShowToast(null), 6000);
     } catch (e: any) {
       setToolRunResult({ error: e.message });
@@ -1217,32 +1248,51 @@ export default function ExecutionEnginePage({
             {/* ── Open Source Tool Selector ── */}
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1.5 font-bold">Test Automation Framework</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {/* Auto button */}
+                <button
+                  onClick={() => setExecTool('auto')}
+                  className={`flex flex-col items-center gap-0.5 py-2 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+                    execTool === 'auto'
+                      ? 'ring-2 ring-offset-1 ring-indigo-500 bg-indigo-50 border-indigo-300 text-indigo-800'
+                      : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <span>⚡ Auto</span>
+                  <span className="text-[9px] opacity-60 font-normal">smart pick</span>
+                </button>
                 {([
                   { id: 'playwright', label: 'Playwright', badge: 'v1.60', color: 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' },
-                  { id: 'robot', label: 'Robot Framework', badge: 'v7.4', color: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
-                  { id: 'selenium', label: 'Selenium+pytest', badge: 'v4.44', color: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
+                  { id: 'robot', label: 'Robot FW', badge: 'v7.4', color: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
+                  { id: 'selenium', label: 'Selenium', badge: 'pytest', color: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
                   { id: 'cypress', label: 'Cypress', badge: 'npx', color: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
-                ] as const).map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => setExecTool(t.id)}
-                    className={`flex flex-col items-center gap-0.5 py-2 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
-                      execTool === t.id
-                        ? 'ring-2 ring-offset-1 ring-blue-500 ' + t.color
-                        : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <span>{t.label}</span>
-                    <span className="text-[9px] opacity-60 font-normal">{t.badge}</span>
-                  </button>
-                ))}
+                ] as const).map(t => {
+                  const isAvail = !toolsStatusLoaded || toolsAvailability[t.id] !== false;
+                  const availIcon = toolsStatusLoaded ? (toolsAvailability[t.id] ? '✅' : '❌') : '⏳';
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setExecTool(t.id)}
+                      className={`flex flex-col items-center gap-0.5 py-2 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all ${
+                        execTool === t.id
+                          ? 'ring-2 ring-offset-1 ring-blue-500 ' + t.color
+                          : isAvail
+                            ? 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
+                            : 'border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <span className="flex items-center gap-0.5">{availIcon} {t.label}</span>
+                      <span className="text-[9px] opacity-60 font-normal">{t.badge}</span>
+                    </button>
+                  );
+                })}
               </div>
               <p className="text-[10px] text-slate-400 font-mono mt-1">
-                {execTool === 'playwright' && '✓ Chromium browser cached · Real subprocess execution'}
-                {execTool === 'robot' && '✓ Robot Framework 7.4.2 installed · Keyword-driven tests'}
-                {execTool === 'selenium' && '✓ Selenium 4.44.0 + pytest 8.3.5 · Python test runner'}
-                {execTool === 'cypress' && '⚠ Cypress requires: npm install cypress in project'}
+                {execTool === 'auto' && '⚡ Auto-selects first available: Playwright → Selenium → Robot → Cypress'}
+                {execTool === 'playwright' && (toolsAvailability['playwright'] ? '✅ Chromium browser cached · Real subprocess execution' : '⚠ Playwright not detected — will attempt with node_modules fallback')}
+                {execTool === 'robot' && (toolsAvailability['robot'] ? '✅ Robot Framework installed · Keyword-driven tests' : '❌ Robot Framework not found — install via pip3 install robotframework')}
+                {execTool === 'selenium' && (toolsAvailability['selenium'] ? '✅ Selenium + pytest installed · Python test runner' : '❌ Selenium/pytest not found — install via pip3 install selenium pytest')}
+                {execTool === 'cypress' && (toolsAvailability['cypress'] ? '✅ Cypress installed · E2E browser tests' : '❌ Cypress not installed — run: npm install cypress')}
               </p>
             </div>
 
@@ -1262,7 +1312,10 @@ export default function ExecutionEnginePage({
                   disabled={toolRunning || parallelRunning}
                   className="btn-primary w-full py-2 px-4 text-xs flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  {toolRunning ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Running {execTool}...</> : <><Play className="w-3.5 h-3.5" /> Run with {execTool === 'robot' ? 'Robot Framework' : execTool.charAt(0).toUpperCase() + execTool.slice(1)}</>}
+                  {toolRunning
+                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> {execTool === 'auto' ? 'Auto-selecting...' : `Running ${execTool}...`}</>
+                    : <><Play className="w-3.5 h-3.5" /> {execTool === 'auto' ? '⚡ Auto-Run Best Tool' : `Run with ${execTool === 'robot' ? 'Robot Framework' : execTool.charAt(0).toUpperCase() + execTool.slice(1)}`}</>
+                  }
                 </button>
               </div>
               <div className="flex items-end">
