@@ -1,12 +1,12 @@
-# Railway Nixpacks config — needed for better-sqlite3 native compilation
+# Railway Nixpacks config
 [phases.setup]
 nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake", "pkg-config"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --omit=dev"]
 
 [phases.build]
-cmds = ["npm run build:railway"]
+cmds = ["echo 'Using pre-built dist/server.cjs'"]
 
 [start]
-cmd = "node dist/server.cjs"
+cmd = "mkdir -p data && node dist/server.cjs"
