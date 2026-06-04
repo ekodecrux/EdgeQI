@@ -1,9 +1,34 @@
-# Railway Nixpacks config
+# Railway Nixpacks config — installs all open source QA tools
 [phases.setup]
-nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake", "pkg-config"]
+nixPkgs = [
+  # Runtime
+  "nodejs_20", "python3", "gcc", "gnumake", "pkg-config",
+  # Perl (for Nikto)
+  "perl", "perlPackages.LWP", "perlPackages.LWPProtocolHttps", "perlPackages.NetSSLeay",
+  # Test Automation
+  "k6",                           # Performance: k6 load testing binary
+  "semgrep",                      # Security SAST: semgrep static analysis
+  "trivy",                        # Security SCA: trivy CVE scanner
+  "nikto",                        # Security DAST: nikto web scanner
+]
 
 [phases.install]
-cmds = ["npm ci --omit=dev"]
+cmds = [
+  # Install production deps (server.cjs needs: express, bcryptjs, better-sqlite3, etc.)
+  "npm ci --omit=dev",
+  # Install artillery separately (devDep but needed at runtime for test runner)
+  "npm install --no-save artillery@latest 2>/dev/null || true",
+  # Python open source tools
+  "pip3 install --quiet --break-system-packages locust robotframework selenium pytest pytest-json-report 2>/dev/null || pip3 install --quiet locust robotframework selenium pytest pytest-json-report 2>/dev/null || true",
+  # Create symlinks in /usr/local/bin for tools installed by Nix profile (so resolveBin fallback also works)
+  "ln -sf $(which k6 2>/dev/null) /usr/local/bin/k6 2>/dev/null || true",
+  "ln -sf $(which trivy 2>/dev/null) /usr/local/bin/trivy 2>/dev/null || true",
+  "ln -sf $(which semgrep 2>/dev/null) /usr/local/bin/semgrep 2>/dev/null || true",
+  # Install Playwright chromium browser
+  "node_modules/.bin/playwright install chromium --with-deps 2>/dev/null || true",
+  # Pre-download Trivy DB to avoid first-run delay
+  "trivy image --download-db-only 2>/dev/null || true",
+]
 
 [phases.build]
 cmds = ["echo 'Using pre-built dist/server.cjs'"]

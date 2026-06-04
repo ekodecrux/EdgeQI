@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "echo 'Skipping full vite build — using pre-built public/ assets for CF worker'",
+    "build": "echo 'Skipping full vite build \u2014 using pre-built public/ assets for CF worker'",
     "build:server": "esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx",
     "build:railway": "npm run build:server",
     "build:cf": "npx esbuild src/index.tsx --bundle --platform=browser --target=es2022 --format=esm --outfile=_worker.js --minify",
@@ -53,6 +53,7 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
-    "wrangler": "^4.86.0"
+    "wrangler": "^4.86.0",
+    "artillery": "latest"
   }
 }
