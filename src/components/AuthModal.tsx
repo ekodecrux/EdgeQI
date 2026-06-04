@@ -25,7 +25,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
       const body = mode === 'login'
         ? { email, password }
         : { email, password, name, role };
-      const res = await fetch(endpoint, {
+      const res = await fetch(apiUrl(endpoint), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
