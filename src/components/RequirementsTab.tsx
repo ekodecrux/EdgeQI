@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare, Image, ScanLine, Zap } from 'lucide-react';
+import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare, Image, ScanLine, Zap, BarChart2, ShieldAlert } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
 import { apiUrl } from '@/src/config/api';
@@ -999,134 +999,111 @@ export default function RequirementsTab({
         </div>
       </div>
 
-      {/* 2. Structured Test Cases Output */}
-      <div className="lg:col-span-7 glass-card p-6 flex flex-col justify-between">
-        <div>
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="font-sans font-semibold text-lg text-slate-900">Generated Test Suite</h3>
-              <p className="text-xs text-slate-500 mt-1">Exhaustive testing coverage compiled via deep AI modeling</p>
+      {/* 2. Requirements Summary Panel */}
+      <div className="lg:col-span-7 space-y-4">
+
+        {/* Summary KPI strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'Total', value: requirements.length, color: 'text-slate-900', bg: 'bg-white' },
+            { label: 'Implemented', value: requirements.filter(r => r.status === 'Implemented' || r.status === 'Done').length, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+            { label: 'In Progress', value: requirements.filter(r => r.status === 'In Progress').length, color: 'text-amber-700', bg: 'bg-amber-50' },
+            { label: 'Draft / Open', value: requirements.filter(r => r.status === 'Draft' || r.status === 'Open' || !r.status).length, color: 'text-slate-600', bg: 'bg-slate-50' },
+          ].map(k => (
+            <div key={k.label} className={`${k.bg} border border-slate-200 rounded-xl p-4 shadow-sm`}>
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">{k.label}</p>
+              <p className={`text-2xl font-bold font-mono mt-1 ${k.color}`}>{k.value}</p>
             </div>
-            <span className="badge badge-blue text-xs font-mono px-3 py-1">
-              {testCases.length} Compiled Cases
-            </span>
-          </div>
+          ))}
+        </div>
 
-          {/* Test case dynamic cards list */}
-          <div role="list" aria-label="Generated test cases" className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-            {testCases.map((tc) => {
-              const isSelected = selectedTestCase?.id === tc.id;
-              return (
-                <div
-                  key={tc.id}
-                  role="listitem"
-                  onClick={() => setSelectedTestCase(isSelected ? null : tc)}
-                  aria-expanded={isSelected}
-                  className={`border rounded-xl p-3 select-none cursor-pointer transition-all ${
-                    isSelected ? 'bg-blue-50/40 border-blue-400' : 'bg-slate-50 border-slate-150 hover:border-blue-200 hover:bg-blue-50/20'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold text-blue-600">{tc.id}</span>
-                        <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-bold uppercase ${
-                          tc.priority === 'P0' ? 'bg-rose-50 text-rose-700 border border-rose-200/50' :
-                          tc.priority === 'P1' ? 'bg-amber-50 text-amber-700 border border-amber-200/50' : 'bg-slate-100 border border-slate-205 text-slate-600'
-                        }`}>
-                          {tc.priority}
-                        </span>
-                        <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
-                          {tc.type}
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-semibold text-slate-900">{tc.title}</h4>
+        {/* Module breakdown */}
+        {requirements.length > 0 && (() => {
+          const byModule: Record<string, number> = {};
+          requirements.forEach(r => {
+            const mod = (r.suggestedModules?.[0] || r.module || 'Other');
+            byModule[mod] = (byModule[mod] || 0) + 1;
+          });
+          const entries = Object.entries(byModule).sort((a, b) => b[1] - a[1]).slice(0, 6);
+          const total = requirements.length;
+          return (
+            <div className="glass-card p-5">
+              <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-indigo-500" /> Coverage by Module
+              </h4>
+              <div className="space-y-2.5">
+                {entries.map(([mod, count]) => (
+                  <div key={mod}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-medium text-slate-700 truncate max-w-[70%]">{mod}</span>
+                      <span className="font-mono text-slate-500">{count} req{count !== 1 ? 's' : ''} · {Math.round((count / total) * 100)}%</span>
                     </div>
-
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {/* REQ-27: Version history button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleLoadTcVersions(tc.id); }}
-                        aria-label={`View version history for test case ${tc.id}`}
-                        title="TC version history"
-                        className="text-[9px] font-mono text-slate-500 hover:text-blue-600 bg-white hover:bg-blue-50 p-1 rounded border border-slate-200 transition-all"
-                      >
-                        <History className="w-3 h-3" aria-hidden="true" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onGenerateTestCaseCode(tc.id); }}
-                        aria-label={`Generate script for test case ${tc.id}`}
-                        className="text-[10px] font-mono text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-600 px-2.5 py-1 rounded-lg border border-blue-200 transition-all flex items-center gap-1 shadow-xs"
-                      >
-                        <Plus className="w-3 h-3" aria-hidden="true" /> Script
-                      </button>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5">
+                      <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.round((count / total) * 100)}%` }} />
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
-                  {/* Expansion info content */}
-                  {isSelected && (
-                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-3 text-xs leading-relaxed text-slate-705">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block font-mono">Assertion Target Description</span>
-                        <p>{tc.description}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono">System Preconditions</span>
-                        <p className="font-mono text-[11px] text-slate-600">{tc.preconditions}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono mb-1">Execution Steps</span>
-                        <ol className="list-decimal list-inside space-y-1 bg-white p-2.5 rounded-lg border border-slate-150 shadow-inner">
-                          {tc.steps.map((st, i) => (
-                            <li key={i} className="text-[11px] text-slate-700">
-                              <span className="font-semibold text-slate-800">{st.action}</span>
-                              <p className="text-[10px] text-blue-500 ml-4 font-mono">→ Expect: {st.expectedResult}</p>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                      <div className="flex gap-4">
-                        <div className="flex-1">
-                          <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono">Test Parameters Data</span>
-                          <span className="text-[10px] font-mono text-slate-600 bg-slate-100 p-1 rounded border border-slate-200 block">{tc.testData}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-405 uppercase block font-mono">Coverage Confidence</span>
-                          <span className="text-[11px] font-mono text-blue-600 font-bold">{tc.confidenceScore}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        {/* Priority breakdown */}
+        {requirements.length > 0 && (() => {
+          const priorities = ['P0', 'P1', 'P2', 'P3'];
+          const pColors: Record<string, string> = { P0: 'bg-rose-500', P1: 'bg-amber-500', P2: 'bg-blue-500', P3: 'bg-slate-400' };
+          const pBg: Record<string, string> = { P0: 'bg-rose-50 text-rose-700', P1: 'bg-amber-50 text-amber-700', P2: 'bg-blue-50 text-blue-700', P3: 'bg-slate-100 text-slate-600' };
+          const counts = priorities.map(p => ({ p, count: requirements.filter(r => r.priority === p).length }));
+          return (
+            <div className="glass-card p-5">
+              <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-500" /> Priority Distribution
+              </h4>
+              <div className="flex gap-3 flex-wrap">
+                {counts.map(({ p, count }) => (
+                  <div key={p} className={`flex-1 min-w-[80px] rounded-xl p-3 text-center border ${pBg[p]} border-current/20`}>
+                    <p className="text-xl font-bold font-mono">{count}</p>
+                    <p className="text-[10px] font-mono font-bold mt-0.5">{p}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Empty state */}
+        {requirements.length === 0 && (
+          <div className="glass-card p-10 text-center">
+            <FileText className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">No requirements yet</p>
+            <p className="text-xs text-slate-400 mt-1">Add your first requirement using the panel on the left.</p>
           </div>
-        </div>
+        )}
 
+        {/* Generate Test Suite CTA */}
+        {requirements.length > 0 && (
+          <div className="glass-card p-5 flex items-center justify-between gap-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {requirements.length} requirement{requirements.length !== 1 ? 's' : ''} ready
+                </p>
+                <p className="text-xs text-slate-500">Generate AI test cases from these requirements in the Test Cases tab.</p>
+              </div>
+            </div>
+            <button
+              onClick={onNavigateToTestCases}
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+            >
+              Generate Test Suite <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ── NEXT STEP CTA ─────────────────────────────────────────── */}
-      {requirements.length > 0 && (
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eaf5fd',border:'1px solid #b0d9f5',borderRadius:10,padding:'12px 18px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <CheckCircle style={{width:18,height:18,color:'#5B6CFF',flexShrink:0}} />
-            <div>
-              <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,color:'#0F172A'}}>
-                {requirements.length} requirement{requirements.length !== 1 ? 's' : ''} parsed · {testCases.length} test case{testCases.length !== 1 ? 's' : ''} generated
-              </span>
-              <span style={{fontFamily:'"Inter",Arial,sans-serif',fontSize:12,color:'#475569',marginLeft:8}}>
-                Review and enrich your test cases next.
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={onNavigateToTestCases}
-            style={{background:'#5B6CFF',color:'#fff',border:'none',borderRadius:8,padding:'8px 18px',fontFamily:'"Inter",Arial,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
-          >
-            Test Cases <ArrowRight style={{width:14,height:14}} />
-          </button>
-        </div>
-      )}
     </div>
     </div>
   );

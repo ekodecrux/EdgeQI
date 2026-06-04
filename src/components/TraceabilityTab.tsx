@@ -42,28 +42,39 @@ export default function TraceabilityTab({
   onTriggerRerun, 
   currentProjectId = 'ALL' 
 }: TraceabilityTabProps) {
-  // Build of requirements dynamically mapped to corresponding test cases
+  // Filter by project first, then build traceability map
+  const projectReqs = useMemo(() => {
+    if (!currentProjectId || currentProjectId === 'ALL') return rawRequirements;
+    return rawRequirements.filter(r => !r.projectId || r.projectId === currentProjectId);
+  }, [rawRequirements, currentProjectId]);
+
+  const projectTcs = useMemo(() => {
+    if (!currentProjectId || currentProjectId === 'ALL') return testCases;
+    return testCases.filter(tc => !tc.projectId || tc.projectId === currentProjectId);
+  }, [testCases, currentProjectId]);
+
+  // Build requirements dynamically mapped to corresponding test cases
   const requirements = useMemo(() => {
-    return rawRequirements.map(req => {
-      const linkedTcs = testCases.filter(tc => tc.requirementId === req.id);
+    return projectReqs.map(req => {
+      const linkedTcs = projectTcs.filter(tc => tc.requirementId === req.id);
       const isAuto = linkedTcs.some(tc => tc.automationStatus === 'Automated' || tc.automationStatus === 'Automatable');
       const hasTcs = linkedTcs.length > 0;
-      
       const mappedTcIds = hasTcs ? linkedTcs.map(tc => tc.id) : [];
 
       return {
         id: req.id,
         title: req.title,
         content: req.content,
-        module: req.suggestedModules?.[0] || 'Core Module',
+        module: req.suggestedModules?.[0] || (req as any).module || 'Core Module',
         isImplemented: hasTcs,
         status: (hasTcs ? (isAuto ? 'Implemented' : 'Pending Validation') : 'Draft') as 'Implemented' | 'In Progress' | 'Pending Validation' | 'Draft',
         mappedTestCases: mappedTcIds.length > 0 ? mappedTcIds : ['Pending Map'],
+        linkedTcCount: linkedTcs.length,
         isAutomated: isAuto,
-        priority: 'P0' as 'P0' | 'P1' | 'P2' | 'P3'
+        priority: (req.priority as any) || 'P2' as 'P0' | 'P1' | 'P2' | 'P3'
       };
     });
-  }, [rawRequirements, testCases]);
+  }, [projectReqs, projectTcs]);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,7 +177,7 @@ export default function TraceabilityTab({
       automatedPercentage: Math.round((automated / total) * 100),
       pendingValidation,
       draft,
-      testCaseCoverage: 100 // Pre-mapped status
+      testCaseCoverage: total > 0 ? Math.round((implemented / total) * 100) : 0
     };
   }, [requirements]);
 
@@ -216,9 +227,9 @@ export default function TraceabilityTab({
           <span className="text-[10px] text-slate-500 block uppercase font-mono tracking-wider font-semibold">Total Requirements</span>
           <div className="mt-2.5 flex items-baseline gap-2">
             <span className="text-2xl font-bold font-mono text-slate-900">{kpis.total}</span>
-            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-100 font-bold font-mono">100% Ingested</span>
+            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-100 font-bold font-mono">{currentProjectId && currentProjectId !== 'ALL' ? 'This Project' : 'All Projects'}</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Sourced from system drafts and API endpoints</p>
+          <p className="text-[10px] text-slate-400 mt-1">{kpis.implemented} linked · {kpis.draft} unlinked to test cases</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between">
@@ -236,7 +247,7 @@ export default function TraceabilityTab({
             <span className="text-2xl font-bold font-mono text-slate-900">{kpis.testCaseCoverage}%</span>
             <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1 .5 rounded border border-emerald-100 font-bold font-mono">1:1 Cov</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">100 requirements mapped directly to scenarios</p>
+          <p className="text-[10px] text-slate-400 mt-1">{kpis.implemented} of {kpis.total} requirements have linked test cases</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between">
@@ -245,7 +256,7 @@ export default function TraceabilityTab({
             <span className="text-2xl font-bold font-mono text-slate-900">{kpis.automated}</span>
             <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1 .5 rounded border border-indigo-100 font-bold font-mono">{kpis.automatedPercentage}%</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">POM scripts fully generated & active</p>
+          <p className="text-[10px] text-slate-400 mt-1">{kpis.automated} of {kpis.total} requirements have automatable test cases</p>
         </div>
 
         <div className="col-span-2 lg:col-span-1 bg-gradient-to-tr from-purple-500 to-indigo-600 rounded-xl p-4 shadow-sm text-white flex flex-col justify-between">
@@ -364,7 +375,7 @@ export default function TraceabilityTab({
         {/* Filter results counts helper banner */}
         <div className="flex justify-between items-center text-[10px] text-slate-450 font-mono pt-1">
           <span>
-            Matched <strong className="text-slate-700">{filteredRequirements.length}</strong> requirements of <strong className="text-slate-700">100</strong> total.
+            Matched <strong className="text-slate-700">{filteredRequirements.length}</strong> requirements of <strong className="text-slate-700">{requirements.length}</strong> total{currentProjectId && currentProjectId !== 'ALL' ? ` in project` : ''}.
           </span>
           {searchQuery || selectedModule !== 'All' || selectedStatus !== 'All' || selectedPriority !== 'All' || selectedAutomation !== 'All' ? (
             <button 
@@ -457,8 +468,12 @@ export default function TraceabilityTab({
                           {req.status}
                         </span>
                       </td>
-                      <td className="py-3 px-3 font-mono font-bold text-purple-700">
-                        {req.mappedTestCases.join(', ')}
+                      <td className="py-3 px-3 font-mono text-purple-700">
+                        {req.linkedTcCount > 0 ? (
+                          <span className="font-bold">{req.linkedTcCount} TC{req.linkedTcCount !== 1 ? 's' : ''}</span>
+                        ) : (
+                          <span className="text-slate-400 text-[10px]">None</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono leading-none ${
@@ -542,8 +557,17 @@ export default function TraceabilityTab({
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500 font-sans">
                     <FileX className="w-12 h-12 text-slate-350 mx-auto mb-2" />
-                    <div className="text-sm font-semibold text-slate-550">No requirements matched your criteria</div>
-                    <p className="text-xs text-slate-400 mt-1">Try relaxing active filters or clearing the search box query.</p>
+                    {requirements.length === 0 ? (
+                      <>
+                        <div className="text-sm font-semibold text-slate-600">No requirements found{currentProjectId && currentProjectId !== 'ALL' ? ' for this project' : ''}</div>
+                        <p className="text-xs text-slate-400 mt-1">Add requirements in the Requirements tab, then link test cases to them to build the traceability matrix.</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-sm font-semibold text-slate-550">No requirements matched your criteria</div>
+                        <p className="text-xs text-slate-400 mt-1">Try relaxing active filters or clearing the search box query.</p>
+                      </>
+                    )}
                   </td>
                 </tr>
               )}

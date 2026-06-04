@@ -139,6 +139,7 @@ export default function TestCaseGeneratorPage({
   const [generatingDetails, setGeneratingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [selectedTC, setSelectedTC] = useState<TestCase | null>(null);
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
 
   // ── TMS Push state ─────────────────────────────────────────────────────────
   const [showTmsPushPanel, setShowTmsPushPanel] = useState(false);
@@ -300,9 +301,22 @@ export default function TestCaseGeneratorPage({
 
   const handleGenerateDetails = async () => {
     if (!canGenerateDetails) return;
+    if (approvedScenarios.length === 0) {
+      setDetailsError('Please approve at least one scenario before generating full test cases.');
+      return;
+    }
     setGeneratingDetails(true);
     setDetailsError('');
     setGeneratedTCs([]);
+    setGenProgress({ done: 0, total: approvedScenarios.length });
+
+    // Simulate per-scenario progress ticks while the real request is in-flight
+    let progressTick = 0;
+    const progressInterval = setInterval(() => {
+      progressTick = Math.min(progressTick + 1, approvedScenarios.length - 1);
+      setGenProgress({ done: progressTick, total: approvedScenarios.length });
+    }, Math.max(800, (approvedScenarios.length * 1200) / approvedScenarios.length));
+
     try {
       const res = await fetch(apiUrl('/api/quality/testcases/generate-details'), {
         method: 'POST',
@@ -313,15 +327,23 @@ export default function TestCaseGeneratorPage({
           projectId: currentProjectId,
         }),
       });
+      clearInterval(progressInterval);
       const data = await res.json();
-      if (data.testCases && Array.isArray(data.testCases)) {
+      if (data.testCases && Array.isArray(data.testCases) && data.testCases.length > 0) {
+        setGenProgress({ done: data.testCases.length, total: approvedScenarios.length });
         setGeneratedTCs(data.testCases);
-        setWizardStep('details');
+        setTimeout(() => { setWizardStep('details'); setGenProgress(null); }, 600);
+      } else if (data.error) {
+        setDetailsError(`AI error: ${data.error}. Check LLM config in Settings → LLM Config.`);
+        setGenProgress(null);
       } else {
-        setDetailsError(data.error || 'AI returned no test cases. Please try again.');
+        setDetailsError('AI returned 0 test cases. This usually means no LLM is configured — go to Settings → LLM Config and add your API key, or the requirements text is too short.');
+        setGenProgress(null);
       }
     } catch (e: any) {
+      clearInterval(progressInterval);
       setDetailsError(`Generation failed: ${e.message}`);
+      setGenProgress(null);
     } finally {
       setGeneratingDetails(false);
     }
@@ -844,6 +866,23 @@ export default function TestCaseGeneratorPage({
           </div>
         )}
 
+        {/* Live generation progress bar */}
+        {genProgress && generatingDetails && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex justify-between text-xs text-blue-700 mb-1.5 font-medium">
+              <span className="flex items-center gap-1.5"><RefreshCw className="w-3 h-3 animate-spin" /> Generating full test cases…</span>
+              <span className="font-mono">{genProgress.done} / {genProgress.total} scenarios processed</span>
+            </div>
+            <div className="w-full bg-blue-100 rounded-full h-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all duration-700"
+                style={{ width: `${Math.round((genProgress.done / genProgress.total) * 100)}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-blue-500 mt-1">AI is expanding each approved scenario into full test steps, preconditions, and test data…</p>
+          </div>
+        )}
+
         <div className="mt-4 flex gap-2 justify-between">
           <button onClick={() => setWizardStep('scenarios')} className="btn-ghost flex items-center gap-1.5">
             ← Back
@@ -862,7 +901,11 @@ export default function TestCaseGeneratorPage({
               className="btn-primary flex items-center gap-2 disabled:opacity-40"
             >
               {generatingDetails
-                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating Test Cases…</>
+                ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    {genProgress
+                      ? `Generating… ${genProgress.done}/${genProgress.total}`
+                      : 'Generating Test Cases…'}
+                  </>
                 : <><Zap className="w-3.5 h-3.5" /> Generate Full Test Cases ({approvedScenarios.length})</>}
             </button>
           </div>
