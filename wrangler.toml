@@ -1,10 +1,9 @@
 # Wrangler config for Genspark hosted deployment
-# This project deploys as a Cloudflare Worker (static SPA only)
 name = "iqstudio"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+main = "dist/_worker.js"
 
-# Static assets served from dist/
-# The React SPA is pre-built into dist/assets/ and dist/index.html
 [assets]
 directory = "./dist"
+binding = "ASSETS"
