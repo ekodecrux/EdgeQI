@@ -43,6 +43,35 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// ── CORS — allow Genspark frontend + Railway + localhost ─────────────────────
+const ALLOWED_ORIGINS = [
+  'https://d289d175-1a57-40c4-8baa-857f077e22aa.vip.gensparksite.com',
+  'https://web-production-db4b5.up.railway.app',
+  /\.pages\.dev$/,
+  /\.railway\.app$/,
+  /\.gensparksite\.com$/,
+  /\.genspark\.ai$/,
+  /^http:\/\/localhost(:\d+)?$/,
+  /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+];
+
+app.use((req: any, res: any, next: any) => {
+  const origin = req.headers.origin || '';
+  const allowed = ALLOWED_ORIGINS.some(o =>
+    typeof o === 'string' ? o === origin : o.test(origin)
+  );
+  if (allowed || !origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*'); // open for unrecognised origins
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 
 // Multer setup — store uploads in memory
