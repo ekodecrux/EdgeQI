@@ -48,7 +48,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
       const res = await fetch(apiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'Demo@2025', name: 'Demo User', role: 'qa_lead' }),
+        body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'demo123', name: 'Demo User', role: 'qa_lead' }),
       });
       const data = await res.json();
       if (data.token) {
@@ -62,7 +62,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
       const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'Demo@2025' }),
+        body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'demo123' }),
       });
       const data = await res.json();
       if (data.token) {
