@@ -8,7 +8,7 @@ import { ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, RefreshCw, FileCode,
 // REQ-83: Security report export (basic CSV/JSON)
 async function exportSecurityReport(format: 'csv' | 'json', vulns: any[]) {
   const token = localStorage.getItem('iq_token'); // GAP-15 fix
-  const res = await fetch(`/api/quality/security/export?format=${format}`, {
+  const res = await fetch(apiUrl(`/api/quality/security/export?format=${format}`), {
     headers: token ? { Authorization: `Bearer ${token}` } : {}
   });
   if (res.ok) {
@@ -104,6 +104,7 @@ ${filtered.length === 0 ? '<p>No findings related to ' + standard + '. System is
 }
 
 import { SecurityVulnerability, TestCase } from '../types';
+import { apiUrl } from '@/src/config/api';
 
 interface SecurityProps {
   vulnerabilities: SecurityVulnerability[];
@@ -156,7 +157,7 @@ export default function SecurityTab({
     setA11yScanning(true); setA11yError(null); setA11yResults([]);
     try {
       const token = localStorage.getItem('iq_token'); // GAP-15 fix
-      const res = await fetch('/api/quality/security/scan/a11y', {
+      const res = await fetch(apiUrl('/api/quality/security/scan/a11y'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ url: a11yTarget })
@@ -175,7 +176,7 @@ export default function SecurityTab({
     setDepScanning(true);
     try {
       const token = localStorage.getItem('iq_token'); // GAP-15 fix
-      const res = await fetch('/api/quality/security/dependency-scan', {
+      const res = await fetch(apiUrl('/api/quality/security/dependency-scan'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -213,7 +214,7 @@ export default function SecurityTab({
       }
 
       const token = localStorage.getItem('iq_token'); // GAP-15 fix
-      const res = await fetch('/api/quality/security/scan', {
+      const res = await fetch(apiUrl('/api/quality/security/scan'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -247,7 +248,7 @@ export default function SecurityTab({
     setSecToolResult(null);
     const token = localStorage.getItem('iq_token') || '';
     try {
-      const res = await fetch('/api/quality/security/tool-run', {
+      const res = await fetch(apiUrl('/api/quality/security/tool-run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({

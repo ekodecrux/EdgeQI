@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Mail, User, Eye, EyeOff, Shield, CheckCircle, Zap } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface AuthModalProps {
   onLogin: (user: { id: number; email: string; name: string; role: string }, token: string) => void;
@@ -44,7 +45,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
   const handleDemo = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(apiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'Demo@2025', name: 'Demo User', role: 'qa_lead' }),
@@ -58,7 +59,7 @@ export default function AuthModal({ onLogin }: AuthModalProps) {
       }
     } catch {}
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'demo@edgeqi.ai', password: 'Demo@2025' }),

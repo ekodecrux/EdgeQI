@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/src/config/api';
 import {
   Activity, CheckCircle2, AlertTriangle, Bug, TrendingUp, TrendingDown,
   FileText, Code2, Zap, Shield, BarChart2, RefreshCw, Clock, Target,
@@ -87,7 +88,7 @@ export default function LiveDashboard({ currentProjectId, currentSprintId, onNav
     setLoading(true);
     try {
       const pid = currentProjectId && currentProjectId !== 'ALL' ? currentProjectId : '';
-      const res = await fetch(`/api/quality/dashboard/live?project_id=${pid}`, { headers: { Authorization: `Bearer ${tok()}` } });
+      const res = await fetch(apiUrl(`/api/quality/dashboard/live?project_id=${pid}`), { headers: { Authorization: `Bearer ${tok()}` } });
       if (res.ok) { const d = await res.json(); setData(d); setLastRefresh(new Date()); }
     } catch {}
     setLoading(false);

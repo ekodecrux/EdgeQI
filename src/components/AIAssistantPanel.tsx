@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, RefreshCw, ChevronDown, ChevronUp, Sparkles, Minimize2, Maximize2, MessageCircle, Copy, Check, Zap } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -125,7 +126,7 @@ export default function AIAssistantPanel({
 
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/ai/assistant', {
+      const res = await fetch(apiUrl('/api/quality/ai/assistant'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -7,6 +7,7 @@ import {
   Database, GitBranch, Target, BarChart2, AlertCircle, ChevronRight
 } from 'lucide-react';
 import { TestCase, RequirementDoc, DefectHotspot, ScriptFile, SecurityVulnerability } from '../types';
+import { apiUrl } from '@/src/config/api';
 
 interface AgenticOrchestratorProps {
   requirements: RequirementDoc[];
@@ -85,7 +86,7 @@ export default function AgenticOrchestrator({
 
   // Load real DB stats on mount
   useEffect(() => {
-    fetch('/api/quality/stats', { headers: authH() })
+    fetch(apiUrl('/api/quality/stats'), { headers: authH() })
       .then(r => r.json())
       .then(d => { if (d.stats) setDbStats(d.stats); })
       .catch(() => {});
@@ -144,7 +145,7 @@ export default function AgenticOrchestrator({
       await new Promise(r => setTimeout(r, 300));
 
       try {
-        const seedRes = await fetch('/api/quality/requirements/add', {
+        const seedRes = await fetch(apiUrl('/api/quality/requirements/add'), {
           method: 'POST',
           headers: authH(),
           body: JSON.stringify({
@@ -194,7 +195,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
       if (reqWithoutTCs) {
         appendLog('REQ-AGENT', `  Generating AI test cases for: [${reqWithoutTCs.id}] ${reqWithoutTCs.title?.slice(0, 50)}…`, 'info');
         try {
-          const tcRes = await fetch('/api/quality/requirements/add', {
+          const tcRes = await fetch(apiUrl('/api/quality/requirements/add'), {
             method: 'POST',
             headers: authH(),
             body: JSON.stringify({
@@ -248,7 +249,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
     for (const tc of tcsToScript) {
       appendLog('SCRIPT-COMPILER', `  Compiling Playwright/TypeScript spec for: [${tc.id}] ${tc.title?.slice(0, 55)}…`, 'info');
       try {
-        const res = await fetch('/api/quality/scripts/generate', {
+        const res = await fetch(apiUrl('/api/quality/scripts/generate'), {
           method: 'POST',
           headers: authH(),
           body: JSON.stringify({
@@ -308,7 +309,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
     const changeDesc = triggerReq?.content?.slice(0, 200) || 'System-wide regression analysis triggered by pipeline run';
 
     try {
-      const impRes = await fetch('/api/quality/impact/analyze', {
+      const impRes = await fetch(apiUrl('/api/quality/impact/analyze'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({ changeTrigger, description: changeDesc }),
@@ -349,7 +350,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
 
     for (const mod of moduleNames) {
       try {
-        const predRes = await fetch('/api/quality/defects/predict', {
+        const predRes = await fetch(apiUrl('/api/quality/defects/predict'), {
           method: 'POST',
           headers: authH(),
           body: JSON.stringify({ title: mod, description: `Defect risk analysis for ${mod} module` }),
@@ -393,7 +394,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
     await new Promise(r => setTimeout(r, 600));
 
     try {
-      const execRes = await fetch('/api/quality/execution/parallel-run', {
+      const execRes = await fetch(apiUrl('/api/quality/execution/parallel-run'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({
@@ -451,7 +452,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
     } catch (err: any) {
       appendLog('EXEC-GRID', `  ⚠ Parallel run failed: ${err.message} — falling back to single-run`, 'warn');
       try {
-        const fallRes = await fetch('/api/quality/execution/run', {
+        const fallRes = await fetch(apiUrl('/api/quality/execution/run'), {
           method: 'POST',
           headers: authH(),
           body: JSON.stringify({ testCaseIds: tcBatch, framework: 'Playwright', browser: 'Chromium' }),
@@ -488,7 +489,7 @@ API: all endpoints require JWT bearer token. 401 on invalid/expired token.`,
     setOutcome(result);
 
     // Reload DB stats
-    fetch('/api/quality/stats', { headers: authH() })
+    fetch(apiUrl('/api/quality/stats'), { headers: authH() })
       .then(r => r.json())
       .then(d => { if (d.stats) setDbStats(d.stats); })
       .catch(() => {});

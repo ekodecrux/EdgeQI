@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { apiUrl } from '@/src/config/api';
 import { 
   Plus, X, Play, Save, RefreshCw, Trash2, ChevronDown, ChevronUp,
   GitBranch, Zap, FileText, TestTube2, Bug, BarChart3, ShieldCheck,
@@ -234,9 +235,9 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
     let dbScripts: any[] = [];
     try {
       const [rRes, tRes, sRes] = await Promise.all([
-        fetch('/api/quality/requirements', { headers: authH() }),
-        fetch('/api/quality/testcases', { headers: authH() }),
-        fetch('/api/quality/scripts', { headers: authH() }),
+        fetch(apiUrl('/api/quality/requirements'), { headers: authH() }),
+        fetch(apiUrl('/api/quality/testcases'), { headers: authH() }),
+        fetch(apiUrl('/api/quality/scripts'), { headers: authH() }),
       ]);
       dbReqs = await rRes.json();
       dbTcs = await tRes.json();
@@ -268,7 +269,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
 
           // ── TRIGGER ─────────────────────────────────────────────────────────
           case 'trigger': {
-            const stats = await fetch('/api/quality/stats', { headers: authH() }).then(r => r.json());
+            const stats = await fetch(apiUrl('/api/quality/stats'), { headers: authH() }).then(r => r.json());
             const s = stats.stats || {};
             output = `Triggered at ${new Date().toLocaleTimeString()} · DB: ${s.requirements ?? 0} reqs, ${s.testCases ?? 0} TCs, ${s.scripts ?? 0} scripts`;
             break;
@@ -282,7 +283,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
               output = `Loaded ${reqs.length} requirements across ${modules.length || 1} module(s) from DB`;
             } else {
               // Seed a real requirement via AI
-              const res = await fetch('/api/quality/requirements/add', {
+              const res = await fetch(apiUrl('/api/quality/requirements/add'), {
                 method: 'POST', headers: authH(),
                 body: JSON.stringify({
                   title: `${activeWorkflow.name} — Core Requirements`,
@@ -309,7 +310,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
               const reqs = ctx.requirements as any[];
               const reqId = reqs[0]?.id;
               if (reqId) {
-                const res = await fetch('/api/quality/requirements/add', {
+                const res = await fetch(apiUrl('/api/quality/requirements/add'), {
                   method: 'POST', headers: authH(),
                   body: JSON.stringify({
                     title: 'Workflow Test Generation Target',
@@ -352,7 +353,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
             if (toScript.length === 0) { output = 'No test cases to generate scripts for'; success = false; break; }
             const results = await Promise.all(
               toScript.map((tc: any) =>
-                fetch('/api/quality/scripts/generate', {
+                fetch(apiUrl('/api/quality/scripts/generate'), {
                   method: 'POST', headers: authH(),
                   body: JSON.stringify({ testCaseId: tc.id, title: tc.title, framework: fw, language: 'TypeScript' }),
                 }).then(r => r.json()).catch(() => ({ success: false }))
@@ -368,7 +369,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
           case 'execute': {
             const tcs = ctx.testCases as any[];
             const tcIds = tcs.slice(0, 8).map((t: any) => t.id);
-            const res = await fetch('/api/quality/execution/parallel-run', {
+            const res = await fetch(apiUrl('/api/quality/execution/parallel-run'), {
               method: 'POST', headers: authH(),
               body: JSON.stringify({
                 testCaseIds: tcIds,
@@ -394,7 +395,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
             const reqs = ctx.requirements as any[];
             const req = reqs[0];
             if (!req) { output = 'No requirements for defect analysis'; break; }
-            const res = await fetch('/api/quality/defects/predict', {
+            const res = await fetch(apiUrl('/api/quality/defects/predict'), {
               method: 'POST', headers: authH(),
               body: JSON.stringify({ title: req.title ?? 'Workflow Module', description: req.content ?? req.title ?? '' }),
             });
@@ -410,7 +411,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
 
           // ── PERFORMANCE ───────────────────────────────────────────────────────
           case 'performance': {
-            const res = await fetch('/api/quality/performance/execute', {
+            const res = await fetch(apiUrl('/api/quality/performance/execute'), {
               method: 'POST', headers: authH(),
               body: JSON.stringify({
                 testType: 'API',
@@ -429,7 +430,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
 
           // ── SECURITY ──────────────────────────────────────────────────────────
           case 'security': {
-            const res = await fetch('/api/quality/security/scan', {
+            const res = await fetch(apiUrl('/api/quality/security/scan'), {
               method: 'POST', headers: authH(),
               body: JSON.stringify({
                 targetUrl: node.config?.targetUrl ?? 'https://staging.qa-env.io',
@@ -447,7 +448,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
 
           // ── AI REVIEW GATE ────────────────────────────────────────────────────
           case 'ai-review': {
-            const stats = await fetch('/api/quality/stats', { headers: authH() }).then(r => r.json());
+            const stats = await fetch(apiUrl('/api/quality/stats'), { headers: authH() }).then(r => r.json());
             const s = stats.stats ?? {};
             const tcCount   = s.testCases ?? 0;
             const scriptCount = s.scripts ?? 0;
@@ -484,7 +485,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
 
           // ── REPORT ────────────────────────────────────────────────────────────
           case 'report': {
-            const stats = await fetch('/api/quality/stats', { headers: authH() }).then(r => r.json());
+            const stats = await fetch(apiUrl('/api/quality/stats'), { headers: authH() }).then(r => r.json());
             const s = stats.stats ?? {};
             const run = ctx.execRun ?? {};
             const passRate = run.totalTests > 0
@@ -498,7 +499,7 @@ export default function WorkflowBuilder({ currentProjectId, currentSprintId }: W
           case 'notify': {
             // Impact analyze doubles as a notification-trigger record
             const req = (ctx.requirements as any[])?.[0];
-            const res = await fetch('/api/quality/impact/analyze', {
+            const res = await fetch(apiUrl('/api/quality/impact/analyze'), {
               method: 'POST', headers: authH(),
               body: JSON.stringify({
                 changeTrigger: req?.title ?? activeWorkflow.name,

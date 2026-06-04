@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/src/config/api';
 import {
   Bug, AlertTriangle, CheckCircle2, Clock, Upload, Sparkles, RefreshCw,
   ExternalLink, Filter, Plus, Search, ChevronDown, ChevronRight, X,
@@ -104,8 +105,8 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
     try {
       const pid = currentProjectId && currentProjectId !== 'ALL' ? currentProjectId : '';
       const [dRes, sRes] = await Promise.all([
-        fetch(`/api/quality/defects?project_id=${pid}`, { headers: { Authorization: `Bearer ${tok()}` } }),
-        fetch(`/api/quality/defects/stats?project_id=${pid}`, { headers: { Authorization: `Bearer ${tok()}` } }),
+        fetch(apiUrl(`/api/quality/defects?project_id=${pid}`), { headers: { Authorization: `Bearer ${tok()}` } }),
+        fetch(apiUrl(`/api/quality/defects/stats?project_id=${pid}`), { headers: { Authorization: `Bearer ${tok()}` } }),
       ]);
       const dData = await dRes.json(); setDefects(dData.defects || []);
       const sData = await sRes.json(); setStats(sData);
@@ -127,7 +128,7 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
     if (!form.title.trim()) return;
     setSaving(true); setSaveErr('');
     try {
-      const res = await fetch('/api/quality/defects', {
+      const res = await fetch(apiUrl('/api/quality/defects'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
         body: JSON.stringify({ ...form, project_id: currentProjectId !== 'ALL' ? currentProjectId : 'PROJ-DEFAULT', sprint_id: currentSprintId || null }),
@@ -141,7 +142,7 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
 
   // ─── Update status/severity inline ───
   const quickUpdate = async (id: string, field: string, value: string) => {
-    await fetch(`/api/quality/defects/${id}`, {
+    await fetch(apiUrl(`/api/quality/defects/${id}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
       body: JSON.stringify({ [field]: value, ...(field === 'status' && value === 'Resolved' ? { resolved_at: new Date().toISOString() } : {}) }),
@@ -153,7 +154,7 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
   const pushToTMS = async (defect: Defect, tmsType = 'jira') => {
     setPushingId(defect.id);
     try {
-      const res = await fetch(`/api/quality/defects/${defect.id}/push-tms`, {
+      const res = await fetch(apiUrl(`/api/quality/defects/${defect.id}/push-tms`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
         body: JSON.stringify({ tms_type: tmsType }),
@@ -176,7 +177,7 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
     try {
       // Parse pasted logs as fake failed tests
       const fakeTests = [{ id: `PASTE-${Date.now()}`, title: 'Pasted failure log', status: 'failed', failure_log: pastedLogs, logs: [pastedLogs] }];
-      const res = await fetch('/api/quality/defects/analyze-failures', {
+      const res = await fetch(apiUrl('/api/quality/defects/analyze-failures'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
         body: JSON.stringify({ project_id: currentProjectId, sprint_id: currentSprintId, failed_tests: fakeTests }),
@@ -193,7 +194,7 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
     if (!changeDesc.trim()) return;
     setRegressionLoading(true); setRegressionResult(null);
     try {
-      const res = await fetch('/api/quality/defects/smart-regression', {
+      const res = await fetch(apiUrl('/api/quality/defects/smart-regression'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
         body: JSON.stringify({
@@ -209,7 +210,7 @@ export default function DefectsManager({ currentProjectId, currentSprintId, onNa
 
   const del = async (id: string) => {
     if (!confirm('Delete this defect?')) return;
-    await fetch(`/api/quality/defects/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tok()}` } });
+    await fetch(apiUrl(`/api/quality/defects/${id}`), { method: 'DELETE', headers: { Authorization: `Bearer ${tok()}` } });
     setDefects(p => p.filter(d => d.id !== id));
   };
 

@@ -27,6 +27,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { TestCase, DefectHotspot, SecurityVulnerability, PerformanceConfig } from '../types';
+import { apiUrl } from '@/src/config/api';
 
 interface DashboardProps {
   testCases: TestCase[];
@@ -68,7 +69,7 @@ export default function DashboardMetrics({
     setSlaLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/health/sla', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(apiUrl('/api/quality/health/sla'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       setSlaData(data);
     } catch { /* silent */ } finally { setSlaLoading(false); }
@@ -80,7 +81,7 @@ export default function DashboardMetrics({
   const loadUptime = async () => {
     setUptimeLoading(true);
     try {
-      const res = await fetch('/api/quality/health');
+      const res = await fetch(apiUrl('/api/quality/health'));
       if (res.ok) {
         const data = await res.json();
         const uptimeSec = data.uptime || 0;
@@ -104,7 +105,7 @@ export default function DashboardMetrics({
     setAlertLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/alerts', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(apiUrl('/api/quality/alerts'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.alerts) setAlertLog(data.alerts);
     } catch { /* silent */ } finally { setAlertLoading(false); }
@@ -112,7 +113,7 @@ export default function DashboardMetrics({
   const acknowledgeAlert = async (id: string) => {
     try {
       const token = localStorage.getItem('iq_token');
-      await fetch(`/api/quality/alerts/${id}/acknowledge`, {
+      await fetch(apiUrl(`/api/quality/alerts/${id}/acknowledge`), {
         method: 'PATCH',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -134,7 +135,7 @@ export default function DashboardMetrics({
   const saveWidgetConfig = async () => {
     try {
       const token = localStorage.getItem('iq_token');
-      await fetch('/api/quality/dashboard/widgets', {
+      await fetch(apiUrl('/api/quality/dashboard/widgets'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ widgets: widgetConfig })
@@ -150,7 +151,7 @@ export default function DashboardMetrics({
     setBundleLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/health/bundle-size', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(apiUrl('/api/quality/health/bundle-size'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.results) setBundleData(data.results);
     } catch { /* silent */ } finally { setBundleLoading(false); }

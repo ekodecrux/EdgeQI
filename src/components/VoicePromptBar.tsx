@@ -11,6 +11,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/src/config/api';
 import {
   Mic, MicOff, Send, Brain, ChevronDown, ChevronUp,
   Loader2, BookOpen, X, Sparkles, History, Clock
@@ -127,7 +128,7 @@ export default function VoicePromptBar({
     try {
       const params = new URLSearchParams({ q: query, limit: '3' });
       if (currentProjectId && currentProjectId !== 'ALL') params.append('project_id', currentProjectId);
-      const r = await fetch(`/api/quality/rag-kb/search?${params}`, { headers });
+      const r = await fetch(apiUrl(`/api/quality/rag-kb/search?${params}`), { headers });
       if (!r.ok) return { context: '', sources: [] };
       const data = await r.json();
       const results = data.results || [];
@@ -156,7 +157,7 @@ export default function VoicePromptBar({
 
     // Save to prompt_history
     const inputType = isListening ? 'voice' : 'text';
-    fetch('/api/quality/prompt-history', {
+    fetch(apiUrl('/api/quality/prompt-history'), {
       method: 'POST', headers,
       body: JSON.stringify({
         project_id: currentProjectId || null,
@@ -184,7 +185,7 @@ export default function VoicePromptBar({
     try {
       const params = new URLSearchParams({ module, limit: '20' });
       if (currentProjectId && currentProjectId !== 'ALL') params.append('project_id', currentProjectId);
-      const r = await fetch(`/api/quality/prompt-history?${params}`, { headers });
+      const r = await fetch(apiUrl(`/api/quality/prompt-history?${params}`), { headers });
       if (r.ok) setHistory(await r.json());
     } catch {}
     setLoadingHistory(false);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, CheckCircle, XCircle, AlertCircle, RefreshCw, Settings, Zap, ExternalLink, Server, Play, List, Database, Trash2, ToggleLeft, ToggleRight, ArrowUp, ArrowDown, User, BookOpen, ShieldCheck, Clock, Activity } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface Provider {
   id: string;
@@ -26,14 +27,14 @@ export default function LLMConfigTab() {
 
   const loadFallbackChain = async () => {
     const token = localStorage.getItem('iq_token');
-    const res = await fetch('/api/quality/llm/fallback-chain', { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(apiUrl('/api/quality/llm/fallback-chain'), { headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) { const d = await res.json(); setFallbackChain(d.chain || []); }
   };
 
   const saveFallbackChain = async (updates: Array<{ provider: string; enabled?: boolean; priority?: number }>) => {
     setChainSaving(true);
     const token = localStorage.getItem('iq_token');
-    const res = await fetch('/api/quality/llm/fallback-chain', {
+    const res = await fetch(apiUrl('/api/quality/llm/fallback-chain'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ updates })
@@ -70,13 +71,13 @@ export default function LLMConfigTab() {
   const loadCacheStats = async () => {
     setCacheLoading(true);
     try {
-      const res = await fetch('/api/quality/llm/cache/stats');
+      const res = await fetch(apiUrl('/api/quality/llm/cache/stats'));
       if (res.ok) setCacheStats(await res.json());
     } finally { setCacheLoading(false); }
   };
 
   const clearCache = async () => {
-    const res = await fetch('/api/quality/llm/cache', { method: 'DELETE' });
+    const res = await fetch(apiUrl('/api/quality/llm/cache'), { method: 'DELETE' });
     const data = await res.json();
     setCacheStats(prev => prev ? { ...prev, size: 0 } : prev);
     setCacheClearMsg(data.message || 'Cache cleared');
@@ -95,7 +96,7 @@ export default function LLMConfigTab() {
   const [ollamaModelsError, setOllamaModelsError] = useState('');
 
   useEffect(() => {
-    fetch('/api/quality/llm/providers').then(r => r.json()).then(d => {
+    fetch(apiUrl('/api/quality/llm/providers')).then(r => r.json()).then(d => {
       setProviders(d.providers || []);
       setActiveProvider(d.activeProvider || 'gemini');
     });
@@ -105,7 +106,7 @@ export default function LLMConfigTab() {
     setOllamaTesting(true);
     setOllamaTestResult(null);
     try {
-      const res = await fetch('/api/quality/llm/ollama-test', {
+      const res = await fetch(apiUrl('/api/quality/llm/ollama-test'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ollamaUrl, model: ollamaModel })
@@ -124,7 +125,7 @@ export default function LLMConfigTab() {
     setOllamaModelsError('');
     setOllamaModels([]);
     try {
-      const res = await fetch(`/api/quality/llm/ollama-models?ollamaUrl=${encodeURIComponent(ollamaUrl)}`);
+      const res = await fetch(apiUrl(`/api/quality/llm/ollama-models?ollamaUrl=${encodeURIComponent(ollamaUrl)}`));
       const data = await res.json();
       if (data.models) {
         setOllamaModels(data.models);
@@ -141,7 +142,7 @@ export default function LLMConfigTab() {
   const testProvider = async (providerId: string, apiKey?: string) => {
     setTesting(providerId);
     try {
-      const res = await fetch('/api/quality/llm/test', {
+      const res = await fetch(apiUrl('/api/quality/llm/test'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: providerId, apiKey: apiKey || customKey, customUrl, model: customModel }),
@@ -518,7 +519,7 @@ function UserPreferencesPanel() {
 
   useEffect(() => {
     setLoading(true);
-    fetch('/api/auth/me/preferences', { headers: authH() })
+    fetch(apiUrl('/api/auth/me/preferences'), { headers: authH() })
       .then(r => r.json()).then(d => { if (d.preferences) setPrefs(d.preferences); })
       .catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -526,7 +527,7 @@ function UserPreferencesPanel() {
   const save = async () => {
     setSaving(true);
     try {
-      await fetch('/api/auth/me/preferences', { method: 'PUT', headers: authH(), body: JSON.stringify({ preferences: prefs }) });
+      await fetch(apiUrl('/api/auth/me/preferences'), { method: 'PUT', headers: authH(), body: JSON.stringify({ preferences: prefs }) });
       setMsg('Preferences saved!'); setTimeout(() => setMsg(''), 3000);
     } catch { /* silent */ } finally { setSaving(false); }
   };
@@ -594,7 +595,7 @@ function ApiDocsPanel() {
     setLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/docs', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(apiUrl('/api/quality/docs'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.routes) setRoutes(data.routes);
     } catch { /* silent */ } finally { setLoading(false); }
@@ -667,7 +668,7 @@ function CompliancePanel() {
 
   const loadRetention = async () => {
     try {
-      const r = await fetch('/api/quality/compliance/retention', { headers: authH() });
+      const r = await fetch(apiUrl('/api/quality/compliance/retention'), { headers: authH() });
       const d = await r.json();
       setRetention(d.policy || []);
     } catch { /* ignore */ }
@@ -675,7 +676,7 @@ function CompliancePanel() {
 
   const loadPerf = async () => {
     try {
-      const r = await fetch('/api/quality/health/performance', { headers: authH() });
+      const r = await fetch(apiUrl('/api/quality/health/performance'), { headers: authH() });
       const d = await r.json();
       setPerfMetrics(d.metrics);
     } catch { /* ignore */ }

@@ -6679,22 +6679,38 @@ async function startServer() {
     }
   });
 
+  // ── Health check (Railway + uptime monitors) ──────────────────────────────
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), ts: Date.now() });
+  });
+
   if (process.env.NODE_ENV !== "production") {
+    // Full-stack dev: serve React via Vite middleware
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.FRONTEND_ORIGIN) {
+    // Monolith production: serve pre-built SPA from dist/, injecting API_BASE
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const apiBase = process.env.API_BASE_URL ?? '';
+      const indexPath = path.join(distPath, 'index.html');
+      let html = fsM.readFileSync(indexPath, 'utf8');
+      html = html.replace(
+        '<script type="module"',
+        `<script>window.__API_BASE__="${apiBase}";</script>\n    <script type="module"`
+      );
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
     });
   }
+  // Hybrid mode: FRONTEND_ORIGIN is set → backend is API-only, no static files
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Express server running on http://localhost:${PORT}`);
+    console.log(`IQStudio backend on http://0.0.0.0:${PORT} | mode: ${process.env.FRONTEND_ORIGIN ? 'hybrid' : 'monolith'}`);
   });
 }
 

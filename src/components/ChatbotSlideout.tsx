@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, MessageSquare, Sparkles, X, Terminal, ArrowRight, User, HelpCircle, ThumbsUp, ThumbsDown, Database, TrendingUp, RefreshCw, ChevronDown, ChevronUp, Trash2, FileText } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -32,7 +33,7 @@ export default function ChatbotSlideout({
   const loadKbAnalytics = async () => {
     setKbLoading(true);
     try {
-      const res = await fetch('/api/quality/rag/analytics');
+      const res = await fetch(apiUrl('/api/quality/rag/analytics'));
       if (res.ok) setKbAnalytics(await res.json());
     } finally { setKbLoading(false); }
   };
@@ -40,7 +41,7 @@ export default function ChatbotSlideout({
   const loadKbDocs = async () => {
     setKbDocsLoading(true);
     try {
-      const res = await fetch('/api/quality/rag/documents');
+      const res = await fetch(apiUrl('/api/quality/rag/documents'));
       if (res.ok) {
         const data = await res.json();
         setKbDocs(Array.isArray(data) ? data : data.documents || []);
@@ -52,7 +53,7 @@ export default function ChatbotSlideout({
     if (!window.confirm('Delete this KB document? This cannot be undone.')) return;
     setDeletingDocId(docId);
     try {
-      const res = await fetch(`/api/quality/rag/documents/${docId}`, { method: 'DELETE' });
+      const res = await fetch(apiUrl(`/api/quality/rag/documents/${docId}`), { method: 'DELETE' });
       if (res.ok) {
         setKbDocs(prev => prev.filter(d => d.id !== docId));
         // Refresh analytics count
@@ -75,7 +76,7 @@ export default function ChatbotSlideout({
 
   const sendFeedback = async (idx: number, vote: 'up' | 'down', content: string) => {
     setVotedMsgs(prev => ({ ...prev, [idx]: vote }));
-    fetch('/api/quality/feedback', {
+    fetch(apiUrl('/api/quality/feedback'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entityType: 'chat_response', entityId: `msg-${idx}`, vote, comment: content.slice(0, 100) }),

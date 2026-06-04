@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare, Image, ScanLine, Zap } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
+import { apiUrl } from '@/src/config/api';
 
 // REQ-12: Status workflow
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -123,7 +124,7 @@ export default function RequirementsTab({
   const loadComments = async (reqId: string) => {
     setCommentsLoading(reqId);
     try {
-      const res = await fetch(`/api/quality/requirements/${reqId}/comments`);
+      const res = await fetch(apiUrl(`/api/quality/requirements/${reqId}/comments`));
       const data = await res.json();
       setCommentsMap(prev => ({ ...prev, [reqId]: data.comments || [] }));
     } finally { setCommentsLoading(null); }
@@ -139,7 +140,7 @@ export default function RequirementsTab({
     if (!newCommentText.trim() || !showCommentsFor) return;
     setSubmittingComment(true);
     try {
-      const res = await fetch(`/api/quality/requirements/${showCommentsFor}/comments`, {
+      const res = await fetch(apiUrl(`/api/quality/requirements/${showCommentsFor}/comments`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: newCommentText.trim() }),
@@ -156,7 +157,7 @@ export default function RequirementsTab({
   };
 
   const handleResolveComment = async (reqId: string, commentId: string, resolved: boolean) => {
-    await fetch(`/api/quality/requirements/${reqId}/comments/${commentId}`, {
+    await fetch(apiUrl(`/api/quality/requirements/${reqId}/comments/${commentId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resolved }),
@@ -183,7 +184,7 @@ export default function RequirementsTab({
   const handleStatusTransition = async (reqId: string, newStatus: string) => {
     setStatusLoading(reqId);
     try {
-      const res = await fetch(`/api/quality/requirements/${reqId}/status`, {
+      const res = await fetch(apiUrl(`/api/quality/requirements/${reqId}/status`), {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -205,7 +206,7 @@ export default function RequirementsTab({
   const handleSetParent = async (reqId: string, parentId: string | null) => {
     setParentLinking(true);
     try {
-      const res = await fetch(`/api/quality/requirements/${reqId}/parent`, {
+      const res = await fetch(apiUrl(`/api/quality/requirements/${reqId}/parent`), {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentId }),
       });
@@ -221,7 +222,7 @@ export default function RequirementsTab({
   const handleSnapshot = async (reqId: string) => {
     setSnapshotting(reqId);
     try {
-      await fetch(`/api/quality/requirements/${reqId}/snapshot`, { method: 'POST' });
+      await fetch(apiUrl(`/api/quality/requirements/${reqId}/snapshot`), { method: 'POST' });
       setStatusMsg(prev => ({ ...prev, [reqId]: '📸 Snapshot saved' }));
       setTimeout(() => setStatusMsg(prev => { const n = { ...prev }; delete n[reqId]; return n; }), 2000);
     } finally { setSnapshotting(null); }
@@ -232,7 +233,7 @@ export default function RequirementsTab({
     setShowDiffModal(reqId);
     setDiffLoading(true);
     try {
-      const res = await fetch(`/api/quality/requirements/${reqId}/diff`);
+      const res = await fetch(apiUrl(`/api/quality/requirements/${reqId}/diff`));
       setDiffData(await res.json());
     } finally { setDiffLoading(false); }
   };
@@ -241,7 +242,7 @@ export default function RequirementsTab({
   const handleExport = async (format: 'csv' | 'json') => {
     setIsExporting(true);
     try {
-      const res = await fetch(`/api/quality/requirements/export?format=${format}`);
+      const res = await fetch(apiUrl(`/api/quality/requirements/export?format=${format}`));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -255,7 +256,7 @@ export default function RequirementsTab({
     if (!searchQuery.trim()) return;
     setSearching(true);
     try {
-      const res = await fetch('/api/quality/rag/search-advanced', {
+      const res = await fetch(apiUrl('/api/quality/rag/search-advanced'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery, topK: 10 }),
       });
@@ -274,7 +275,7 @@ export default function RequirementsTab({
     setShowTcVersions(tcId);
     setTcVersionsLoading(true);
     try {
-      const res = await fetch(`/api/quality/testcases/${tcId}/versions`);
+      const res = await fetch(apiUrl(`/api/quality/testcases/${tcId}/versions`));
       const data = await res.json();
       setTcVersions(data.versions || []);
     } finally { setTcVersionsLoading(false); }
@@ -311,7 +312,7 @@ export default function RequirementsTab({
       try {
         const formData = new FormData();
         formData.append('file', pendingFile); formData.append('projectId', currentProjectId && currentProjectId !== 'ALL' ? currentProjectId : 'PROJ-DEFAULT');
-        const resp = await fetch('/api/quality/requirements/upload-file', { method: 'POST', body: formData });
+        const resp = await fetch(apiUrl('/api/quality/requirements/upload-file'), { method: 'POST', body: formData });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || 'Upload failed');
         await onAddRequirement(data.requirement.title, data.requirement.content, 'file', {});
@@ -756,7 +757,7 @@ export default function RequirementsTab({
                         const fd = new FormData();
                         fd.append('image', imageFile);
                         fd.append('projectId', currentProjectId && currentProjectId !== 'ALL' ? currentProjectId : 'PROJ-DEFAULT');
-                        const resp = await fetch('/api/quality/requirements/ocr-image', {
+                        const resp = await fetch(apiUrl('/api/quality/requirements/ocr-image'), {
                           method: 'POST',
                           headers: { Authorization: `Bearer ${token}` },
                           body: fd,

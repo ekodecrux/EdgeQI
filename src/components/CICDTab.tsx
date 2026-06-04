@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GitBranch, Webhook, Play, CheckCircle, Copy, Download, Settings, Zap, RefreshCw, Terminal, AlertCircle, Bell, BellOff, Layers, Plus, X } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 export default function CICDTab() {
   // REQ-87: Pipeline status state
@@ -11,7 +12,7 @@ export default function CICDTab() {
     setPipelineLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/cicd/pipeline-status', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(apiUrl('/api/quality/cicd/pipeline-status'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.pipelines) setPipelineStatus(data.pipelines);
     } catch { /* silent */ } finally { setPipelineLoading(false); }
@@ -21,7 +22,7 @@ export default function CICDTab() {
     if (!newPipeline.name.trim()) return;
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/cicd/pipeline-status', {
+      const res = await fetch(apiUrl('/api/quality/cicd/pipeline-status'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(newPipeline)
@@ -40,7 +41,7 @@ export default function CICDTab() {
     setNotifLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/notifications/config', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(apiUrl('/api/quality/notifications/config'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       const data = await res.json();
       if (data.configs) setNotifConfigs(data.configs);
     } catch { /* silent */ } finally { setNotifLoading(false); }
@@ -50,7 +51,7 @@ export default function CICDTab() {
     if (!newNotif.url.trim()) return;
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/notifications/config', {
+      const res = await fetch(apiUrl('/api/quality/notifications/config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ ...newNotif, events: [newNotif.events] })
@@ -63,7 +64,7 @@ export default function CICDTab() {
   const toggleNotif = async (id: string, enabled: boolean) => {
     try {
       const token = localStorage.getItem('iq_token');
-      await fetch(`/api/quality/notifications/config/${id}`, {
+      await fetch(apiUrl(`/api/quality/notifications/config/${id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ enabled })
@@ -84,7 +85,7 @@ export default function CICDTab() {
   const [webhookUrl, setWebhookUrl] = useState('');
 
   useEffect(() => {
-    fetch('/api/quality/cicd/integrations').then(r => r.json()).then(d => setIntegrations(d.integrations || []));
+    fetch(apiUrl('/api/quality/cicd/integrations')).then(r => r.json()).then(d => setIntegrations(d.integrations || []));
     setWebhookUrl(`${window.location.origin}/api/quality/cicd/webhook`);
     loadPipelines();
     loadNotifConfigs();
@@ -93,7 +94,7 @@ export default function CICDTab() {
   const generateConfig = async () => {
     setGenerating(true);
     try {
-      const res = await fetch('/api/quality/cicd/generate-config', {
+      const res = await fetch(apiUrl('/api/quality/cicd/generate-config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

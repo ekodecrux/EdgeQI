@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, BookOpen, Plus, Trash2, Copy, Search, Tag } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface Template {
   id: string;
@@ -37,18 +38,18 @@ export default function FeedbackTemplatesTab() {
   }, []);
 
   const loadTemplates = () => {
-    fetch('/api/quality/prompt-templates').then(r => r.json()).then(d => setTemplates(d.templates || []));
+    fetch(apiUrl('/api/quality/prompt-templates')).then(r => r.json()).then(d => setTemplates(d.templates || []));
   };
 
   const loadFeedback = () => {
-    fetch('/api/quality/feedback').then(r => r.json()).then(d => setFeedback(d.entries || []));
+    fetch(apiUrl('/api/quality/feedback')).then(r => r.json()).then(d => setFeedback(d.entries || []));
   };
 
   const addTemplate = async () => {
     if (!newName.trim() || !newPrompt.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/quality/prompt-templates', {
+      await fetch(apiUrl('/api/quality/prompt-templates'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName, prompt: newPrompt, category: newCategory }),
@@ -58,12 +59,12 @@ export default function FeedbackTemplatesTab() {
   };
 
   const deleteTemplate = async (id: string) => {
-    await fetch(`/api/quality/prompt-templates/${id}`, { method: 'DELETE' });
+    await fetch(apiUrl(`/api/quality/prompt-templates/${id}`), { method: 'DELETE' });
     loadTemplates();
   };
 
   const useTemplate = async (tpl: Template) => {
-    await fetch(`/api/quality/prompt-templates/${tpl.id}/use`, { method: 'POST' });
+    await fetch(apiUrl(`/api/quality/prompt-templates/${tpl.id}/use`), { method: 'POST' });
     navigator.clipboard.writeText(tpl.prompt);
     setCopied(tpl.id);
     setTimeout(() => setCopied(null), 2000);

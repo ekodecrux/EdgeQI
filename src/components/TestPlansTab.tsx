@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TableProperties, Plus, X, RefreshCw, FolderOpen, CheckSquare } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface TestPlansTabProps {
   currentProjectId?: string;
@@ -16,7 +17,7 @@ function PlanProgressPanel({ planId, planName }: { planId: string; planName: str
   const load = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/quality/test-plans/${planId}/progress`, { headers: authH() });
+      const r = await fetch(apiUrl(`/api/quality/test-plans/${planId}/progress`), { headers: authH() });
       const d = await r.json();
       setProgress(d);
     } catch { /* ignore */ }
@@ -102,7 +103,7 @@ export default function TestPlansTab({ currentProjectId = 'ALL', currentSprintId
         projectId: currentProjectId !== 'ALL' ? currentProjectId : undefined,
         sprintId:  currentSprintId || undefined,
       };
-      const res = await fetch('/api/quality/test-plans', {
+      const res = await fetch(apiUrl('/api/quality/test-plans'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify(body),
       });
@@ -119,7 +120,7 @@ export default function TestPlansTab({ currentProjectId = 'ALL', currentSprintId
 
   const deletePlan = async (id: string) => {
     try {
-      await fetch(`/api/quality/test-plans/${id}`, { method: 'DELETE', headers: authH() });
+      await fetch(apiUrl(`/api/quality/test-plans/${id}`), { method: 'DELETE', headers: authH() });
       setPlans(prev => prev.filter(p => p.id !== id));
     } catch { /* silent */ }
   };

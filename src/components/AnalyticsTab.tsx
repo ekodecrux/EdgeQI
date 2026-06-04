@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Cpu, Clock, DollarSign, RefreshCw, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface TrendEntry {
   date: string;
@@ -76,7 +77,7 @@ export default function AnalyticsTab() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/quality/analytics/ai-usage?days=${d}`);
+      const res = await fetch(apiUrl(`/api/quality/analytics/ai-usage?days=${d}`));
       const json = await res.json();
       setData(json);
       setLastRefresh(new Date());

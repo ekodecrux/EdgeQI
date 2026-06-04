@@ -80,6 +80,7 @@ import VoicePromptBar from './components/VoicePromptBar';
 import ProjectContextBar from './components/ProjectContextBar';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import WorkflowBuilder from './components/WorkflowBuilder';
+import { apiUrl } from '@/src/config/api';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
 function SidebarItem({ id, label, Icon, active, onClick }: {
@@ -140,7 +141,7 @@ function ManualExecutionTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/quality/execution/manual', { headers: authH() });
+      const res = await fetch(apiUrl('/api/quality/execution/manual'), { headers: authH() });
       const data = await res.json();
       if (data.runs) setRuns(data.runs);
     } catch { /* silent */ } finally { setLoading(false); }
@@ -151,7 +152,7 @@ function ManualExecutionTab() {
   const startRun = async () => {
     if (!form.tcTitle.trim()) return;
     try {
-      const res = await fetch('/api/quality/execution/manual', {
+      const res = await fetch(apiUrl('/api/quality/execution/manual'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ tcTitle: form.tcTitle, tester: form.tester || 'QA Engineer', notes: form.notes,
           steps: [{ action: 'Navigate to feature', expected: 'Page loads correctly' }, { action: 'Perform test action', expected: 'Feature responds as expected' }] })
@@ -163,7 +164,7 @@ function ManualExecutionTab() {
 
   const updateStatus = async (runId: string, status: string) => {
     try {
-      const res = await fetch(`/api/quality/execution/manual/${runId}/status`, {
+      const res = await fetch(apiUrl(`/api/quality/execution/manual/${runId}/status`), {
         method: 'PATCH', headers: authH(),
         body: JSON.stringify({ status })
       });
@@ -174,7 +175,7 @@ function ManualExecutionTab() {
 
   const updateStep = async (runId: string, stepIdx: number, result: string, actual: string) => {
     try {
-      const res = await fetch(`/api/quality/execution/manual/${runId}/step`, {
+      const res = await fetch(apiUrl(`/api/quality/execution/manual/${runId}/step`), {
         method: 'PATCH', headers: authH(),
         body: JSON.stringify({ stepIdx, result, actual })
       });
@@ -385,14 +386,14 @@ export default function App() {
   // Load projects from DB on mount and whenever user leaves ProjectHub
   const reloadProjects = () => {
     const token = localStorage.getItem('iq_token') || '';
-    fetch('/api/quality/projects', { headers: { 'Authorization': `Bearer ${token}` } })
+    fetch(apiUrl('/api/quality/projects'), { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : { projects: [] })
       .then((data: any) => {
         const list = data.projects || data || [];
         setDbProjects(list.map((p: any) => ({ id: p.id, name: p.name, icon: p.icon || '🚀', color: p.color || '#1e96df', status: p.status || 'active' })));
       })
       .catch(() => {});
-    fetch('/api/quality/sprints', { headers: { 'Authorization': `Bearer ${token}` } })
+    fetch(apiUrl('/api/quality/sprints'), { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : { sprints: [] })
       .then((data: any) => { setAllDbSprints(data.sprints || data || []); })
       .catch(() => {});
@@ -405,7 +406,7 @@ export default function App() {
   useEffect(() => {
     if (currentProjectId === 'ALL') { setDbSprints([]); setCurrentSprintId(''); return; }
     const token = localStorage.getItem('iq_token') || '';
-    fetch(`/api/quality/sprints?project_id=${currentProjectId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+    fetch(apiUrl(`/api/quality/sprints?project_id=${currentProjectId}`), { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : { sprints: [] })
       .then((data: any) => {
         const list = data.sprints || data || [];
@@ -521,14 +522,14 @@ LATEST QE DASHBOARD RESULTS:
     async function loadInitialData() {
       try {
         const [reqs, tcs, defects, impacts, scriptsList, perfs, vuls, logs] = await Promise.all([
-          fetch('/api/quality/requirements').then(r => r.json()),
-          fetch('/api/quality/testcases').then(r => r.json()),
-          fetch('/api/quality/defects/hotspots').then(r => r.json()),
-          fetch('/api/quality/impact/reports').then(r => r.json()),
-          fetch('/api/quality/scripts').then(r => r.json()),
-          fetch('/api/quality/performance/configs').then(r => r.json()),
-          fetch('/api/quality/security/vulnerabilities').then(r => r.json()),
-          fetch('/api/quality/audit').then(r => r.json())
+          fetch(apiUrl('/api/quality/requirements')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/testcases')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/defects/hotspots')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/impact/reports')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/scripts')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/performance/configs')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/security/vulnerabilities')).then(r => r.json()),
+          fetch(apiUrl('/api/quality/audit')).then(r => r.json())
         ]);
 
         setRequirements(reqs);
@@ -571,7 +572,7 @@ LATEST QE DASHBOARD RESULTS:
     setActiveSteps(prev => prev.map(s => s.id === 'req-agent' ? { ...s, status: 'running', progress: 40, output: prepMessage } : s));
 
     try {
-      const response = await fetch('/api/quality/requirements/add', {
+      const response = await fetch(apiUrl('/api/quality/requirements/add'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -609,7 +610,7 @@ LATEST QE DASHBOARD RESULTS:
   // 2. RUN PREDICITVE HOTSPOT MODEL FORECASTS
   const handlePredictHotspots = async (title: string, description: string) => {
     try {
-      const res = await fetch('/api/quality/defects/predict', {
+      const res = await fetch(apiUrl('/api/quality/defects/predict'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, description }),
@@ -632,7 +633,7 @@ LATEST QE DASHBOARD RESULTS:
     setActiveSteps(prev => prev.map(s => s.id === 'impact-agent' ? { ...s, status: 'running', progress: 50, output: `[${new Date().toLocaleTimeString()}] Scanning Git repository commit histories...` } : s));
 
     try {
-      const res = await fetch('/api/quality/impact/analyze', {
+      const res = await fetch(apiUrl('/api/quality/impact/analyze'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ changeTrigger, description }),
@@ -665,7 +666,7 @@ LATEST QE DASHBOARD RESULTS:
     setActiveSteps(prev => prev.map(s => s.id === 'script-agent' ? { ...s, status: 'running', progress: 30, output: `[${new Date().toLocaleTimeString()}] Initializing code compilers for targets...` } : s));
 
     try {
-      const res = await fetch('/api/quality/scripts/generate', {
+      const res = await fetch(apiUrl('/api/quality/scripts/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ testCaseId, framework, language }),
@@ -699,7 +700,7 @@ LATEST QE DASHBOARD RESULTS:
   ) => {
     setIsExecutingPerformance(true);
     try {
-      const res = await fetch('/api/quality/performance/execute', {
+      const res = await fetch(apiUrl('/api/quality/performance/execute'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ testType, endpointOrJourney, virtualUsers, durationSeconds, rampUpTimeSeconds, rpsLimit }),
@@ -720,7 +721,7 @@ LATEST QE DASHBOARD RESULTS:
   const handleApplyRemediation = async (vulnerabilityId: string) => {
     setIsRemediatingSecurity(vulnerabilityId);
     try {
-      const res = await fetch('/api/quality/security/remediate', {
+      const res = await fetch(apiUrl('/api/quality/security/remediate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vulnerabilityId }),
@@ -740,7 +741,7 @@ LATEST QE DASHBOARD RESULTS:
   // 7. CLIENT-SIDE SERVICE BOT ENQUIRIES (Proxy to Gemini server endpoint)
   const handleSendAssistantMessage = async (prompt: string) => {
     // Collect last few messages to preserve history context
-    const response = await fetch('/api/quality/assistant/chat', {
+    const response = await fetch(apiUrl('/api/quality/assistant/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt }),
@@ -752,7 +753,7 @@ LATEST QE DASHBOARD RESULTS:
   // Helper trigger audit fetch after changes
   const handleAddAuditLog = async () => {
     try {
-      const logs = await fetch('/api/quality/audit').then(r => r.json());
+      const logs = await fetch(apiUrl('/api/quality/audit')).then(r => r.json());
       setAuditLogs(logs);
     } catch (e) {
       console.warn("Audit refresh failure.");
@@ -840,7 +841,7 @@ LATEST QE DASHBOARD RESULTS:
     try {
       // Pick up to 35 real test case IDs from state
       const tcIds = testCases.slice(0, 35).map(tc => tc.id);
-      const res = await fetch('/api/quality/execution/run', {
+      const res = await fetch(apiUrl('/api/quality/execution/run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

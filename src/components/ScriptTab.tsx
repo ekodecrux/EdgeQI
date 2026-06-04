@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { TestCase, ScriptFile } from '../types';
 import VoicePromptBar from './VoicePromptBar';
+import { apiUrl } from '@/src/config/api';
 
 interface ScriptProps {
   testCases: TestCase[];
@@ -111,7 +112,7 @@ export default function ScriptTab({
 
     try {
       // Call real backend — generate-framework returns real feasibility data computed from DB test cases
-      const res = await fetch('/api/quality/scripts/generate-framework', {
+      const res = await fetch(apiUrl('/api/quality/scripts/generate-framework'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({
@@ -266,7 +267,7 @@ export default function ScriptTab({
     const selectedCases = testCases.filter(tc => selectedTestCaseIds.has(tc.id));
 
     try {
-      const res = await fetch('/api/quality/scripts/generate-framework', {
+      const res = await fetch(apiUrl('/api/quality/scripts/generate-framework'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({
@@ -294,7 +295,7 @@ export default function ScriptTab({
         // Backend returned minimal/empty code — use individual script generate for each TC
         const scripts = await Promise.all(
           selectedCases.slice(0, 5).map(tc =>
-            fetch('/api/quality/scripts/generate', {
+            fetch(apiUrl('/api/quality/scripts/generate'), {
               method: 'POST', headers: authH(),
               body: JSON.stringify({ testCaseId: tc.id, title: tc.title, framework, language }),
             }).then(r => r.json()).catch(() => ({ script: null }))
@@ -346,7 +347,7 @@ export default function ScriptTab({
       : testCases.slice(0, 5);
 
     try {
-      const res = await fetch('/api/quality/scripts/generate-data-driven', {
+      const res = await fetch(apiUrl('/api/quality/scripts/generate-data-driven'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({

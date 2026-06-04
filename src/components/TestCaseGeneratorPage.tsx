@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
+import { apiUrl } from '@/src/config/api';
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ export default function TestCaseGeneratorPage({
     setSourceUrlLoading(true);
     setFetchedUrlContent('');
     try {
-      const res = await fetch('/api/quality/requirements/fetch-url', {
+      const res = await fetch(apiUrl('/api/quality/requirements/fetch-url'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({ url: sourceUrl }),
@@ -259,7 +260,7 @@ export default function TestCaseGeneratorPage({
     setScenarioError('');
     setScenarios([]);
     try {
-      const res = await fetch('/api/quality/testcases/generate-scenarios', {
+      const res = await fetch(apiUrl('/api/quality/testcases/generate-scenarios'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({
@@ -303,7 +304,7 @@ export default function TestCaseGeneratorPage({
     setDetailsError('');
     setGeneratedTCs([]);
     try {
-      const res = await fetch('/api/quality/testcases/generate-details', {
+      const res = await fetch(apiUrl('/api/quality/testcases/generate-details'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({
@@ -352,7 +353,7 @@ export default function TestCaseGeneratorPage({
     setTmsPushing(true);
     setTmsPushResult(null);
     try {
-      const res = await fetch('/api/quality/integrations/tms/push-testcases', {
+      const res = await fetch(apiUrl('/api/quality/integrations/tms/push-testcases'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({ ...tmsPushConfig, testCases: generatedTCs }),
@@ -379,7 +380,7 @@ export default function TestCaseGeneratorPage({
     setFeasibilityResults([]);
     setFeasibilitySummary(null);
     try {
-      const res = await fetch('/api/quality/testcases/feasibility-analysis', {
+      const res = await fetch(apiUrl('/api/quality/testcases/feasibility-analysis'), {
         method: 'POST',
         headers: authH(),
         body: JSON.stringify({
@@ -411,7 +412,7 @@ export default function TestCaseGeneratorPage({
     try {
       const params = new URLSearchParams({ format });
       if (currentProjectId && currentProjectId !== 'ALL') params.set('projectId', currentProjectId);
-      const res = await fetch(`/api/quality/testcases/export?${params}`);
+      const res = await fetch(apiUrl(`/api/quality/testcases/export?${params}`));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

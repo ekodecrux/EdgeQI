@@ -38,6 +38,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.support.ui.ExpectedConditions;
+import { apiUrl } from '@/src/config/api';
 
 public class CheckoutTest {
     public static void main(String[] args) {
@@ -188,7 +189,7 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
     setFeedbackMsg({ type: '', text: '' });
     
     try {
-      const response = await fetch('/api/quality/scripts/convert', {
+      const response = await fetch(apiUrl('/api/quality/scripts/convert'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

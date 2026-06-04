@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Plus, Play, Pause, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Calendar, Settings2, Bell, X } from 'lucide-react';
+import { apiUrl } from '@/src/config/api';
 
 interface Schedule {
   id: string;
@@ -56,7 +57,7 @@ export default function SchedulerTab() {
   const loadSchedules = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/quality/schedules');
+      const res = await fetch(apiUrl('/api/quality/schedules'));
       const data = await res.json();
       setSchedules(data.schedules || []);
     } catch (e: any) {
@@ -73,7 +74,7 @@ export default function SchedulerTab() {
     if (!formName.trim() || !formCron.trim()) return;
     setFormSaving(true);
     try {
-      const res = await fetch('/api/quality/schedules', {
+      const res = await fetch(apiUrl('/api/quality/schedules'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +105,7 @@ export default function SchedulerTab() {
 
   const toggleSchedule = async (s: Schedule) => {
     try {
-      const res = await fetch(`/api/quality/schedules/${s.id}`, {
+      const res = await fetch(apiUrl(`/api/quality/schedules/${s.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !s.enabled })
@@ -122,7 +123,7 @@ export default function SchedulerTab() {
   const deleteSchedule = async (s: Schedule) => {
     if (!confirm(`Delete schedule "${s.name}"?`)) return;
     try {
-      const res = await fetch(`/api/quality/schedules/${s.id}`, { method: 'DELETE' });
+      const res = await fetch(apiUrl(`/api/quality/schedules/${s.id}`), { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         setSchedules(prev => prev.filter(sc => sc.id !== s.id));
@@ -137,7 +138,7 @@ export default function SchedulerTab() {
   const saveNotification = async (scheduleId: string) => {
     setNotifSaving(true);
     try {
-      const res = await fetch(`/api/quality/schedules/${scheduleId}/notifications`, {
+      const res = await fetch(apiUrl(`/api/quality/schedules/${scheduleId}/notifications`), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ webhookUrl: notifWebhook, emailTo: notifEmail, onSuccess: notifOnSuccess, onFailure: notifOnFailure }),
       });

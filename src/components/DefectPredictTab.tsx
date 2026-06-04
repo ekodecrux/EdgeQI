@@ -7,6 +7,7 @@ import {
   Cpu, Bot
 } from 'lucide-react';
 import { DefectHotspot, ImpactReport, TestCase } from '../types';
+import { apiUrl } from '@/src/config/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ const severityColor: Record<string, string> = {
 };
 
 async function exportDefects(format: 'csv' | 'json') {
-  const res = await fetch(`/api/quality/defects/export?format=${format}`);
+  const res = await fetch(apiUrl(`/api/quality/defects/export?format=${format}`));
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = `defects.${format}`; a.click();
@@ -172,7 +173,7 @@ export default function DefectPredictTab({
       const formData = new FormData();
       formData.append('file', file);
       formData.append('sourceType', selectedFileSource);
-      const resp = await fetch('/api/quality/defects/upload-dump', { method: 'POST', body: formData });
+      const resp = await fetch(apiUrl('/api/quality/defects/upload-dump'), { method: 'POST', body: formData });
       const data = await resp.json();
       if (data.success && data.analysis) {
         const a = data.analysis;
@@ -228,7 +229,7 @@ export default function DefectPredictTab({
     if (!pasteText.trim()) return;
     setIsClassifyingText(true);
     try {
-      const r = await fetch('/api/quality/defects/classify-text', {
+      const r = await fetch(apiUrl('/api/quality/defects/classify-text'), {
         method: 'POST', headers: authH(), body: JSON.stringify({ text: pasteText, projectId: currentProjectId })
       });
       const d = await r.json();
@@ -243,7 +244,7 @@ export default function DefectPredictTab({
   const handleTmsPull = async () => {
     setIsTmsPulling(true);
     try {
-      const r = await fetch('/api/quality/defects/tms-pull', {
+      const r = await fetch(apiUrl('/api/quality/defects/tms-pull'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ ...tmsPullConfig, projectId: currentProjectId })
       });
@@ -261,7 +262,7 @@ export default function DefectPredictTab({
   const handleLoadSampleClassify = async () => {
     setIsAiClassifying(true);
     try {
-      const r = await fetch('/api/quality/defects/ai-classify', {
+      const r = await fetch(apiUrl('/api/quality/defects/ai-classify'), {
         method: 'POST', headers: authH(), body: JSON.stringify({ useSample: true, projectId: currentProjectId })
       });
       const d = await r.json();
@@ -276,7 +277,7 @@ export default function DefectPredictTab({
     if (!classified.length) return;
     setIsAiClassifying(true);
     try {
-      const r = await fetch('/api/quality/defects/ai-classify', {
+      const r = await fetch(apiUrl('/api/quality/defects/ai-classify'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ items: classified.map(c => ({ id: c.id, title: c.title, failureReason: c.failureReason })) })
       });
@@ -300,7 +301,7 @@ export default function DefectPredictTab({
     if (!tmsPushConfig.baseUrl && tmsPushConfig.tmsType !== 'demo') { showToast('❌ Base URL required'); return; }
     setIsPushing(true); setPushResult(null);
     try {
-      const r = await fetch('/api/quality/defects/tms-push', {
+      const r = await fetch(apiUrl('/api/quality/defects/tms-push'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ ...tmsPushConfig, defects: toRaise, projectId: currentProjectId })
       });
@@ -321,7 +322,7 @@ export default function DefectPredictTab({
     if (!changeReq.trim()) return;
     setIsAnalyzingFull(true); setImpactedSuite([]); setImpactSummary('');
     try {
-      const r = await fetch('/api/quality/impact/analyze-full', {
+      const r = await fetch(apiUrl('/api/quality/impact/analyze-full'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({
           changeRequirement: changeReq, description: changeDesc,
@@ -346,7 +347,7 @@ export default function DefectPredictTab({
     if (!toQueue.length) { showToast('No test cases selected for execution'); return; }
     setIsQueueing(true);
     try {
-      const r = await fetch('/api/quality/execution/queue-impact', {
+      const r = await fetch(apiUrl('/api/quality/execution/queue-impact'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ testCaseIds: toQueue, projectId: currentProjectId, source: 'defect-impact' })
       });
@@ -370,7 +371,7 @@ export default function DefectPredictTab({
   const loadClusters = async () => {
     setClustersLoading(true);
     try {
-      const r = await fetch('/api/quality/defects/clusters', { headers: { Authorization: `Bearer ${token()}` } });
+      const r = await fetch(apiUrl('/api/quality/defects/clusters'), { headers: { Authorization: `Bearer ${token()}` } });
       const d = await r.json(); setClusters(d.clusters || []);
     } catch { /* ignore */ }
     setClustersLoading(false);
@@ -378,7 +379,7 @@ export default function DefectPredictTab({
 
   const handleAddCluster = async () => {
     if (!newClusterLabel || !newClusterPattern) return;
-    const r = await fetch('/api/quality/defects/clusters', {
+    const r = await fetch(apiUrl('/api/quality/defects/clusters'), {
       method: 'POST', headers: authH(),
       body: JSON.stringify({ label: newClusterLabel, pattern: newClusterPattern, severity: 'Medium' })
     });
@@ -390,7 +391,7 @@ export default function DefectPredictTab({
     if (!triageTitle && !triageDesc) return;
     setTriaging(true); setTriageResult(null);
     try {
-      const r = await fetch('/api/quality/defects/triage', {
+      const r = await fetch(apiUrl('/api/quality/defects/triage'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ title: triageTitle, description: triageDesc, stackTrace: triageStack })
       });
@@ -403,7 +404,7 @@ export default function DefectPredictTab({
     if (!assistantMsg.trim()) return;
     setAssistantLoading(true); setAssistantReply('');
     try {
-      const r = await fetch('/api/quality/assistant/chat', {
+      const r = await fetch(apiUrl('/api/quality/assistant/chat'), {
         method: 'POST', headers: authH(),
         body: JSON.stringify({ message: assistantMsg, module: 'defect-impact', projectId: currentProjectId })
       });

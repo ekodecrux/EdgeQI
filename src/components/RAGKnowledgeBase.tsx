@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { apiUrl } from '@/src/config/api';
 import {
   Brain, Upload, Search, FileText, Trash2, CheckCircle, AlertCircle,
   Loader2, Database, Settings, ChevronDown, ChevronRight, X, Plus,
@@ -154,7 +155,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
           setUploadProgress(p);
         }
       }
-      const r = await fetch('/api/quality/rag-kb/upload', {
+      const r = await fetch(apiUrl('/api/quality/rag-kb/upload'), {
         method: 'POST', headers,
         body: JSON.stringify({ project_id: scopedProjectId, name: uploadName, content: uploadText, file_type: uploadFileType, llm_provider: uploadProvider })
       });
@@ -186,7 +187,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
       });
       setUploadProgress(60);
       const ext = file.name.split('.').pop()?.toLowerCase() || 'txt';
-      const r = await fetch('/api/quality/rag-kb/upload', {
+      const r = await fetch(apiUrl('/api/quality/rag-kb/upload'), {
         method: 'POST', headers,
         body: JSON.stringify({ project_id: scopedProjectId, name, content, file_type: ext, llm_provider: uploadProvider })
       });
@@ -205,7 +206,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
     try {
       const params = new URLSearchParams({ q: searchQuery, limit: '8' });
       if (scopedProjectId) params.append('project_id', scopedProjectId);
-      const r = await fetch(`/api/quality/rag-kb/search?${params}`, { headers });
+      const r = await fetch(apiUrl(`/api/quality/rag-kb/search?${params}`), { headers });
       if (r.ok) { const data = await r.json(); setSearchResults(data.results || []); }
     } catch {}
     setSearching(false);
@@ -217,7 +218,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
     setKbQuerying(true);
     setKbAnswer(''); setKbSources([]);
     try {
-      const r = await fetch('/api/quality/rag-kb/query', {
+      const r = await fetch(apiUrl('/api/quality/rag-kb/query'), {
         method: 'POST', headers,
         body: JSON.stringify({ question: kbQuestion, project_id: scopedProjectId, module: 'rag-kb' })
       });
@@ -235,7 +236,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
   // ── Delete doc ────────────────────────────────────────────────────────────
   const handleDeleteDoc = async (id: string) => {
     if (!confirm('Remove this document from the knowledge base?')) return;
-    await fetch(`/api/quality/rag-kb/${id}`, { method: 'DELETE', headers });
+    await fetch(apiUrl(`/api/quality/rag-kb/${id}`), { method: 'DELETE', headers });
     setDocs(prev => prev.filter(d => d.id !== id));
   };
 
@@ -244,7 +245,7 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
     if (!llmForm.provider || !llmForm.model) return;
     setSavingLLM(true);
     try {
-      const r = await fetch('/api/quality/llm-configs', {
+      const r = await fetch(apiUrl('/api/quality/llm-configs'), {
         method: 'POST', headers,
         body: JSON.stringify({ ...llmForm, project_id: scopedProjectId, is_active: llmForm.is_active ? 1 : 0, is_internal: llmForm.is_internal ? 1 : 0 })
       });
@@ -258,12 +259,12 @@ export default function RAGKnowledgeBase({ currentProjectId, onNavigateTo }: RAG
   };
 
   const handleActivateLLM = async (id: string) => {
-    await fetch(`/api/quality/llm-configs/${id}`, { method: 'PATCH', headers, body: JSON.stringify({ is_active: 1 }) });
+    await fetch(apiUrl(`/api/quality/llm-configs/${id}`), { method: 'PATCH', headers, body: JSON.stringify({ is_active: 1 }) });
     await fetchLLMConfigs();
   };
 
   const handleDeleteLLM = async (id: string) => {
-    await fetch(`/api/quality/llm-configs/${id}`, { method: 'DELETE', headers });
+    await fetch(apiUrl(`/api/quality/llm-configs/${id}`), { method: 'DELETE', headers });
     setLLMConfigs(prev => prev.filter(c => c.id !== id));
   };
 

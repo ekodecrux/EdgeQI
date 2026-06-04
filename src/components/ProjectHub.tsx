@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from '@/src/config/api';
 import {
   FolderOpen, Plus, Edit3, Trash2, X, ChevronDown, ChevronRight,
   ArrowRight, Layers, Play, BookOpen, Target, TrendingUp, Zap,
@@ -144,9 +145,9 @@ export default function ProjectHub({ currentProjectId, onSelectProject, onNaviga
     setLoading(true);
     try {
       const [pRes, sRes, rRes] = await Promise.all([
-        fetch('/api/quality/projects', { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch('/api/quality/sprints', { headers: { Authorization: `Bearer ${token()}` } }),
-        fetch('/api/quality/run-versions', { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(apiUrl('/api/quality/projects'), { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(apiUrl('/api/quality/sprints'), { headers: { Authorization: `Bearer ${token()}` } }),
+        fetch(apiUrl('/api/quality/run-versions'), { headers: { Authorization: `Bearer ${token()}` } }),
       ]);
       const [pData, sData, rData] = await Promise.all([pRes.json(), sRes.json(), rRes.json()]);
       setProjects(pData.projects || []);
@@ -187,7 +188,7 @@ export default function ProjectHub({ currentProjectId, onSelectProject, onNaviga
     if (!sprintForm.name.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/quality/sprints', {
+      const res = await fetch(apiUrl('/api/quality/sprints'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ ...sprintForm, project_id: filterProject !== 'ALL' ? filterProject : sprintForm.project_id }),
@@ -204,13 +205,13 @@ export default function ProjectHub({ currentProjectId, onSelectProject, onNaviga
 
   const deleteProject = async (id: string) => {
     if (!confirm('Delete this project and all its data?')) return;
-    await fetch(`/api/quality/projects/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
+    await fetch(apiUrl(`/api/quality/projects/${id}`), { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } });
     await loadAll();
     if (currentProjectId === id) onSelectProject('ALL');
   };
 
   const updateSprintStatus = async (id: string, status: string) => {
-    await fetch(`/api/quality/sprints/${id}`, {
+    await fetch(apiUrl(`/api/quality/sprints/${id}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
       body: JSON.stringify({ status }),

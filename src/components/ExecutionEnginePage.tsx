@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import AgentFlowVisualizer from './AgentFlowVisualizer';
 import { AgentStep } from '../types';
+import { apiUrl } from '@/src/config/api';
 
 interface ExecutionEnginePageProps {
   activeSteps: AgentStep[];
@@ -278,7 +279,7 @@ export default function ExecutionEnginePage({
     setRerunningFailed(true);
     setRerunMsg('');
     try {
-      const res = await fetch('/api/quality/execution/run', {
+      const res = await fetch(apiUrl('/api/quality/execution/run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ failedOnly: true, baseRunId: lastRun.runId, totalTests: lastRun.failed }),
@@ -301,7 +302,7 @@ export default function ExecutionEnginePage({
     if (pollingRunId === runId) return;   // already polling
     setPollingRunId(runId);
     try {
-      const res = await fetch(`/api/quality/execution/runs/${runId}/status`);
+      const res = await fetch(apiUrl(`/api/quality/execution/runs/${runId}/status`));
       if (res.ok) {
         const data = await res.json();
         setLiveRunStatus(prev => ({ ...prev, [runId]: data.status || 'unknown' }));
@@ -316,7 +317,7 @@ export default function ExecutionEnginePage({
     setDefectsLoading(true);
     try {
       const token = localStorage.getItem('iq_token') || localStorage.getItem('iq_token');
-      const r = await fetch('/api/quality/defects/from-run', { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(apiUrl('/api/quality/defects/from-run'), { headers: { Authorization: `Bearer ${token}` } });
       if (r.ok) { const d = await r.json(); setAutoDefects(d.defects || []); }
     } finally { setDefectsLoading(false); }
   };
@@ -326,7 +327,7 @@ export default function ExecutionEnginePage({
     setLoggingDefect(true);
     try {
       const token = localStorage.getItem('iq_token') || localStorage.getItem('iq_token');
-      const r = await fetch('/api/quality/defects/from-run', {
+      const r = await fetch(apiUrl('/api/quality/defects/from-run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ runId: logDefectRunId, severity: 'High', failureMsg: 'Test case failed during automated execution' }),
@@ -346,7 +347,7 @@ export default function ExecutionEnginePage({
     setQuarantineLoading(true);
     try {
       const token = localStorage.getItem('iq_token');
-      const res = await fetch('/api/quality/execution/flaky', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(apiUrl('/api/quality/execution/flaky'), { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) { const d = await res.json(); setQuarantined(d.quarantined || []); }
     } finally { setQuarantineLoading(false); }
   };
@@ -354,7 +355,7 @@ export default function ExecutionEnginePage({
   const handleAutoScan = async () => {
     setAutoScanMsg('Scanning...');
     const token = localStorage.getItem('iq_token');
-    const res = await fetch('/api/quality/execution/flaky/auto-scan', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(apiUrl('/api/quality/execution/flaky/auto-scan'), { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
     const d = await res.json();
     setAutoScanMsg(`Auto-scan: ${d.autoFlagged?.length || 0} new flaky test(s) quarantined`);
     loadQuarantine();
@@ -363,7 +364,7 @@ export default function ExecutionEnginePage({
 
   const handleReleaseQuarantine = async (tcId: string) => {
     const token = localStorage.getItem('iq_token');
-    await fetch(`/api/quality/execution/flaky/${tcId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(apiUrl(`/api/quality/execution/flaky/${tcId}`), { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     setQuarantined(prev => prev.filter(q => q.tcId !== tcId));
   };
 
@@ -371,7 +372,7 @@ export default function ExecutionEnginePage({
   const handleExportRunHistory = async (format: 'csv' | 'json') => {
     setHistoryExporting(true);
     try {
-      const res = await fetch(`/api/quality/execution/runs/export?format=${format}`);
+      const res = await fetch(apiUrl(`/api/quality/execution/runs/export?format=${format}`));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `run-history.${format}`; a.click();
@@ -393,7 +394,7 @@ export default function ExecutionEnginePage({
   useEffect(() => {
     async function loadRunHistory() {
       try {
-        const res = await fetch('/api/quality/execution/runs');
+        const res = await fetch(apiUrl('/api/quality/execution/runs'));
         const data = await res.json();
         if (data.runs && data.runs.length > 0) {
           // Map API audit records to RunRecord shape
@@ -436,7 +437,7 @@ export default function ExecutionEnginePage({
         // Try to fetch actual run result from the API
         async function fetchLatestRun() {
           try {
-            const res = await fetch('/api/quality/execution/runs');
+            const res = await fetch(apiUrl('/api/quality/execution/runs'));
             const data = await res.json();
             if (data.runs && data.runs.length > 0) {
               const latest = data.runs[0];
@@ -462,7 +463,7 @@ export default function ExecutionEnginePage({
               // ── Auto-record to run_versions table ────────────────────────
               if (currentProjectId && currentProjectId !== 'ALL') {
                 const passRate = newRecord.totalTests > 0 ? Math.round((newRecord.passed / newRecord.totalTests) * 100) : 0;
-                fetch('/api/quality/run-versions', {
+                fetch(apiUrl('/api/quality/run-versions'), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('iq_token') || ''}` },
                   body: JSON.stringify({
@@ -541,7 +542,7 @@ export default function ExecutionEnginePage({
     setParallelRunning(true);
     setParallelResult(null);
     try {
-      const res = await fetch('/api/quality/execution/parallel-run', {
+      const res = await fetch(apiUrl('/api/quality/execution/parallel-run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -569,7 +570,7 @@ export default function ExecutionEnginePage({
     setToolRunResult(null);
     const t = localStorage.getItem('iq_token') || '';
     try {
-      const res = await fetch('/api/quality/execution/tool-run', {
+      const res = await fetch(apiUrl('/api/quality/execution/tool-run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
         body: JSON.stringify({ tool: execTool, workers: parallelWorkers, targetUrl: '' })
@@ -591,7 +592,7 @@ export default function ExecutionEnginePage({
     if (sseEventSource) { sseEventSource.close(); }
     setSseLines([]);
     setSseConnected(true);
-    const es = new EventSource(`/api/quality/execution/stream/${runId}`);
+    const es = new EventSource(apiUrl(`/api/quality/execution/stream/${runId}`));
     setSseEventSource(es);
     es.onmessage = (evt) => {
       try {
@@ -622,7 +623,7 @@ export default function ExecutionEnginePage({
   const handleAbortRun = async (runId: string) => {
     setAbortingRunId(runId);
     try {
-      const res = await fetch(`/api/quality/execution/runs/${runId}/abort`, { method: 'POST' });
+      const res = await fetch(apiUrl(`/api/quality/execution/runs/${runId}/abort`), { method: 'POST' });
       const data = await res.json();
       setAbortMsg(data.message || 'Abort signal sent');
       setTimeout(() => setAbortMsg(''), 4000);
