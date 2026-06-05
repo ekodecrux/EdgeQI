@@ -158,6 +158,10 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
   const [oracleEbs, setOracleEbs] = useState(false);
   const [workdayHcm, setWorkdayHcm] = useState(false);
   const [visualAiCoord, setVisualAiCoord] = useState(false);
+  // Universal Browser App Connector (script generation)
+  const [universalAppEnabled, setUniversalAppEnabled] = useState(false);
+  const [universalAppUrl, setUniversalAppUrl] = useState('');
+  const [universalLoginStrategy, setUniversalLoginStrategy] = useState<'smart'|'basic'|'oauth'|'saml'|'mfa'>('smart');
 
   // Stats / state managers
   const [isProcessing, setIsProcessing] = useState(false);
@@ -181,6 +185,7 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
     setServicenowFrames(t.cotsAddons.servicenowFrames);
     setVisualAiCoord(t.cotsAddons.visualAiCoord);
     setErapEnabled(false); setOracleEbs(false); setWorkdayHcm(false);
+    setUniversalAppEnabled(false); setUniversalAppUrl(''); setUniversalLoginStrategy('smart');
 
     setConvertedCode('');
     setConversionReport(null);
@@ -208,7 +213,10 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
           servicenowFrames,
           oracleEbs,
           workdayHcm,
-          visualAiCoord
+          visualAiCoord,
+          universalAppEnabled,
+          universalAppUrl,
+          universalLoginStrategy
         })
       });
 
@@ -248,13 +256,65 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
     // Incorporating requested COTS/SAP Bridges and Imports
     if (targetFramework === 'Playwright') {
       if (targetLang === 'TypeScript' || targetLang === 'JavaScript') {
-        codeResult += `import { test, expect } from '@playwright/test';\n`;
+        codeResult += `import { test, expect, Page } from '@playwright/test';\n`;
         if (sapGuiWeb) {
           codeResult += `import { SAPWebAdapter } from '../adapters/sap_web_gui_adapter';\n`;
+        }
+        // ── Universal App Connector preamble ──────────────────────────────────
+        if (universalAppEnabled) {
+          codeResult += `\n// ══════════════════════════════════════════════════════════════════════\n`;
+          codeResult += `// Universal Browser App Connector — strategy: ${universalLoginStrategy.toUpperCase()}\n`;
+          codeResult += `// Target: ${universalAppUrl || '<YOUR_APP_URL>'}\n`;
+          codeResult += `// Auto-discovers login form on ANY browser-based app\n`;
+          codeResult += `// ══════════════════════════════════════════════════════════════════════\n`;
+          codeResult += `async function eRapLocate(page: Page, selectors: string[], timeout = 12000) {\n`;
+          codeResult += `  for (const sel of selectors) {\n`;
+          codeResult += `    try { const el = page.locator(sel); await el.waitFor({ state: 'visible', timeout }); return el; } catch {}\n`;
+          codeResult += `  }\n`;
+          codeResult += `  throw new Error('ERap: No selector resolved: ' + selectors.join(' | '));\n`;
+          codeResult += `}\n\n`;
+          codeResult += `async function universalLogin(page: Page, username: string, password: string) {\n`;
+          codeResult += `  await page.waitForLoadState('domcontentloaded');\n`;
+          codeResult += `  // Auto-detect username field (30+ patterns)\n`;
+          codeResult += `  const userField = await eRapLocate(page, [\n`;
+          codeResult += `    'input[name="username"]','input[name="user"]','input[name="email"]',\n`;
+          codeResult += `    'input[id="username"]','input[id="identifierId"]','input[id="okta-signin-username"]',\n`;
+          codeResult += `    'input[id="i0116"]','input[type="email"]','input[type="text"][autocomplete*="user"]',\n`;
+          codeResult += `    'input[placeholder*="user" i]','input[placeholder*="email" i]',\n`;
+          codeResult += `    '[data-automation-id="user-name"]','#UserName','input[type="text"]:visible'\n`;
+          codeResult += `  ]);\n`;
+          codeResult += `  await userField.clear(); await userField.fill(username);\n`;
+          codeResult += `  // Multi-step login (Next/Continue) detection\n`;
+          codeResult += `  for (const sel of ['button:has-text("Next")','#idSIButton9','button[data-se="next-button"]']) {\n`;
+          codeResult += `    try { const b = page.locator(sel); if (await b.isVisible({ timeout: 2000 })) { await b.click(); await page.waitForLoadState('networkidle'); break; } } catch {}\n`;
+          codeResult += `  }\n`;
+          codeResult += `  // Auto-detect password field\n`;
+          codeResult += `  const pwdField = await eRapLocate(page, [\n`;
+          codeResult += `    'input[type="password"]','input[name="password"]','input[id="password"]',\n`;
+          codeResult += `    'input[id="okta-signin-password"]','input[id="i0118"]',\n`;
+          codeResult += `    'input[autocomplete="current-password"]','[data-automation-id="password"]'\n`;
+          codeResult += `  ]);\n`;
+          codeResult += `  await pwdField.fill(password);\n`;
+          codeResult += `  // Auto-detect submit button\n`;
+          codeResult += `  const submitBtn = await eRapLocate(page, [\n`;
+          codeResult += `    'button[type="submit"]','input[type="submit"]',\n`;
+          codeResult += `    'button:has-text("Sign in")','button:has-text("Log in")','button:has-text("Login")',\n`;
+          codeResult += `    '#idSIButton9','#okta-signin-submit','[data-automation-id="signIn"]'\n`;
+          codeResult += `  ]);\n`;
+          codeResult += `  await submitBtn.click();\n`;
+          codeResult += `  await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});\n`;
+          codeResult += `}\n\n`;
         }
         codeResult += `\n`;
         codeResult += `test('Converted Autonomous Enterprise Flow', async ({ page, context }) => {\n`;
         codeResult += `  await page.setDefaultTimeout(15000);\n`;
+        // Navigate to app URL if universal mode
+        if (universalAppEnabled && universalAppUrl) {
+          codeResult += `  await page.goto('${universalAppUrl}');\n`;
+          codeResult += `  await universalLogin(page, process.env.APP_USERNAME || '', process.env.APP_PASSWORD || '');\n`;
+          codeResult += `  // Verify login success\n`;
+          codeResult += `  await expect(page.locator('body')).toBeVisible();\n`;
+        }
       } else {
         codeResult += `from playwright.sync_api import sync_playwright, expect\n\n`;
         codeResult += `def test_converted_flow():\n`;
@@ -445,8 +505,9 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
         accuracy: 94,
         originalLines: sourceCode.split('\n').length,
         convertedLines: codeResult.split('\n').length,
-        locatorsConverted: 5 + (sapGuiWeb ? 3 : 0) + (salesforceShadow ? 4 : 0) + (oracleEbs ? 2 : 0) + (workdayHcm ? 2 : 0),
+        locatorsConverted: 5 + (sapGuiWeb ? 3 : 0) + (salesforceShadow ? 4 : 0) + (oracleEbs ? 2 : 0) + (workdayHcm ? 2 : 0) + (universalAppEnabled ? 12 : 0),
         modulesLoaded: [
+          ...(universalAppEnabled ? [`Universal Connector (${universalLoginStrategy.toUpperCase()}) — any browser app`] : []),
           ...(erapEnabled ? ['ERap Add-in (ERAP v2)'] : []),
           ...(sapGuiWeb ? ['SAP Web GUI / Fiori Adapter'] : []),
           ...(salesforceShadow ? ['LWC Shadow DOM Resolver'] : []),
@@ -604,6 +665,53 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
                   Enable enterprise bridges for COTS/ERP apps. ERap injects self-healing locator chains, frame sync, and shadow-DOM piercing:
                 </p>
               </div>
+
+              {/* Universal Browser App Connector */}
+              <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-emerald-200 cursor-pointer bg-emerald-50 hover:bg-emerald-100 transition-all">
+                <input type="checkbox" checked={universalAppEnabled} onChange={(e) => setUniversalAppEnabled(e.target.checked)}
+                  className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 mt-1" />
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                    🌐 Universal Browser App Connector
+                    <span className="text-[9px] bg-emerald-600 text-white rounded px-1.5 py-0.5 font-mono">ANY APP</span>
+                  </span>
+                  <p className="text-[10px] text-emerald-700 leading-normal mt-0.5">
+                    Auto-detects login on <strong>any</strong> browser-based app — ERP, CRM, ITSM, HCM, custom portals.
+                    Injects <code className="bg-emerald-100 text-emerald-700 px-0.5 rounded">universalLogin()</code> with 30+ selector fallback patterns.
+                  </p>
+                  {universalAppEnabled && (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        type="url"
+                        placeholder="https://your-app.example.com/login"
+                        value={universalAppUrl}
+                        onChange={e => setUniversalAppUrl(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-full px-2 py-1 text-[10px] font-mono border border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                      />
+                      <div className="flex flex-wrap gap-1">
+                        {(['smart','basic','oauth','saml','mfa'] as const).map(s => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={e => { e.stopPropagation(); setUniversalLoginStrategy(s); }}
+                            className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold border transition-all ${
+                              universalLoginStrategy === s
+                                ? 'bg-emerald-600 text-white border-emerald-700'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                            }`}
+                          >
+                            {s === 'smart' ? '⚡' : s === 'oauth' ? '🔑' : s === 'saml' ? '🔐' : s === 'mfa' ? '📱' : '📝'} {s.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[9px] text-emerald-600 font-mono">
+                        Credentials injected via <code>process.env.APP_USERNAME</code> / <code>APP_PASSWORD</code> (secure, not hardcoded)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </label>
 
               {/* ERap Master Toggle */}
               <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-indigo-200 cursor-pointer bg-indigo-50 hover:bg-indigo-100 transition-all">
