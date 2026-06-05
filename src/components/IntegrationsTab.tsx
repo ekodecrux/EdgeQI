@@ -7,8 +7,8 @@ import {
 import { TestCase, RequirementDoc, DefectHotspot } from '../types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
-type TmsTool = 'jira' | 'testrail' | 'azuredevops' | 'qtest' | 'hpalm';
-type SyncOp = 'pull-reqs' | 'pull-tcs' | 'push-tcs' | 'push-defects';
+type TmsTool = 'jira' | 'testrail' | 'azuredevops' | 'qtest' | 'hpalm' | 'xray' | 'zephyr';
+type SyncOp = 'pull-reqs' | 'pull-tcs' | 'push-tcs' | 'push-defects' | 'push-results';
 
 interface SyncRecord {
   op: SyncOp;
@@ -27,19 +27,22 @@ interface IntegrationsProps {
 }
 
 // ── Tool Config ───────────────────────────────────────────────────────────────
-const TOOLS: { id: TmsTool; label: string; logo: string; color: string; demo: boolean; ops: SyncOp[] }[] = [
-  { id: 'jira',        label: 'Jira',         logo: '🟦', color: '#0052cc', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-defects'] },
-  { id: 'testrail',    label: 'TestRail',      logo: '🟧', color: '#e07b39', demo: true,  ops: ['pull-tcs', 'push-tcs'] },
-  { id: 'azuredevops', label: 'Azure DevOps',  logo: '🟪', color: '#0078d4', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-defects'] },
-  { id: 'qtest',       label: 'qTest',         logo: '🟩', color: '#00963f', demo: true,  ops: ['pull-tcs'] },
-  { id: 'hpalm',       label: 'HP ALM',        logo: '🟥', color: '#cf2124', demo: true,  ops: ['pull-tcs'] },
+const TOOLS: { id: TmsTool; label: string; logo: string; color: string; demo: boolean; ops: SyncOp[]; badge?: string }[] = [
+  { id: 'jira',        label: 'Jira',          logo: '🟦', color: '#0052cc', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-defects'] },
+  { id: 'xray',        label: 'Xray (Jira)',   logo: '🔷', color: '#0065FF', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-results'], badge: 'NEW' },
+  { id: 'zephyr',      label: 'Zephyr Scale',  logo: '🌀', color: '#00b4d8', demo: true,  ops: ['pull-tcs', 'push-tcs', 'push-results'], badge: 'NEW' },
+  { id: 'testrail',    label: 'TestRail',       logo: '🟧', color: '#e07b39', demo: true,  ops: ['pull-tcs', 'push-tcs'] },
+  { id: 'azuredevops', label: 'Azure DevOps',   logo: '🟪', color: '#0078d4', demo: true,  ops: ['pull-reqs', 'pull-tcs', 'push-tcs', 'push-defects'] },
+  { id: 'qtest',       label: 'qTest',          logo: '🟩', color: '#00963f', demo: true,  ops: ['pull-tcs'] },
+  { id: 'hpalm',       label: 'HP ALM',         logo: '🟥', color: '#cf2124', demo: true,  ops: ['pull-tcs'] },
 ];
 
 const OP_META: Record<SyncOp, { label: string; icon: React.FC<any>; dir: 'in' | 'out'; desc: string; color: string }> = {
-  'pull-reqs':    { label: 'Pull Requirements', icon: ArrowDown,    dir: 'in',  desc: 'Import Stories/Epics → EDGE QI Requirements', color: '#0ea5e9' },
-  'pull-tcs':     { label: 'Pull Test Cases',   icon: ArrowDown,    dir: 'in',  desc: 'Import test cases from TMS → EDGE QI',         color: '#6366f1' },
-  'push-tcs':     { label: 'Push Test Cases',   icon: ArrowUp,      dir: 'out', desc: 'Export EDGE QI test cases → TMS',              color: '#10b981' },
-  'push-defects': { label: 'Push Defects',      icon: ArrowUp,      dir: 'out', desc: 'Export defect hotspots → TMS as Bug items',    color: '#f59e0b' },
+  'pull-reqs':    { label: 'Pull Requirements', icon: ArrowDown,    dir: 'in',  desc: 'Import Stories/Epics → EDGE QI Requirements',     color: '#0ea5e9' },
+  'pull-tcs':     { label: 'Pull Test Cases',   icon: ArrowDown,    dir: 'in',  desc: 'Import test cases from TMS → EDGE QI',             color: '#6366f1' },
+  'push-tcs':     { label: 'Push Test Cases',   icon: ArrowUp,      dir: 'out', desc: 'Export EDGE QI test cases → TMS',                  color: '#10b981' },
+  'push-defects': { label: 'Push Defects',      icon: ArrowUp,      dir: 'out', desc: 'Export defect hotspots → TMS as Bug items',        color: '#f59e0b' },
+  'push-results': { label: 'Push Run Results',  icon: ArrowUp,      dir: 'out', desc: 'Upload execution results as Test Execution/Cycle',  color: '#a78bfa' },
 };
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -50,12 +53,14 @@ export default function IntegrationsTab({
   onAddRequirement,
   onAddTestCases,
 }: IntegrationsProps) {
-  const [activeTool, setActiveTool] = useState<TmsTool>('jira');
+  const [activeTool, setActiveTool] = useState<TmsTool>('xray');
   const [activeOp, setActiveOp] = useState<SyncOp>('pull-reqs');
 
   // Credentials state per tool
   const [creds, setCreds] = useState<Record<TmsTool, Record<string, string>>>({
     jira:        { url: '', email: '', token: '', projectKey: '' },
+    xray:        { url: '', email: '', token: '', projectKey: '', zephyrToken: '' },
+    zephyr:      { url: '', email: '', token: '', projectKey: '', zephyrToken: '' },
     testrail:    { url: '', email: '', token: '', projectId: '1' },
     azuredevops: { orgUrl: '', project: '', pat: '' },
     qtest:       { url: '', token: '', projectId: '' },
@@ -100,6 +105,17 @@ export default function IntegrationsTab({
         if (activeOp === 'pull-tcs')     { endpoint = '/api/quality/integrations/azure/sync';               body = base; }
         if (activeOp === 'push-tcs')     { endpoint = '/api/quality/integrations/azure/sync';               body = { ...base, testCaseIds: testCases.map(tc => tc.id) }; }
         if (activeOp === 'push-defects') { endpoint = '/api/quality/integrations/azure/push-defects';       body = { ...base, defects: defectHotspots }; }
+      } else if (activeTool === 'xray') {
+        const base = { jiraUrl: c.url, email: c.email, token: c.token, projectKey: c.projectKey };
+        if (activeOp === 'pull-reqs')    { endpoint = '/api/quality/integrations/xray/pull-requirements'; body = base; }
+        if (activeOp === 'pull-tcs')     { endpoint = '/api/quality/integrations/xray/pull-testcases';    body = base; }
+        if (activeOp === 'push-tcs')     { endpoint = '/api/quality/integrations/xray/push-testcases';    body = { ...base, testCases }; }
+        if (activeOp === 'push-results') { endpoint = '/api/quality/integrations/xray/push-results';      body = { ...base, runId: '' }; }
+      } else if (activeTool === 'zephyr') {
+        const base = { jiraUrl: c.url, email: c.email, token: c.token, zephyrToken: c.zephyrToken, projectKey: c.projectKey };
+        if (activeOp === 'pull-tcs')     { endpoint = '/api/quality/integrations/zephyr/pull-testcases';  body = base; }
+        if (activeOp === 'push-tcs')     { endpoint = '/api/quality/integrations/zephyr/push-testcases';  body = { ...base, testCases }; }
+        if (activeOp === 'push-results') { endpoint = '/api/quality/integrations/zephyr/push-results';    body = { ...base, runId: '' }; }
       } else if (activeTool === 'qtest') {
         endpoint = '/api/quality/integrations/qtest/pull-testcases';
         body = { qtestUrl: c.url, token: c.token, projectId: c.projectId };
@@ -134,6 +150,9 @@ export default function IntegrationsTab({
           onAddTestCases(tcs);
           setImportedCount(prev => ({ ...prev, tcs: prev.tcs + tcs.length }));
         }
+      } else if (activeOp === 'push-results') {
+        // push-results returns a single execution/cycle object, not an array
+        setResults([{ executionKey: data.executionKey, cycleKey: data.cycleKey, resultsLinked: data.resultsLinked, source: data.source }]);
       } else {
         setResults(data.results || data.items || []);
       }
@@ -217,6 +236,42 @@ export default function IntegrationsTab({
       </div>
     );
 
+    if (activeTool === 'xray') return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ background: '#0065FF15', border: '1px solid #0065FF30', borderRadius: 8, padding: '10px 14px' }}>
+          <p style={{ fontSize: 11, color: '#93c5fd', margin: 0 }}>
+            <strong>Xray for Jira</strong> — supports both <em>Xray Cloud</em> (Bearer JWT token) and <em>Xray Server/DC</em> (Jira Basic Auth).
+            Use your Jira instance URL + project key. Xray Cloud: generate a client token from Xray → Settings → API Keys.
+          </p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {inp('Jira Instance URL', 'url', 'https://yourcompany.atlassian.net')}
+          {inp('Project Key *', 'projectKey', 'PROJ')}
+          {inp('Email (Server/DC)', 'email', 'you@company.com')}
+          {inp('Jira API Token / Xray JWT', 'token', 'Atlassian token or Xray JWT...', 'password')}
+        </div>
+      </div>
+    );
+
+    if (activeTool === 'zephyr') return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ background: '#00b4d815', border: '1px solid #00b4d830', borderRadius: 8, padding: '10px 14px' }}>
+          <p style={{ fontSize: 11, color: '#67e8f9', margin: 0 }}>
+            <strong>Zephyr Scale (SmartBear)</strong> — for <em>Zephyr Scale Cloud</em>, generate an API access token from
+            Zephyr Scale → Settings → API Access Tokens and enter it in the Zephyr API Token field.
+            For <em>Zephyr for Jira Server</em>, use your Jira URL + Basic Auth credentials.
+          </p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {inp('Project Key *', 'projectKey', 'PROJ')}
+          {inp('Zephyr Scale API Token (Cloud)', 'zephyrToken', 'Bearer token from Zephyr Scale...', 'password')}
+          {inp('Jira URL (Server fallback)', 'url', 'https://yourcompany.atlassian.net')}
+          {inp('Jira Email (Server)', 'email', 'you@company.com')}
+          {inp('Jira API Token (Server)', 'token', 'Jira API token...', 'password')}
+        </div>
+      </div>
+    );
+
     if (activeTool === 'hpalm') return (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {inp('ALM Server URL', 'url', 'http://alm-server:8080/qcbin')}
@@ -236,6 +291,7 @@ export default function IntegrationsTab({
     const isIn = OP_META[activeOp].dir === 'in';
     const isPushDefects = activeOp === 'push-defects';
     const isPullReqs = activeOp === 'pull-reqs';
+    const isPushResults = activeOp === 'push-results';
 
     return (
       <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 16 }}>
@@ -264,6 +320,7 @@ export default function IntegrationsTab({
                 {activeOp === 'pull-tcs' && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>ID</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Title</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Priority</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Automation</th></>}
                 {activeOp === 'push-tcs' && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>EDGE QI ID</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>TMS Key/ID</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Title</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Status</th></>}
                 {isPushDefects && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Module</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>TMS Issue</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Risk Score</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Status</th></>}
+                {isPushResults && <><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Execution / Cycle Key</th><th style={{ textAlign: 'left', padding: '6px 10px 6px 0' }}>Results Linked</th><th style={{ textAlign: 'left', padding: '6px 0' }}>Source</th></>}
               </tr>
             </thead>
             <tbody>
@@ -301,6 +358,13 @@ export default function IntegrationsTab({
                       <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: r.status === 'created' ? '#10b981' : '#ef4444', background: r.status === 'created' ? '#10b98115' : '#ef444415', borderRadius: 4, padding: '2px 6px' }}>{r.status === 'created' ? '✓ Created' : '✗ Failed'}</span></td>
                     </>
                   )}
+                  {isPushResults && (
+                    <>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#a78bfa', fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontWeight: 700 }}>{r.executionKey || r.cycleKey || '—'}</td>
+                      <td style={{ padding: '7px 10px 7px 0', color: '#10b981' }}>{r.resultsLinked ?? '—'} tests</td>
+                      <td style={{ padding: '7px 0' }}><span style={{ fontSize: 10, color: (r.source||'').includes('live') ? '#10b981' : '#f59e0b', background: (r.source||'').includes('live') ? '#10b98115' : '#f59e0b15', borderRadius: 4, padding: '2px 6px' }}>{(r.source||'').includes('live') ? '✅ Live' : '🎭 Demo'}</span></td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -322,7 +386,7 @@ export default function IntegrationsTab({
           </div>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>TMS Integrations</h1>
-            <p style={{ fontSize: 12, color: '#475569', margin: 0 }}>Bidirectional sync with Jira, TestRail, Azure DevOps, qTest, HP ALM</p>
+            <p style={{ fontSize: 12, color: '#475569', margin: 0 }}>Bidirectional sync with Jira, Xray, Zephyr Scale, TestRail, Azure DevOps, qTest, HP ALM</p>
           </div>
         </div>
         {/* Live stats */}
@@ -358,7 +422,10 @@ export default function IntegrationsTab({
             >
               <span style={{ fontSize: 20 }}>{t.logo}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: activeTool === t.id ? '#f1f5f9' : '#94a3b8' }}>{t.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: activeTool === t.id ? '#f1f5f9' : '#94a3b8' }}>{t.label}</span>
+                  {t.badge && <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', background: '#10b981', borderRadius: 4, padding: '1px 5px', letterSpacing: '0.04em' }}>{t.badge}</span>}
+                </div>
                 <div style={{ fontSize: 10, color: '#64748b' }}>
                   {t.ops.length} operation{t.ops.length !== 1 ? 's' : ''} · {t.demo ? 'Demo ✓' : 'Live only'}
                 </div>
@@ -549,7 +616,7 @@ export default function IntegrationsTab({
           <Database style={{ width: 15, height: 15, color: '#475569' }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Integration Coverage</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
           {TOOLS.map(t => (
             <div key={t.id} style={{ background: '#0a0f1a', border: `1px solid ${t.color}30`, borderRadius: 10, padding: '12px 10px', textAlign: 'center' }}>
               <div style={{ fontSize: 24, marginBottom: 4 }}>{t.logo}</div>

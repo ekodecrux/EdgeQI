@@ -228,6 +228,14 @@ export default function ExecutionEnginePage({
   // Tool availability from /api/quality/tools/status
   const [toolsAvailability, setToolsAvailability] = useState<Record<string, boolean>>({});
   const [toolsStatusLoaded, setToolsStatusLoaded] = useState(false);
+  // COTS / ERap execution flags
+  const [erapEnabled, setErapEnabled] = useState(false);
+  const [cotsAppType, setCotsAppType] = useState<'none' | 'sap' | 'salesforce' | 'servicenow' | 'oracle' | 'workday'>('none');
+  const [sapGuiWeb, setSapGuiWeb] = useState(false);
+  const [salesforceShadow, setSalesforceShadow] = useState(false);
+  const [servicenowFrames, setServicenowFrames] = useState(false);
+  const [visualAiCoord, setVisualAiCoord] = useState(false);
+  const [showCotsPanel, setShowCotsPanel] = useState(false);
 
   // SSE streaming state (REQ-55)
   const [sseRunId, setSseRunId] = useState('');
@@ -579,7 +587,13 @@ export default function ExecutionEnginePage({
           testCaseIds: [],
           framework: execTool === 'playwright' ? 'Playwright' : execTool === 'robot' ? 'Robot Framework' : execTool === 'selenium' ? 'Selenium' : 'Cypress',
           browser: 'Chromium',
-          workers: parallelWorkers
+          workers: parallelWorkers,
+          erapEnabled,
+          cotsAppType,
+          sapGuiWeb,
+          salesforceShadow,
+          servicenowFrames,
+          visualAiCoord
         })
       });
       const data = await res.json();
@@ -603,7 +617,17 @@ export default function ExecutionEnginePage({
       const res = await fetch(apiUrl('/api/quality/execution/tool-run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
-        body: JSON.stringify({ tool: execTool, workers: parallelWorkers, targetUrl: '' })
+        body: JSON.stringify({
+          tool: execTool,
+          workers: parallelWorkers,
+          targetUrl: '',
+          erapEnabled,
+          cotsAppType,
+          sapGuiWeb,
+          salesforceShadow,
+          servicenowFrames,
+          visualAiCoord
+        })
       });
       const data = await res.json();
       setToolRunResult(data);
@@ -1294,6 +1318,135 @@ export default function ExecutionEnginePage({
                 {execTool === 'selenium' && (toolsAvailability['selenium'] ? '✅ Selenium + pytest installed · Python test runner' : '❌ Selenium/pytest not found — install via pip3 install selenium pytest')}
                 {execTool === 'cypress' && (toolsAvailability['cypress'] ? '✅ Cypress installed · E2E browser tests' : '❌ Cypress not installed — run: npm install cypress')}
               </p>
+            </div>
+
+            {/* ── COTS / ERap Automation Panel ── */}
+            <div className="border border-indigo-200 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50">
+              <button
+                onClick={() => setShowCotsPanel(p => !p)}
+                className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="text-xs font-mono font-bold text-indigo-800">COTS / ERap Automation Add-ons</span>
+                  {(erapEnabled || cotsAppType !== 'none' || sapGuiWeb || salesforceShadow || servicenowFrames || visualAiCoord) && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-mono font-bold">
+                      ACTIVE
+                    </span>
+                  )}
+                </div>
+                <span className="text-slate-400 text-xs">{showCotsPanel ? '▲' : '▼'}</span>
+              </button>
+
+              {showCotsPanel && (
+                <div className="px-3 pb-3 space-y-3">
+
+                  {/* ERap master toggle */}
+                  <div className="flex items-start gap-3 p-2.5 bg-white border border-indigo-200 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="exec-erap"
+                      checked={erapEnabled}
+                      onChange={e => setErapEnabled(e.target.checked)}
+                      className="mt-0.5 accent-indigo-600"
+                    />
+                    <label htmlFor="exec-erap" className="cursor-pointer flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono font-bold text-indigo-800">ERap Add-in</span>
+                        <span className="inline-flex items-center px-1 py-0 rounded bg-indigo-600 text-white text-[8px] font-mono font-bold">MASTER</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Injects <code className="bg-slate-100 px-0.5 rounded">eRapLocate()</code> self-healing selector chains into every Playwright test — ERAP v2</p>
+                    </label>
+                  </div>
+
+                  {/* COTS App Type selector */}
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1.5 font-bold">Target COTS Application</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                      {([
+                        { id: 'none',        label: 'None',       icon: '—' },
+                        { id: 'sap',         label: 'SAP',        icon: '🏗' },
+                        { id: 'salesforce',  label: 'Salesforce', icon: '☁' },
+                        { id: 'servicenow',  label: 'ServiceNow', icon: '🔧' },
+                        { id: 'oracle',      label: 'Oracle EBS', icon: '🔶' },
+                        { id: 'workday',     label: 'Workday',    icon: '💼' },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setCotsAppType(opt.id)}
+                          className={`flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-lg border text-[10px] font-mono font-bold transition-all ${
+                            cotsAppType === opt.id
+                              ? 'ring-2 ring-indigo-500 bg-indigo-50 border-indigo-300 text-indigo-800'
+                              : 'border-slate-200 text-slate-500 bg-white hover:border-indigo-200'
+                          }`}
+                        >
+                          <span>{opt.icon}</span>
+                          <span className="text-[9px]">{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-mono mt-1">
+                      {cotsAppType === 'sap' && '🏗 SAP Fiori Bridge — sapFrame(), sapFill(), sapClick() helpers injected'}
+                      {cotsAppType === 'salesforce' && '☁ Salesforce LWC Shadow DOM — sfLocator(), sfNavigate() deep-pierce helpers'}
+                      {cotsAppType === 'servicenow' && '🔧 ServiceNow #gsft_main frame — snFrame(), snFill() iframe stabilizers'}
+                      {cotsAppType === 'oracle' && '🔶 Oracle EBS / Fusion — oraFrame() helper + EBS navigation adapters'}
+                      {cotsAppType === 'workday' && '💼 Workday HCM / Finance — wdLocator() using [data-automation-id] selectors'}
+                      {cotsAppType === 'none' && 'No COTS adapter. Standard web Playwright execution.'}
+                    </p>
+                  </div>
+
+                  {/* Individual add-in checkboxes */}
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1.5 font-bold">Individual Add-ins</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {[
+                        {
+                          id: 'sapGuiWeb',
+                          checked: sapGuiWeb,
+                          set: setSapGuiWeb,
+                          label: 'SAP Web GUI / Fiori Bridge',
+                          desc: 'sapFrame(), sapFill(), sapClick() — iframe-based SAP navigation'
+                        },
+                        {
+                          id: 'salesforceShadow',
+                          checked: salesforceShadow,
+                          set: setSalesforceShadow,
+                          label: 'Salesforce LWC Shadow DOM',
+                          desc: 'sfLocator() >>> deep-pierce + sfNavigate() App Launcher'
+                        },
+                        {
+                          id: 'servicenowFrames',
+                          checked: servicenowFrames,
+                          set: setServicenowFrames,
+                          label: 'ServiceNow Frame Stabilizer',
+                          desc: 'snFrame() + snFill() for #gsft_main iframe forms'
+                        },
+                        {
+                          id: 'visualAiCoord',
+                          checked: visualAiCoord,
+                          set: setVisualAiCoord,
+                          label: 'Visual AI OCR Anchor',
+                          desc: 'visualClick() coordinate fallback when all selectors fail'
+                        },
+                      ].map(item => (
+                        <label key={item.id} className="flex items-start gap-2 p-2 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-indigo-200 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={item.checked}
+                            onChange={e => item.set(e.target.checked)}
+                            className="mt-0.5 accent-indigo-600"
+                          />
+                          <div>
+                            <p className="text-[10px] font-mono font-bold text-slate-700">{item.label}</p>
+                            <p className="text-[9px] text-slate-400">{item.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

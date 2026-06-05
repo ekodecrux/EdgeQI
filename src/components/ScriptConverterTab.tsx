@@ -151,9 +151,12 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
   const [targetLang, setTargetLang] = useState<string>('TypeScript');
   
   // Enterprise COTS application parameters
+  const [erapEnabled, setErapEnabled] = useState(false);
   const [sapGuiWeb, setSapGuiWeb] = useState(false);
   const [salesforceShadow, setSalesforceShadow] = useState(false);
   const [servicenowFrames, setServicenowFrames] = useState(false);
+  const [oracleEbs, setOracleEbs] = useState(false);
+  const [workdayHcm, setWorkdayHcm] = useState(false);
   const [visualAiCoord, setVisualAiCoord] = useState(false);
 
   // Stats / state managers
@@ -177,6 +180,7 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
     setSalesforceShadow(t.cotsAddons.salesforceShadow);
     setServicenowFrames(t.cotsAddons.servicenowFrames);
     setVisualAiCoord(t.cotsAddons.visualAiCoord);
+    setErapEnabled(false); setOracleEbs(false); setWorkdayHcm(false);
 
     setConvertedCode('');
     setConversionReport(null);
@@ -198,9 +202,12 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
           sourceLang,
           targetFramework,
           targetLang,
+          erapEnabled,
           sapGuiWeb,
           salesforceShadow,
           servicenowFrames,
+          oracleEbs,
+          workdayHcm,
           visualAiCoord
         })
       });
@@ -438,12 +445,15 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
         accuracy: 94,
         originalLines: sourceCode.split('\n').length,
         convertedLines: codeResult.split('\n').length,
-        locatorsConverted: 5 + (sapGuiWeb ? 3 : 0) + (salesforceShadow ? 4 : 0),
+        locatorsConverted: 5 + (sapGuiWeb ? 3 : 0) + (salesforceShadow ? 4 : 0) + (oracleEbs ? 2 : 0) + (workdayHcm ? 2 : 0),
         modulesLoaded: [
-          ...(sapGuiWeb ? ['SAP Web GUI Adapter'] : []),
-          ...(salesforceShadow ? ['Lightning Root Resolver'] : []),
-          ...(servicenowFrames ? ['Frame Synchronizer'] : []),
-          ...(visualAiCoord ? ['OCR Canvas Anchoring'] : [])
+          ...(erapEnabled ? ['ERap Add-in (ERAP v2)'] : []),
+          ...(sapGuiWeb ? ['SAP Web GUI / Fiori Adapter'] : []),
+          ...(salesforceShadow ? ['LWC Shadow DOM Resolver'] : []),
+          ...(servicenowFrames ? ['ServiceNow Frame Stabilizer'] : []),
+          ...(oracleEbs ? ['Oracle EBS / Fusion Adapter'] : []),
+          ...(workdayHcm ? ['Workday HCM Adapter'] : []),
+          ...(visualAiCoord ? ['Visual AI OCR Anchor'] : [])
         ],
         details: 'Constructed custom transpile logic using localized QE templates with active bridge libraries.'
       });
@@ -588,81 +598,96 @@ export default function ScriptConverterTab({}: ScriptConverterTabProps) {
               <div>
                 <h4 className="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-bold flex items-center gap-1.5 mb-1.5">
                   <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                  COTS & SAP Automation Add-ons
+                  COTS &amp; ERap Automation Add-ons
                 </h4>
                 <p className="text-[10px] text-slate-500 leading-normal mb-3">
-                  Check platforms to append active robust bridges. Addresses COTS limitations with custom dynamic resolution wrappers:
+                  Enable enterprise bridges for COTS/ERP apps. ERap injects self-healing locator chains, frame sync, and shadow-DOM piercing:
                 </p>
               </div>
 
+              {/* ERap Master Toggle */}
+              <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-indigo-200 cursor-pointer bg-indigo-50 hover:bg-indigo-100 transition-all">
+                <input type="checkbox" checked={erapEnabled} onChange={(e) => setErapEnabled(e.target.checked)}
+                  className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 mt-1" />
+                <div>
+                  <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                    ⚡ ERap Add-in (Enterprise Resource Automation Protocol)
+                    <span className="text-[9px] bg-indigo-600 text-white rounded px-1.5 py-0.5 font-mono">MASTER</span>
+                  </span>
+                  <p className="text-[10px] text-indigo-700 leading-normal mt-0.5">
+                    Injects <code className="bg-indigo-100 text-indigo-700 px-0.5 rounded">eRapLocate()</code> self-healing fallback selector chains, ERap retry wrappers, and resilient wait strategies for all ERP/COTS UIs.
+                  </p>
+                </div>
+              </label>
+
               {/* SAP GUI Web Client */}
               <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-all">
-                <input
-                  type="checkbox"
-                  checked={sapGuiWeb}
-                  onChange={(e) => setSapGuiWeb(e.target.checked)}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1"
-                />
+                <input type="checkbox" checked={sapGuiWeb} onChange={(e) => setSapGuiWeb(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1" />
                 <div>
-                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    SAP Web GUI Client Bridge
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">SAP Web GUI / Fiori Bridge</span>
                   <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
-                    Resolves nested sap-iframe contexts and auto-binds SAP control locator attributes.
+                    Resolves nested <code className="bg-slate-100 text-purple-600 px-0.5 rounded">sap-iframe-layer</code> contexts, SAP Fiori launchpad, and auto-binds <code className="bg-slate-100 text-purple-600 px-0.5 rounded">data-sap-ui</code> locators.
                   </p>
                 </div>
               </label>
 
               {/* Salesforce Shadow Root */}
               <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-all">
-                <input
-                  type="checkbox"
-                  checked={salesforceShadow}
-                  onChange={(e) => setSalesforceShadow(e.target.checked)}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1"
-                />
+                <input type="checkbox" checked={salesforceShadow} onChange={(e) => setSalesforceShadow(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1" />
                 <div>
-                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    Salesforce Shadow DOM Resolver
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">Salesforce LWC Shadow DOM Resolver</span>
                   <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
-                    Enables deep query selector chains (<code className="bg-slate-100 text-purple-600 px-0.5 rounded">&gt;&gt;&gt;</code>) to bypass LWC custom shadow roots.
+                    Deep <code className="bg-slate-100 text-purple-600 px-0.5 rounded">&gt;&gt;&gt;</code> pierce chains for Lightning Web Components. Includes <code className="bg-slate-100 text-purple-600 px-0.5 rounded">sfNavigate()</code> helper.
                   </p>
                 </div>
               </label>
 
               {/* ServiceNow Frames */}
               <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-all">
-                <input
-                  type="checkbox"
-                  checked={servicenowFrames}
-                  onChange={(e) => setServicenowFrames(e.target.checked)}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1"
-                />
+                <input type="checkbox" checked={servicenowFrames} onChange={(e) => setServicenowFrames(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1" />
                 <div>
-                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    ServiceNow Frame Stabilizer
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">ServiceNow Frame Stabilizer</span>
                   <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
-                    Handles dynamic <code className="bg-slate-100 text-purple-600 px-0.5 rounded">#gsft_main</code> frames and wait structures on loading panels.
+                    Handles <code className="bg-slate-100 text-purple-600 px-0.5 rounded">#gsft_main</code> frame sync, modal waits, and <code className="bg-slate-100 text-purple-600 px-0.5 rounded">snFill()</code> helper.
+                  </p>
+                </div>
+              </label>
+
+              {/* Oracle EBS */}
+              <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-all">
+                <input type="checkbox" checked={oracleEbs} onChange={(e) => setOracleEbs(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1" />
+                <div>
+                  <span className="text-xs font-bold text-slate-900">Oracle EBS / Fusion Adapter</span>
+                  <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
+                    Resolves Oracle Forms <code className="bg-slate-100 text-purple-600 px-0.5 rounded">#mainBody</code> frame and OAF page transitions.
+                  </p>
+                </div>
+              </label>
+
+              {/* Workday HCM */}
+              <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-all">
+                <input type="checkbox" checked={workdayHcm} onChange={(e) => setWorkdayHcm(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1" />
+                <div>
+                  <span className="text-xs font-bold text-slate-900">Workday HCM / Finance Adapter</span>
+                  <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
+                    Uses <code className="bg-slate-100 text-purple-600 px-0.5 rounded">[data-automation-id]</code> locators and <code className="bg-slate-100 text-purple-600 px-0.5 rounded">wdLocator()</code> helper for Workday web components.
                   </p>
                 </div>
               </label>
 
               {/* OCR Coordinate mapping */}
               <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-all">
-                <input
-                  type="checkbox"
-                  checked={visualAiCoord}
-                  onChange={(e) => setVisualAiCoord(e.target.checked)}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1"
-                />
+                <input type="checkbox" checked={visualAiCoord} onChange={(e) => setVisualAiCoord(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 mt-1" />
                 <div>
-                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    Visual AI OCR Coordinate Anchor
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">Visual AI OCR Coordinate Anchor</span>
                   <p className="text-[10px] text-slate-500 leading-normal mt-0.5">
-                    Appends fallback pixel offset calculations for canvas and custom dynamic graph containers.
+                    Bounding-box click fallback for canvas, chart, and dynamic graph containers.
                   </p>
                 </div>
               </label>
