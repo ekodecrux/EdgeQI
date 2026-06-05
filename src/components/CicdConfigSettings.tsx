@@ -15,6 +15,7 @@ import {
   Settings2, Activity,
 } from 'lucide-react';
 import { apiUrl } from '@/src/config/api';
+import CicdTriggerSettings from './CicdTriggerSettings';
 
 // ── Provider definitions ──────────────────────────────────────────────────────
 
@@ -554,6 +555,25 @@ export default function CicdConfigSettings() {
             })}
           </div>
         )}
+      </div>
+
+      {/* ── Manual Kickstart + Auto-Trigger Policy ──────────────────────────── */}
+      <div className="glass-card p-5 border border-slate-200">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-slate-800 to-slate-700 text-white">
+            <Settings2 className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Execution Trigger Settings</h3>
+            <p className="text-[11px] text-slate-500">
+              Manually kick off test suites or define auto-trigger rules for incoming CI/CD events
+            </p>
+          </div>
+        </div>
+        <CicdTriggerSettings
+          hasActiveConfig={!!activeCfg}
+          providerLabel={activeProvider?.name || 'CI/CD'}
+        />
       </div>
 
       {/* ── Quality gate integration info ─────────────────────────────────────── */}

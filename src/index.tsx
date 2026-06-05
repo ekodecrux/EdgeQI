@@ -20,7 +20,7 @@ const INDEX_HTML = `<!doctype html>
     <div id="root"></div>
     <!-- API_BASE: Railway backend URL. Primary CF: https://edgeqi.parimi-prasad.workers.dev -->
     <script>window.__API_BASE__ = "https://web-production-db4b5.up.railway.app";</script>
-    <script type="module" src="/assets/index-CWKJBorM.js"></script>
+    <script type="module" src="/assets/index-BE68552B.js"></script>
   </body>
 </html>`;
 

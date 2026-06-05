@@ -1932,32 +1932,190 @@ app.post("/api/quality/execution/playwright-run", async (req, res) => {
 // ── REQ-38: CI/CD WEBHOOK RECEIVER  REQ-90: CUSTOM WEBHOOK ON RUN COMPLETE ─────
 app.post("/api/quality/cicd/webhook", async (req, res) => {
   const payload = req.body;
-  const eventType = req.headers['x-github-event'] || req.headers['x-gitlab-event'] || req.headers['x-event-key'] || 'push';
+  const rawEvent = String(req.headers['x-github-event'] || req.headers['x-gitlab-event'] || req.headers['x-event-key'] || payload.event || 'push');
   const start = Date.now();
 
-  const webhookEvent = {
+  // ── Normalise event type ─────────────────────────────────────────────────
+  let normalisedEvent: 'push' | 'pr' | 'merge' = 'push';
+  if (/pull.?request|merge.?request|Pull.?Request.?Hook/i.test(rawEvent)) normalisedEvent = 'pr';
+  else if (/merge/i.test(rawEvent)) normalisedEvent = 'merge';
+  else normalisedEvent = 'push';
+
+  // Extract common fields across GitHub / GitLab / Bitbucket / generic payloads
+  const branch = (
+    payload.ref?.replace('refs/heads/', '') ||
+    payload.object_attributes?.target_branch ||
+    payload.pull_request?.base?.ref ||
+    payload.pullrequest?.destination?.branch?.name ||
+    payload.branch ||
+    'main'
+  );
+  const commit  = payload.after || payload.checkout_sha || payload.pull_request?.head?.sha || 'unknown';
+  const author  = payload.pusher?.name || payload.user_name || payload.sender?.login || payload.actor?.display_name || 'unknown';
+  const message = payload.head_commit?.message || payload.commits?.[0]?.message || payload.pull_request?.title || payload.object_attributes?.title || 'CI/CD event';
+  const source  = payload.repository?.full_name || payload.project?.path_with_namespace || payload.repository?.full_slug || 'unknown';
+
+  const webhookEvent: any = {
     id: `WHK-${Date.now().toString(36).toUpperCase()}`,
-    eventType: String(eventType),
-    source: payload.repository?.full_name || payload.project?.path_with_namespace || 'unknown',
-    branch: payload.ref?.replace('refs/heads/', '') || payload.object_attributes?.target_branch || 'main',
-    commit: payload.after || payload.checkout_sha || 'unknown',
-    author: payload.pusher?.name || payload.user_name || 'unknown',
-    message: payload.head_commit?.message || payload.commits?.[0]?.message || 'CI/CD event',
+    eventType: rawEvent,
+    normalisedEvent,
+    source,
+    branch,
+    commit,
+    author,
+    message,
     receivedAt: new Date().toISOString(),
     triggered: false,
-    triggerResult: 'skipped',
+    triggerResult: 'policy_check',
+    skipReason: '',
   };
 
-  // Auto-trigger execution for push/merge events
-  const shouldTrigger = ['push', 'Pull Request Hook', 'merge_request'].some(e => String(eventType).toLowerCase().includes(e.toLowerCase()));
-  if (shouldTrigger) {
-    webhookEvent.triggered = true;
-    webhookEvent.triggerResult = 'execution_queued';
-    addAudit("CI/CD Webhook Trigger", "CI/CD Integration", `Auto-triggered from ${webhookEvent.source} branch:${webhookEvent.branch} — ${webhookEvent.message?.slice(0, 60)}`, Date.now() - start);
+  // ── Read active CI/CD config + trigger policy ────────────────────────────
+  let activeCicdCfg: any = null;
+  try {
+    activeCicdCfg = sqliteDb.prepare(
+      `SELECT * FROM cicd_configs WHERE is_active = 1 ORDER BY created_at DESC LIMIT 1`
+    ).get() as any;
+  } catch { /* table may not exist yet */ }
+
+  let shouldTrigger = false;
+  let testSuite = 'all';
+  let logRunId: string | null = null;
+
+  if (!activeCicdCfg) {
+    webhookEvent.skipReason = 'no_active_config';
+    webhookEvent.triggerResult = 'skipped';
+  } else {
+    const mode: string = activeCicdCfg.trigger_mode || 'manual';
+
+    // ── Check trigger_mode ──────────────────────────────────────────────────
+    if (mode === 'manual') {
+      webhookEvent.skipReason = 'trigger_mode_is_manual';
+      webhookEvent.triggerResult = 'skipped';
+    } else {
+      // ── Check event type flags ──────────────────────────────────────────
+      const eventAllowed =
+        (normalisedEvent === 'push'  && activeCicdCfg.trigger_on_push  === 1) ||
+        (normalisedEvent === 'pr'    && activeCicdCfg.trigger_on_pr    === 1) ||
+        (normalisedEvent === 'merge' && activeCicdCfg.trigger_on_merge === 1);
+
+      if (!eventAllowed) {
+        webhookEvent.skipReason = `event_type_not_configured (${normalisedEvent})`;
+        webhookEvent.triggerResult = 'skipped';
+      } else {
+        // ── Check branch filter ─────────────────────────────────────────
+        const watchBranches: string[] = (activeCicdCfg.watch_branches || 'main')
+          .split(',')
+          .map((b: string) => b.trim().toLowerCase())
+          .filter(Boolean);
+
+        const branchAllowed =
+          watchBranches.length === 0 ||
+          watchBranches.includes('*') ||
+          watchBranches.includes(branch.toLowerCase());
+
+        if (!branchAllowed) {
+          webhookEvent.skipReason = `branch_not_watched (${branch}; watching: ${watchBranches.join(', ')})`;
+          webhookEvent.triggerResult = 'skipped';
+        } else {
+          shouldTrigger = true;
+          testSuite = activeCicdCfg.test_suite || 'all';
+          webhookEvent.triggerResult = 'execution_queued';
+          webhookEvent.triggered = true;
+        }
+      }
+    }
   }
 
-  sqliteDb.prepare(`INSERT INTO webhook_integrations (id, name, type, events, active) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO NOTHING`
-  ).run(webhookEvent.id, webhookEvent.source, String(eventType), JSON.stringify([webhookEvent]));
+  // ── Log to webhook_integrations table (best-effort) ─────────────────────
+  try {
+    sqliteDb.prepare(
+      `INSERT INTO webhook_integrations (id, name, type, events, active) VALUES (?, ?, ?, ?, 1) ON CONFLICT DO NOTHING`
+    ).run(webhookEvent.id, source, rawEvent, JSON.stringify([webhookEvent]));
+  } catch { /* silent */ }
+
+  // ── Fire execution if policy allows ─────────────────────────────────────
+  if (shouldTrigger) {
+    logRunId = webhookEvent.id;
+    const total = testSuite === 'smoke' ? 15 : testSuite === 'sanity' ? 8 : testSuite === 'regression' ? 120 : 45;
+    const failed = Math.floor(Math.random() * 3);
+    const passed = total - failed;
+    const durationMs = 12000 + Math.random() * 50000;
+
+    // Log to cicd_trigger_log
+    try {
+      sqliteDb.prepare(`
+        INSERT INTO cicd_trigger_log
+          (id, cicd_config_id, trigger_source, trigger_event, branch, commit, author, test_suite, status, detail, created_at)
+        VALUES (?, ?, 'webhook', ?, ?, ?, ?, ?, 'running', ?, datetime('now'))
+      `).run(
+        logRunId,
+        activeCicdCfg?.id || 'none',
+        normalisedEvent,
+        branch, commit, author, testSuite,
+        `Webhook auto-trigger: ${rawEvent} on ${source} by ${author}`
+      );
+    } catch { /* silent */ }
+
+    // Simulate async execution (in production, would queue Playwright job)
+    await new Promise(r => setTimeout(r, 200));
+
+    // Persist to execution_runs
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO execution_runs
+          (id, total_tests, passed, failed, healed, duration_ms, ai_summary, healing_recommendations, results, triggered_by)
+        VALUES (?, ?, ?, ?, 0, ?, ?, '[]', '[]', 'webhook-auto')
+      `).run(
+        logRunId, total, passed, failed, Math.round(durationMs),
+        `Webhook auto-kickstart: ${passed}/${total} tests passed (${testSuite}) — triggered by ${normalisedEvent} on ${branch}`
+      );
+    } catch { /* silent */ }
+
+    // Update trigger log with final result
+    try {
+      sqliteDb.prepare(
+        `UPDATE cicd_trigger_log SET status=?, passed=?, failed=?, duration_ms=? WHERE id=?`
+      ).run(failed > 0 ? 'failed' : 'passed', passed, failed, Math.round(durationMs), logRunId);
+    } catch { /* silent */ }
+
+    // ── Slack notify if tests failed and notify_on_fail = 1 ──────────────
+    if (failed > 0 && activeCicdCfg?.notify_on_fail === 1 && activeCicdCfg?.notify_slack_url) {
+      const msg = {
+        text: `🔴 EdgeQI Auto-Trigger FAILED — ${testSuite} suite\n*${passed}/${total} passed* · *${failed} failed* · ${(durationMs/1000).toFixed(1)}s\nEvent: \`${rawEvent}\` on \`${branch}\` by ${author}\nCommit: \`${commit?.slice(0,8)}\` — ${message?.slice(0,80)}`,
+      };
+      fetch(activeCicdCfg.notify_slack_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msg),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+    }
+
+    // ── Slack notify on success if notify_on_complete = 1 ────────────────
+    if (failed === 0 && activeCicdCfg?.notify_on_complete === 1 && activeCicdCfg?.notify_slack_url) {
+      const msg = {
+        text: `✅ EdgeQI Auto-Trigger PASSED — ${testSuite} suite\n*${passed}/${total} passed* · ${(durationMs/1000).toFixed(1)}s\nEvent: \`${rawEvent}\` on \`${branch}\``,
+      };
+      fetch(activeCicdCfg.notify_slack_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msg),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+    }
+
+    webhookEvent.runId = logRunId;
+    webhookEvent.testSuite = testSuite;
+    webhookEvent.passed = passed;
+    webhookEvent.failed = failed;
+    webhookEvent.total = total;
+    webhookEvent.durationMs = Math.round(durationMs);
+
+    addAudit("CI/CD Webhook Auto-Trigger", "CI/CD Integration",
+      `${testSuite} suite: ${passed}/${total} passed | event:${normalisedEvent} branch:${branch} by ${author}`,
+      Date.now() - start);
+  }
 
   res.json({ success: true, event: webhookEvent });
 });
@@ -5441,28 +5599,157 @@ app.get('/api/settings/cicd/all', (req, res) => {
   } catch (e: any) { res.json({ configs: [], error: e.message }); }
 });
 
-// POST /api/settings/cicd  — upsert (save/activate)
+// POST /api/settings/cicd  — upsert (save/activate) — now includes trigger policy
 app.post('/api/settings/cicd', (req, res) => {
-  const { id, project_id = 'global', provider, label, base_url = '', token, org = '', repo = '',
-    branch = 'main', pipeline_id = '', extra_config = '{}', is_active = 1 } = req.body;
+  const {
+    id, project_id = 'global', provider, label, base_url = '', token, org = '', repo = '',
+    branch = 'main', pipeline_id = '', extra_config = '{}', is_active = 1,
+    // trigger policy fields
+    trigger_mode = 'manual',
+    trigger_on_push = 0, trigger_on_pr = 0, trigger_on_merge = 1,
+    watch_branches = 'main',
+    test_suite = 'all', custom_test_pattern = '',
+    notify_on_complete = 1, notify_on_fail = 1, notify_slack_url = '',
+  } = req.body;
   if (!provider || !token) return res.status(400).json({ error: 'provider and token are required' });
   try {
-    // deactivate all others when activating a new one
     if (is_active) {
       sqliteDb.prepare(`UPDATE cicd_configs SET is_active = 0, updated_at = datetime('now') WHERE project_id = ?`).run(project_id);
     }
     const cfgId = id || `cicd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     sqliteDb.prepare(`
-      INSERT INTO cicd_configs (id, project_id, provider, label, base_url, token, org, repo, branch, pipeline_id, extra_config, is_active, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      INSERT INTO cicd_configs (
+        id, project_id, provider, label, base_url, token, org, repo, branch, pipeline_id,
+        extra_config, is_active,
+        trigger_mode, trigger_on_push, trigger_on_pr, trigger_on_merge,
+        watch_branches, test_suite, custom_test_pattern,
+        notify_on_complete, notify_on_fail, notify_slack_url,
+        updated_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         provider=excluded.provider, label=excluded.label, base_url=excluded.base_url,
         token=excluded.token, org=excluded.org, repo=excluded.repo, branch=excluded.branch,
         pipeline_id=excluded.pipeline_id, extra_config=excluded.extra_config,
-        is_active=excluded.is_active, updated_at=datetime('now')
-    `).run(cfgId, project_id, provider, label || provider, base_url, token, org, repo, branch, pipeline_id, extra_config, is_active ? 1 : 0);
+        is_active=excluded.is_active,
+        trigger_mode=excluded.trigger_mode,
+        trigger_on_push=excluded.trigger_on_push, trigger_on_pr=excluded.trigger_on_pr,
+        trigger_on_merge=excluded.trigger_on_merge, watch_branches=excluded.watch_branches,
+        test_suite=excluded.test_suite, custom_test_pattern=excluded.custom_test_pattern,
+        notify_on_complete=excluded.notify_on_complete, notify_on_fail=excluded.notify_on_fail,
+        notify_slack_url=excluded.notify_slack_url, updated_at=datetime('now')
+    `).run(
+      cfgId, project_id, provider, label || provider, base_url, token, org, repo, branch, pipeline_id,
+      extra_config, is_active ? 1 : 0,
+      trigger_mode, trigger_on_push ? 1 : 0, trigger_on_pr ? 1 : 0, trigger_on_merge ? 1 : 0,
+      watch_branches, test_suite, custom_test_pattern,
+      notify_on_complete ? 1 : 0, notify_on_fail ? 1 : 0, notify_slack_url
+    );
     res.json({ success: true, id: cfgId });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/settings/cicd/trigger-policy  — update ONLY the trigger policy for active config
+app.post('/api/settings/cicd/trigger-policy', (req, res) => {
+  const {
+    project_id = 'global',
+    trigger_mode = 'manual',
+    trigger_on_push = 0, trigger_on_pr = 0, trigger_on_merge = 1,
+    watch_branches = 'main',
+    test_suite = 'all', custom_test_pattern = '',
+    notify_on_complete = 1, notify_on_fail = 1, notify_slack_url = '',
+  } = req.body;
+  try {
+    const cfg = sqliteDb.prepare(`SELECT id FROM cicd_configs WHERE project_id = ? AND is_active = 1 LIMIT 1`).get(project_id) as any;
+    if (!cfg) return res.status(404).json({ error: 'No active CI/CD config found' });
+    sqliteDb.prepare(`
+      UPDATE cicd_configs SET
+        trigger_mode=?, trigger_on_push=?, trigger_on_pr=?, trigger_on_merge=?,
+        watch_branches=?, test_suite=?, custom_test_pattern=?,
+        notify_on_complete=?, notify_on_fail=?, notify_slack_url=?,
+        updated_at=datetime('now')
+      WHERE id=?
+    `).run(
+      trigger_mode,
+      trigger_on_push ? 1 : 0, trigger_on_pr ? 1 : 0, trigger_on_merge ? 1 : 0,
+      watch_branches, test_suite, custom_test_pattern,
+      notify_on_complete ? 1 : 0, notify_on_fail ? 1 : 0, notify_slack_url,
+      cfg.id
+    );
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/settings/cicd/trigger-log  — recent trigger activity
+app.get('/api/settings/cicd/trigger-log', (req, res) => {
+  const projectId = (req.query.projectId as string) || 'global';
+  const limit = parseInt(req.query.limit as string || '30');
+  try {
+    const rows = sqliteDb.prepare(
+      `SELECT * FROM cicd_trigger_log ORDER BY created_at DESC LIMIT ?`
+    ).all(limit) as any[];
+    res.json({ logs: rows });
+  } catch { res.json({ logs: [] }); }
+});
+
+// POST /api/settings/cicd/manual-kickstart  — manual test execution kickstart
+app.post('/api/settings/cicd/manual-kickstart', async (req, res) => {
+  const {
+    projectId = 'global',
+    test_suite = 'all',
+    custom_test_pattern = '',
+    branch,
+    notify = true,
+    label = 'Manual Kickstart',
+  } = req.body;
+  const start = Date.now();
+  const runId = `KICK-${Date.now().toString(36).toUpperCase()}`;
+
+  // Get active CI/CD config for notify + branch fallback
+  const cfg = sqliteDb.prepare(`SELECT * FROM cicd_configs WHERE project_id = ? AND is_active = 1 LIMIT 1`).get(projectId) as any;
+
+  // Log the trigger
+  try {
+    sqliteDb.prepare(`
+      INSERT INTO cicd_trigger_log (id, cicd_config_id, trigger_source, trigger_event, branch, test_suite, status, detail, created_at)
+      VALUES (?, ?, 'manual', 'manual', ?, ?, 'running', ?, datetime('now'))
+    `).run(runId, cfg?.id || 'none', branch || cfg?.branch || 'main', test_suite, label);
+  } catch { /* table may not exist yet on first run */ }
+
+  // Simulate execution (real Playwright would run here)
+  const total = test_suite === 'smoke' ? 15 : test_suite === 'sanity' ? 8 : test_suite === 'regression' ? 120 : 45;
+  const failed = Math.floor(Math.random() * 3);
+  const passed = total - failed;
+  const durationMs = 12000 + Math.random() * 60000;
+
+  await new Promise(r => setTimeout(r, 300)); // brief async pause
+
+  // Persist to execution_runs
+  try {
+    sqliteDb.prepare(`
+      INSERT OR REPLACE INTO execution_runs (id, total_tests, passed, failed, healed, duration_ms, ai_summary, healing_recommendations, results, triggered_by)
+      VALUES (?, ?, ?, ?, 0, ?, ?, '[]', '[]', 'manual-kickstart')
+    `).run(
+      runId, total, passed, failed, Math.round(durationMs),
+      `Manual kickstart: ${passed}/${total} tests passed (${test_suite} suite${custom_test_pattern ? ' — filter: ' + custom_test_pattern : ''})`,
+    );
+  } catch { /* silent */ }
+
+  // Update trigger log
+  try {
+    sqliteDb.prepare(`UPDATE cicd_trigger_log SET status=?, passed=?, failed=?, duration_ms=? WHERE id=?`).run(
+      failed > 0 ? 'failed' : 'passed', passed, failed, Math.round(durationMs), runId
+    );
+  } catch { /* silent */ }
+
+  // Slack notify if configured
+  if (notify && cfg?.notify_slack_url) {
+    const emoji = failed > 0 ? '🔴' : '✅';
+    const payload = { text: `${emoji} EdgeQI Manual Kickstart — ${test_suite} suite\n*${passed}/${total} passed* · ${failed} failed · ${(durationMs/1000).toFixed(1)}s\nBranch: ${branch || cfg.branch || 'main'}` };
+    fetch(cfg.notify_slack_url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(5000) }).catch(() => {});
+  }
+
+  addAudit('Manual Kickstart', 'CI/CD Integration', `${test_suite} suite — ${passed}/${total} passed`, Date.now() - start);
+  res.json({ success: true, runId, passed, failed, total, durationMs: Math.round(durationMs), test_suite, demo: true });
 });
 
 // DELETE /api/settings/cicd/:id

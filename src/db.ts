@@ -337,8 +337,38 @@ sqliteDb.exec(`
     is_active INTEGER DEFAULT 1,
     last_tested_at DATETIME,
     last_tested_ok INTEGER DEFAULT 0,
+    -- ── Trigger policy (stored as JSON in trigger_policy column) ────────────
+    trigger_mode TEXT DEFAULT 'manual',
+    -- manual | auto | both
+    trigger_on_push INTEGER DEFAULT 0,     -- auto-trigger on any push event
+    trigger_on_pr INTEGER DEFAULT 0,       -- auto-trigger on PR/MR open/update
+    trigger_on_merge INTEGER DEFAULT 1,    -- auto-trigger on merge to watched branch
+    watch_branches TEXT DEFAULT 'main',    -- comma-separated branch filter for auto
+    test_suite TEXT DEFAULT 'all',         -- all | smoke | regression | sanity | custom
+    custom_test_pattern TEXT DEFAULT '',   -- grep/tag pattern for custom suite
+    notify_on_complete INTEGER DEFAULT 1,  -- push result notification back to provider
+    notify_on_fail INTEGER DEFAULT 1,      -- send alert webhook on failure
+    notify_slack_url TEXT DEFAULT '',      -- optional Slack webhook for trigger alerts
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- CI/CD trigger activity log
+  CREATE TABLE IF NOT EXISTS cicd_trigger_log (
+    id TEXT PRIMARY KEY,
+    cicd_config_id TEXT,
+    trigger_source TEXT NOT NULL,  -- manual | webhook | schedule
+    trigger_event TEXT DEFAULT '', -- push | pr | merge | manual
+    branch TEXT DEFAULT '',
+    commit TEXT DEFAULT '',
+    author TEXT DEFAULT '',
+    test_suite TEXT DEFAULT 'all',
+    status TEXT DEFAULT 'queued',  -- queued | running | passed | failed | skipped
+    passed INTEGER DEFAULT 0,
+    failed INTEGER DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    detail TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- TMS sync activity log (per module per operation)
