@@ -873,3 +873,140 @@ header { background: var(--color-surface); }
 .sidebar button > .sidebar-section-label {
   color: rgba(203,213,225,0.75) !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS — EDGE QI
+   Breakpoints: mobile < 768px (md), tablet 768-1023px, desktop >= 1024px
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Mobile overlay backdrop ────────────────────────────────────────────── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 39;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ── Sidebar hidden by default on mobile, slides in when open ───────────── */
+@media (max-width: 767px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+  /* Main content takes full width on mobile */
+  .main-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* ── Tablet: narrower sidebar ────────────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --sidebar-w: 220px;
+  }
+  .sidebar {
+    transform: none;
+    transition: none;
+  }
+  .main-content {
+    margin-left: var(--sidebar-w);
+  }
+}
+
+/* ── Desktop: full sidebar always visible ───────────────────────────────── */
+@media (min-width: 1024px) {
+  .sidebar {
+    transform: none;
+  }
+  .main-content {
+    margin-left: var(--sidebar-w);
+  }
+}
+
+/* ── Glass cards — full width on mobile ─────────────────────────────────── */
+@media (max-width: 767px) {
+  .glass-card {
+    border-radius: 12px;
+    padding: 14px !important;
+  }
+
+  /* Reduce padding on smaller panels */
+  .glass-card .p-5 { padding: 14px !important; }
+  .glass-card .p-6 { padding: 14px !important; }
+
+  /* Tables: horizontal scroll on mobile */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Make all grid-cols-12 become single column on mobile */
+  .lg\:grid-cols-12,
+  .lg\:col-span-5,
+  .lg\:col-span-7,
+  .lg\:col-span-8 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Ensure buttons don't overflow */
+  .btn-primary,
+  .btn-ghost,
+  .btn-secondary {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* Header height on mobile */
+  header {
+    height: 56px !important;
+    min-height: 56px !important;
+  }
+
+  /* Page padding on mobile */
+  .flex-1.p-6 {
+    padding: 12px !important;
+  }
+
+  /* Input glass on mobile — full width */
+  .input-glass {
+    max-width: 100% !important;
+    width: 100%;
+    font-size: 14px;
+  }
+
+  /* Chips and badges — smaller on mobile */
+  .chip {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+}
+
+/* ── Small mobile extra fixes (< 480px) ─────────────────────────────────── */
+@media (max-width: 479px) {
+  .glass-card {
+    padding: 10px !important;
+  }
+
+  /* Hide less critical header elements */
+  .hidden-xs {
+    display: none !important;
+  }
+
+  /* Stack horizontal flex containers */
+  .flex-xs-col {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Panel titles smaller */
+  .panel-title {
+    font-size: 13px;
+  }
+}

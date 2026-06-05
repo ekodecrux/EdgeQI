@@ -34,7 +34,8 @@ import {
   FolderOpen,
   Brain,
   Target,
-  GitMerge
+  GitMerge,
+  Menu
 } from 'lucide-react';
 
 import { 
@@ -309,6 +310,9 @@ function ManualExecutionTab() {
 }
 
 export default function App() {
+  // Mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Navigation layout Page active
   const [activeTab, setActiveTab] = useState<
     'agentic' |
@@ -750,6 +754,12 @@ LATEST QE DASHBOARD RESULTS:
     return data.text;
   };
 
+  // Close mobile menu when tab changes
+  const handleTabChange = (tab: any) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   // Helper trigger audit fetch after changes
   const handleAddAuditLog = async () => {
     try {
@@ -931,8 +941,16 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
       {/* Auth Gate — show login if not authenticated */}
       {!authUser && <AuthModal onLogin={handleLogin} />}
 
+      {/* ── MOBILE OVERLAY BACKDROP ─────────────────────────────────── */}
+      {mobileMenuOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
-      <aside className="sidebar">
+      <aside className={`sidebar${mobileMenuOpen ? ' sidebar-open' : ''}`}>
         {/* Logo — fixed at top */}
         <div className="px-4 py-4 shrink-0 border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
@@ -954,7 +972,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             {[
               { id: 'projects', label: 'Project Hub',    icon: FolderOpen },
               { id: 'rag-kb',   label: 'Knowledge Base', icon: Brain },
-            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => handleTabChange(p.id)} />)}
           </SidebarGroup>
 
           {/* ── Section: Testing Workflow ────────────────────────────── */}
@@ -967,7 +985,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'traceability',  label: 'Traceability Matrix',    icon: Table },
               { id: 'scripts',       label: 'Test Automation',        icon: Settings2 },
               { id: 'defect-impact', label: 'Defect & Impact AI',     icon: Target },
-            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => handleTabChange(p.id)} />)}
           </SidebarGroup>
 
           {/* ── Section: Run & Analyze ──────────────────────────────── */}
@@ -979,7 +997,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'performance',      label: 'Load & Performance', icon: Sliders },
               { id: 'security',         label: 'Security Scan',      icon: ShieldAlert },
               { id: 'dashboard',        label: 'Live Dashboard',     icon: TrendingUp },
-            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => handleTabChange(p.id)} />)}
           </SidebarGroup>
 
           {/* ── Section: Settings & Integrations ────────────────────── */}
@@ -994,7 +1012,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'converter',    label: 'Script Converter',  icon: RefreshCw },
               { id: 'feedback',     label: 'Prompt Library',    icon: BookOpen },
               { id: 'audit',        label: 'Activity Log',      icon: History },
-            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => setActiveTab(p.id as any)} />)}
+            ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => handleTabChange(p.id)} />)}
           </SidebarGroup>
 
         </div>
@@ -1039,18 +1057,28 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
       <div className="main-content flex flex-col min-h-screen">
 
         {/* Top Header Bar — Enterprise Design System */}
-        <header className="sticky top-0 z-30 px-6 flex items-center justify-between"
-          style={{ background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', boxShadow: '0 1px 4px rgba(15,23,42,0.06)', height: 'var(--topbar-h, 72px)', minHeight: 'var(--topbar-h, 72px)' }}>
+        <header className="sticky top-0 z-30 px-4 md:px-6 flex items-center justify-between"
+          style={{ background: '#FFFFFF', borderBottom: '1px solid #E2E8F0', boxShadow: '0 1px 4px rgba(15,23,42,0.06)', height: 'var(--topbar-h, 56px)', minHeight: 'var(--topbar-h, 56px)' }}>
           <div className="flex items-center gap-3">
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 border border-slate-200"
+              onClick={() => setMobileMenuOpen(o => !o)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen
+                ? <X className="w-4 h-4 text-slate-600" />
+                : <Menu className="w-4 h-4 text-slate-600" />}
+            </button>
             <div>
               <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 800, color: '#0F172A', letterSpacing: '0.12em', lineHeight: 1 }}>
                 EDGE <span style={{ color: '#5B6CFF' }}>QI</span>
               </h1>
-              <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#94A3B8', letterSpacing: '0.06em', marginTop: 2 }}>Edge Quality Intelligence Platform</p>
+              <p className="hidden sm:block" style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#94A3B8', letterSpacing: '0.06em', marginTop: 2 }}>Edge Quality Intelligence Platform</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             {/* Project Selector — populated from DB */}
             <div className="flex items-center gap-1.5">
               <FolderOpen className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
@@ -1058,7 +1086,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
                 value={currentProjectId}
                 onChange={(e) => { setCurrentProjectId(e.target.value); }}
                 className="input-glass text-xs"
-                style={{ maxWidth: 160 }}
+                style={{ maxWidth: 130 }}
               >
                 <option value="ALL">🗂 All Projects</option>
                 {dbProjects.map(p => (
@@ -1072,13 +1100,13 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
 
             {/* Sprint Selector — shows only when a project is selected */}
             {currentProjectId !== 'ALL' && dbSprints.length > 0 && (
-              <div className="flex items-center gap-1.5">
+              <div className="hidden sm:flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-slate-400 hidden md:block" />
                 <select
                   value={currentSprintId}
                   onChange={e => setCurrentSprintId(e.target.value)}
                   className="input-glass text-xs"
-                  style={{ maxWidth: 140 }}
+                  style={{ maxWidth: 130 }}
                 >
                   <option value="">No Sprint</option>
                   {dbSprints.map(s => (
@@ -1108,7 +1136,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 p-6 overflow-x-hidden">
+        <div className="flex-1 p-3 md:p-6 overflow-x-hidden">
           
           {activeTab === 'agentic' && (
             <AgenticOrchestrator
