@@ -46,6 +46,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import AgentFlowVisualizer from './AgentFlowVisualizer';
+import { TmsSyncBar } from './TmsSyncBar';
 import { AgentStep } from '../types';
 import { apiUrl } from '@/src/config/api';
 
@@ -1667,7 +1668,7 @@ export default function ExecutionEnginePage({
             {/* Tool Run Result */}
             {toolRunResult && !toolRunResult.error && (
               <div className="space-y-2 pt-2 border-t border-green-100">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-mono font-bold text-slate-600">{toolRunResult.tool?.toUpperCase()} · {toolRunResult.toolVersion}</span>
                   <span className="badge badge-green text-[9px]">{toolRunResult.passed || 0} passed</span>
                   {(toolRunResult.failed || 0) > 0 && <span className="badge badge-red text-[9px]">{toolRunResult.failed} failed</span>}
@@ -1678,6 +1679,24 @@ export default function ExecutionEnginePage({
                     <div key={i} className="text-[9px] font-mono text-slate-300 leading-relaxed">{log}</div>
                   ))}
                 </div>
+                {/* Push results to TMS */}
+                <TmsSyncBar
+                  module="results"
+                  ops={['push']}
+                  pushLabel="Push Results to TMS"
+                  pushData={{
+                    runResult: {
+                      tool: toolRunResult.tool,
+                      passed: toolRunResult.passed,
+                      failed: toolRunResult.failed,
+                      total: (toolRunResult.passed || 0) + (toolRunResult.failed || 0),
+                      durationMs: toolRunResult.durationMs,
+                      testCaseIds: toolRunResult.testCaseIds || [],
+                      runAt: new Date().toISOString(),
+                    }
+                  }}
+                  compact
+                />
               </div>
             )}
             {toolRunResult?.error && (

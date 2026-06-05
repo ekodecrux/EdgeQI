@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TmsSyncBar } from './TmsSyncBar';
 import { 
   Search, 
   Filter, 
@@ -217,9 +218,44 @@ export default function TraceabilityTab({
     alert(`Triggered system simulation test run for Scenario Mapped ID: ${tcId}. Telemetry checks executing concurrent loops.`);
   };
 
+  // TMS pulled regression suites state
+  const [tmsRegressionSuites, setTmsRegressionSuites] = useState<any[]>([]);
+
+  const handleTmsRegressionPull = (suites: any[]) => {
+    setTmsRegressionSuites(suites);
+  };
+
   return (
     <div className="space-y-6">
-      
+
+      {/* TMS Regression Suite Banner */}
+      <TmsSyncBar
+        module="regression"
+        ops={['pull']}
+        onPull={handleTmsRegressionPull}
+        projectId={currentProjectId !== 'ALL' ? currentProjectId : 'global'}
+      />
+
+      {/* TMS Regression suites overlay */}
+      {tmsRegressionSuites.length > 0 && (
+        <div className="glass-card p-4 border border-cyan-200 bg-cyan-50/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-mono font-bold text-cyan-700">
+              📥 {tmsRegressionSuites.length} Regression Suites pulled from TMS
+            </span>
+            <button onClick={() => setTmsRegressionSuites([])} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {tmsRegressionSuites.map((s: any, i: number) => (
+              <span key={i} className="text-[10px] font-mono px-2 py-1 rounded-lg border border-cyan-300 bg-white text-cyan-700">
+                {s.key && <span className="font-bold mr-1">{s.key}</span>}{s.name || s.title || `Suite ${i+1}`}
+                {s.testCaseCount != null && <span className="ml-1 text-slate-400">({s.testCaseCount} TCs)</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 1. Header Overview and KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         

@@ -301,6 +301,38 @@ sqliteDb.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- TMS / Test Management Tool global configuration (one active config per project)
+  CREATE TABLE IF NOT EXISTS tms_configs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT DEFAULT 'global',
+    tool TEXT NOT NULL,            -- jira | xray | zephyr | testrail | azuredevops | qtest | hpalm
+    label TEXT DEFAULT '',         -- user-friendly name e.g. "Production Jira"
+    base_url TEXT NOT NULL,
+    email TEXT DEFAULT '',
+    token TEXT NOT NULL,
+    project_key TEXT DEFAULT '',
+    zephyr_token TEXT DEFAULT '',  -- Zephyr Scale Cloud separate token
+    extra_config TEXT DEFAULT '{}',-- JSON for tool-specific extras
+    is_active INTEGER DEFAULT 1,
+    last_tested_at DATETIME,
+    last_tested_ok INTEGER DEFAULT 0,
+    last_synced_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- TMS sync activity log (per module per operation)
+  CREATE TABLE IF NOT EXISTS tms_sync_log (
+    id TEXT PRIMARY KEY,
+    tms_config_id TEXT,
+    module TEXT NOT NULL,          -- requirements | testcases | defects | regression | results
+    operation TEXT NOT NULL,       -- pull | push
+    status TEXT DEFAULT 'ok',      -- ok | error | partial
+    item_count INTEGER DEFAULT 0,
+    detail TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   -- Project prompt history (all voice + text prompts per module)
   CREATE TABLE IF NOT EXISTS prompt_history (
     id TEXT PRIMARY KEY,

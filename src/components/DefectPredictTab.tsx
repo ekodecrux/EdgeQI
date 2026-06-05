@@ -7,6 +7,7 @@ import {
   Cpu, Bot
 } from 'lucide-react';
 import { DefectHotspot, ImpactReport, TestCase } from '../types';
+import { TmsSyncBar } from './TmsSyncBar';
 import { apiUrl } from '@/src/config/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -430,8 +431,38 @@ export default function DefectPredictTab({
     { id: 'hotspot',  label: '4. Hotspot Heatmap',        icon: BarChart2, badge: defects.length || undefined },
   ];
 
+  // ── Global TMS pull handler: defect dump ──────────────────────────────
+  const handleGlobalTmsPull = (items: any[]) => {
+    if (items.length === 0) return;
+    const converted: ClassifiedDefect[] = items.map((d: any, i: number) => ({
+      id: d.key || d.id || `tms-${i}`,
+      title: d.title || d.summary || `Defect ${i + 1}`,
+      module: d.component || d.module || 'TMS Import',
+      severity: (d.priority === 'Critical' ? 'Critical' : d.priority === 'High' ? 'High' : d.priority === 'Low' ? 'Low' : 'Medium') as any,
+      category: 'Genuine',
+      confidence: 0.85,
+      failureReason: d.description || d.body || '',
+      steps: d.steps || '',
+      approved: null,
+    }));
+    setClassified(prev => {
+      const existingIds = new Set(prev.map(c => c.id));
+      return [...converted.filter(c => !existingIds.has(c.id)), ...prev];
+    });
+    setPanel('classify');
+    showToast(`✅ Pulled ${converted.length} defects from TMS — ready to classify`);
+  };
+
   return (
     <div className="space-y-5 animate-fadeInUp">
+
+      {/* TMS Defect Dump Banner */}
+      <TmsSyncBar
+        module="defects"
+        ops={['pull']}
+        onPull={handleGlobalTmsPull}
+        projectId={currentProjectId}
+      />
 
       {/* Toast */}
       {toast && (

@@ -122,6 +122,18 @@ export default function DashboardMetrics({
   };
   useEffect(() => { loadAlertLog(); }, []);
 
+  // ── TMS sync dashboard data ──────────────────────────────────────────────────
+  const [tmsDashData, setTmsDashData] = useState<any>(null);
+  const [tmsLoading, setTmsLoading] = useState(false);
+  const loadTmsDash = async () => {
+    setTmsLoading(true);
+    try {
+      const r = await fetch(apiUrl('/api/tms/dashboard?projectId=global'));
+      if (r.ok) { const d = await r.json(); setTmsDashData(d); }
+    } catch { /* silent */ } finally { setTmsLoading(false); }
+  };
+  useEffect(() => { loadTmsDash(); }, []);
+
   // REQ-91: Widget config state
   const [widgetConfig, setWidgetConfig] = useState<{ id: string; label: string; visible: boolean }[]>([
     { id: 'coverage', label: 'Coverage Metrics', visible: true },
@@ -749,6 +761,106 @@ export default function DashboardMetrics({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* TMS LIVE SYNC STATUS PANEL */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <h3 className="panel-title flex items-center gap-2">
+              <Database className="w-4 h-4 text-indigo-500" />
+              TMS Live Sync Status
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">Real-time sync state of your connected Test Management System across all modules</p>
+          </div>
+          <button onClick={loadTmsDash} disabled={tmsLoading}
+            className="btn-ghost text-xs flex items-center gap-1.5">
+            <RefreshCw className={`w-3 h-3 ${tmsLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+        {tmsDashData?.configured ? (
+          <div className="space-y-3">
+            {/* Active tool banner */}
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50">
+              <span className="text-lg">{tmsDashData.icon || '🔗'}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono font-bold text-indigo-700">{tmsDashData.tool?.toUpperCase()} — {tmsDashData.label || 'Active'}</span>
+                  <span className="badge badge-green text-[9px]">● ACTIVE</span>
+                  {tmsDashData.last_tested_ok && <span className="text-[9px] text-emerald-600 font-mono flex items-center gap-0.5"><CheckCircle2 className="w-2.5 h-2.5" /> Verified</span>}
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono">{tmsDashData.base_url} · {tmsDashData.project_key}</p>
+              </div>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'settings' }))}
+                className="text-[10px] font-mono text-indigo-600 hover:underline flex items-center gap-0.5 shrink-0">
+                <Settings className="w-2.5 h-2.5" /> Configure
+              </button>
+            </div>
+            {/* Per-module sync status grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {[
+                { module: 'requirements', label: 'Requirements', icon: '📋', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+                { module: 'testcases',    label: 'Test Cases',   icon: '✅', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+                { module: 'defects',      label: 'Defects',      icon: '🐛', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+                { module: 'regression',   label: 'Regression',   icon: '🔗', color: 'text-cyan-700', bg: 'bg-cyan-50', border: 'border-cyan-200' },
+                { module: 'results',      label: 'Results',      icon: '▶️', color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200' },
+              ].map(m => {
+                const mod = tmsDashData.modules?.[m.module] || {};
+                return (
+                  <div key={m.module} className={`p-3 rounded-xl border ${m.border} ${m.bg}`}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-sm">{m.icon}</span>
+                      <span className={`text-[10px] font-mono font-bold ${m.color}`}>{m.label}</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {mod.lastPull && (
+                        <div className="flex items-center gap-1 text-[9px] font-mono text-slate-500">
+                          <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                          {mod.pullCount || 0} pulled · {new Date(mod.lastPull).toLocaleDateString()}
+                        </div>
+                      )}
+                      {mod.lastPush && (
+                        <div className="flex items-center gap-1 text-[9px] font-mono text-slate-500">
+                          <ArrowRight className="w-2.5 h-2.5 text-indigo-500" />
+                          pushed · {new Date(mod.lastPush).toLocaleDateString()}
+                        </div>
+                      )}
+                      {!mod.lastPull && !mod.lastPush && (
+                        <span className="text-[9px] text-slate-400 font-mono">No sync yet</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Summary stats row */}
+            {tmsDashData.summary && (
+              <div className="flex flex-wrap gap-4 pt-2 border-t border-slate-100">
+                {[
+                  { label: 'Total syncs', val: tmsDashData.summary.totalOps || 0, color: 'text-slate-700' },
+                  { label: 'Successful', val: tmsDashData.summary.successOps || 0, color: 'text-emerald-700' },
+                  { label: 'Items synced', val: tmsDashData.summary.totalItems || 0, color: 'text-indigo-700' },
+                  { label: 'Last activity', val: tmsDashData.summary.lastActivity ? new Date(tmsDashData.summary.lastActivity).toLocaleString() : 'Never', color: 'text-blue-700' },
+                ].map(s => (
+                  <div key={s.label} className="text-center min-w-[80px]">
+                    <p className={`text-sm font-bold font-mono ${s.color}`}>{s.val}</p>
+                    <p className="text-[9px] text-slate-400 font-mono">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <Database className="w-8 h-8 text-slate-300" />
+            <p className="text-xs text-slate-500">No TMS configured yet</p>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'settings' }))}
+              className="btn-primary text-xs flex items-center gap-1.5 mt-1">
+              <Settings className="w-3 h-3" /> Configure TMS in Settings
+            </button>
+          </div>
+        )}
       </div>
 
       {/* INTEGRATIONS SYSTEM CONNECTIONS HUB */}

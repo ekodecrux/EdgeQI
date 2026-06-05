@@ -81,6 +81,7 @@ import VoicePromptBar from './components/VoicePromptBar';
 import ProjectContextBar from './components/ProjectContextBar';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import WorkflowBuilder from './components/WorkflowBuilder';
+import TmsConfigSettings from './components/TmsConfigSettings';
 import { apiUrl } from '@/src/config/api';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
@@ -338,7 +339,8 @@ export default function App() {
     'projects' |
     'rag-kb' |
     'workflow-builder' |
-    'defect-impact'
+    'defect-impact' |
+    'settings'
   >('agentic');
   
   // Sprint context — active sprint for current project
@@ -760,6 +762,16 @@ LATEST QE DASHBOARD RESULTS:
     setMobileMenuOpen(false);
   };
 
+  // navigate-tab custom event — fired by TmsSyncBar "Configure in Settings →" link
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent).detail as string;
+      if (tab) handleTabChange(tab);
+    };
+    window.addEventListener('navigate-tab', handler);
+    return () => window.removeEventListener('navigate-tab', handler);
+  }, []);
+
   // Helper trigger audit fetch after changes
   const handleAddAuditLog = async () => {
     try {
@@ -1003,6 +1015,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {/* ── Section: Settings & Integrations ────────────────────── */}
           <SidebarGroup label="Settings & Integrations">
             {[
+              { id: 'settings',     label: 'TMS Settings',       icon: Settings2 },
               { id: 'integrations', label: 'Connect Tools',     icon: Link },
               { id: 'workflow-builder', label: 'Workflow Builder', icon: GitBranch },
               { id: 'cicd',         label: 'CI/CD Pipeline',    icon: GitBranch },
@@ -1358,6 +1371,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             />
           )}
           {activeTab === 'manual-execution' && <ManualExecutionTab />}
+          {activeTab === 'settings' && <TmsConfigSettings />}
           {activeTab === 'llm-config' && <LLMConfigTab />}
           {activeTab === 'cicd' && <CICDTab />}
           {activeTab === 'integrations' && (

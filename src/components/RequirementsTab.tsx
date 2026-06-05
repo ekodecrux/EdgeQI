@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, ArrowRight, FileText, Globe, Volume2, Plus, Sparkles, RefreshCcw, HelpCircle, Square, Download, GitBranch, CheckCircle, Clock, Archive, Eye, Search, Link, History, ChevronDown, ChevronRight, X, MessageSquare, Send, CheckSquare, Image, ScanLine, Zap, BarChart2, ShieldAlert } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
+import { TmsSyncBar } from './TmsSyncBar';
 import { apiUrl } from '@/src/config/api';
 
 // REQ-12: Status workflow
@@ -345,8 +346,47 @@ export default function RequirementsTab({
     (r.title.toLowerCase().includes(parentSearch.toLowerCase()) || r.id.toLowerCase().includes(parentSearch.toLowerCase()))
   ).slice(0, 10);
 
+  // TMS pulled requirements state
+  const [tmsPulledReqs, setTmsPulledReqs] = useState<any[]>([]);
+
+  const handleTmsPull = (items: any[]) => {
+    setTmsPulledReqs(items);
+    // Auto-populate title+content from first pulled item if form is empty
+    if (items.length > 0 && !title && !content) {
+      const first = items[0];
+      setTitle(first.title || first.summary || '');
+      setContent(first.description || first.body || first.content || '');
+      setSourceType('text');
+    }
+  };
+
   return (
     <div className="space-y-6">
+    {/* TMS Sync Banner */}
+    <TmsSyncBar
+      module="requirements"
+      ops={['pull']}
+      onPull={handleTmsPull}
+      projectId={currentProjectId}
+    />
+    {/* Pulled items preview */}
+    {tmsPulledReqs.length > 0 && (
+      <div className="glass-card p-4 border border-indigo-200 bg-indigo-50/50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-mono font-bold text-indigo-700">📥 {tmsPulledReqs.length} Requirements pulled from TMS — click to load</span>
+          <button onClick={() => setTmsPulledReqs([])} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+        </div>
+        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+          {tmsPulledReqs.map((r: any, i: number) => (
+            <button key={i}
+              onClick={() => { setTitle(r.title || r.summary || `REQ-${i+1}`); setContent(r.description || r.body || r.content || r.title || ''); setSourceType('text'); }}
+              className="text-[10px] font-mono px-2 py-1 rounded-lg border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 transition-all text-left max-w-[200px] truncate">
+              {r.key && <span className="font-bold mr-1">{r.key}</span>}{r.title || r.summary || `Item ${i+1}`}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
     {/* Page Header */}
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,borderBottom:'1px solid #E2E8F0'}}>
       <div style={{display:'flex',alignItems:'center',gap:12}}>

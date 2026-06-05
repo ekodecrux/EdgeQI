@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { TestCase, RequirementDoc } from '../types';
 import VoicePromptBar from './VoicePromptBar';
+import { TmsSyncBar } from './TmsSyncBar';
 import { apiUrl } from '@/src/config/api';
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
@@ -1255,8 +1256,53 @@ export default function TestCaseGeneratorPage({
 
   // ── Main Render ───────────────────────────────────────────────────────────
 
+  // ── TMS pull: load existing TCs from TMS into local list ─────────────────
+  const handleTmsTcPull = (items: any[]) => {
+    if (items.length === 0) return;
+    const converted: TestCase[] = items.map((item: any, i: number) => ({
+      id: item.key || item.id || `tms-tc-${i}`,
+      title: item.title || item.summary || `Test Case ${i + 1}`,
+      description: item.description || item.objective || '',
+      steps: item.steps || [],
+      expectedResult: item.expectedResult || '',
+      priority: (item.priority as any) || 'P2',
+      module: item.module || item.component || 'TMS Import',
+      automationStatus: 'Automatable',
+      status: 'Active',
+      requirementId: item.requirementId || '',
+      projectId: currentProjectId,
+    }));
+    setLocalTestCases(prev => {
+      const existingIds = new Set(prev.map(t => t.id));
+      return [...converted.filter(t => !existingIds.has(t.id)), ...prev];
+    });
+  };
+
+  // ── TMS push: send generated TCs to TMS ──────────────────────────────────
+  const handleTmsTcPush = async (): Promise<any> => {
+    const toPush = generatedTCs.length > 0 ? generatedTCs : localTestCases.slice(0, 20);
+    const r = await fetch(apiUrl('/api/tms/push/testcases'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: currentProjectId, testCases: toPush }),
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error || 'Push failed');
+    return d;
+  };
+
   return (
     <div className="space-y-4 animate-fadeInUp">
+      {/* TMS Sync Banner */}
+      <TmsSyncBar
+        module="testcases"
+        ops={['pull', 'push']}
+        onPull={handleTmsTcPull}
+        onPush={handleTmsTcPush}
+        pushLabel={`Push ${generatedTCs.length > 0 ? generatedTCs.length : ''} TCs to TMS`}
+        pushDisabled={generatedTCs.length === 0 && localTestCases.length === 0}
+        projectId={currentProjectId}
+      />
       {/* Global feedback toast */}
       {feedback && (
         <div className="fixed top-4 right-4 z-50 px-4 py-2 bg-blue-600 text-white text-xs rounded-xl shadow-lg font-mono animate-fadeInUp">
