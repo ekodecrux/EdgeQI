@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { GitBranch, Webhook, Play, CheckCircle, Copy, Download, Settings, Zap, RefreshCw, Terminal, AlertCircle, Bell, BellOff, Layers, Plus, X } from 'lucide-react';
+import { GitBranch, Webhook, Play, CheckCircle, Copy, Download, Settings, Zap, RefreshCw, Terminal, AlertCircle, Bell, BellOff, Layers, Plus, X, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { apiUrl } from '@/src/config/api';
 
 export default function CICDTab() {
+  // CI/CD provider config state
+  const [cicdCfg, setCicdCfg] = useState<any>(null);
+  const [cicdCfgLoaded, setCicdCfgLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/settings/cicd?projectId=global'))
+      .then(r => r.json())
+      .then(d => { setCicdCfg(d.configured ? d.config : null); setCicdCfgLoaded(true); })
+      .catch(() => setCicdCfgLoaded(true));
+  }, []);
+
   // REQ-87: Pipeline status state
   const [pipelineStatus, setPipelineStatus] = useState<any[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(false);
@@ -137,6 +148,17 @@ export default function CICDTab() {
     { id: 'azure-pipelines', label: 'Azure Pipelines', icon: '☁️' },
   ];
 
+  const PROVIDER_META: Record<string, { icon: string; color: string; bg: string; border: string }> = {
+    github:    { icon: '⚡', color: 'text-slate-800',   bg: 'bg-slate-50',   border: 'border-slate-300' },
+    gitlab:    { icon: '🦊', color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200' },
+    jenkins:   { icon: '🔧', color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200' },
+    azure:     { icon: '☁️', color: 'text-indigo-700', bg: 'bg-indigo-50',  border: 'border-indigo-200' },
+    circleci:  { icon: '🔵', color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200' },
+    teamcity:  { icon: '🏠', color: 'text-purple-700', bg: 'bg-purple-50',  border: 'border-purple-200' },
+    bitbucket: { icon: '🪣', color: 'text-blue-600',   bg: 'bg-blue-50',    border: 'border-blue-200' },
+    default:   { icon: '🔗', color: 'text-slate-700',  bg: 'bg-slate-50',   border: 'border-slate-200' },
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -144,10 +166,34 @@ export default function CICDTab() {
         <div className="w-10 h-10 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center">
           <GitBranch className="w-5 h-5 text-blue-500" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="panel-title">CI/CD Integration</h2>
           <p className="text-slate-500 text-xs">Webhooks, quality gates and pipeline triggers</p>
         </div>
+        {/* Provider config status badge */}
+        {cicdCfgLoaded && (
+          cicdCfg ? (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${(PROVIDER_META[cicdCfg.provider] || PROVIDER_META.default).border} ${(PROVIDER_META[cicdCfg.provider] || PROVIDER_META.default).bg}`}>
+              <span className="text-sm">{(PROVIDER_META[cicdCfg.provider] || PROVIDER_META.default).icon}</span>
+              <span className={`text-[10px] font-mono font-bold ${(PROVIDER_META[cicdCfg.provider] || PROVIDER_META.default).color}`}>{cicdCfg.label || cicdCfg.provider?.toUpperCase()}</span>
+              <span className="badge badge-green text-[9px]">● Active</span>
+              {cicdCfg.last_tested_ok && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+              <button onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'cicd-settings' }))}
+                className="text-[9px] font-mono text-blue-600 hover:underline flex items-center gap-0.5 ml-1">
+                <Settings className="w-2.5 h-2.5" /> Configure
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-[10px] font-mono text-slate-500">No CI/CD provider —</span>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'cicd-settings' }))}
+                className="text-[10px] font-mono font-bold text-blue-600 hover:underline">
+                Configure in Settings →
+              </button>
+            </div>
+          )
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

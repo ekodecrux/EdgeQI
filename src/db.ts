@@ -321,6 +321,26 @@ sqliteDb.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- CI/CD provider connection configs (GitHub/Jenkins/GitLab/Azure/CircleCI/TeamCity)
+  CREATE TABLE IF NOT EXISTS cicd_configs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT DEFAULT 'global',
+    provider TEXT NOT NULL,        -- github | jenkins | gitlab | azure | circleci | teamcity | bitbucket
+    label TEXT DEFAULT '',         -- user-friendly name e.g. "GitHub Actions – Prod"
+    base_url TEXT DEFAULT '',      -- Jenkins/GitLab self-hosted URL
+    token TEXT NOT NULL,           -- PAT / API token / service account key
+    org TEXT DEFAULT '',           -- GitHub org or Azure org
+    repo TEXT DEFAULT '',          -- repo name or project slug
+    branch TEXT DEFAULT 'main',    -- default branch to trigger
+    pipeline_id TEXT DEFAULT '',   -- Jenkins job name, GitLab project ID, Azure pipeline ID
+    extra_config TEXT DEFAULT '{}',-- JSON for provider-specific extras
+    is_active INTEGER DEFAULT 1,
+    last_tested_at DATETIME,
+    last_tested_ok INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   -- TMS sync activity log (per module per operation)
   CREATE TABLE IF NOT EXISTS tms_sync_log (
     id TEXT PRIMARY KEY,

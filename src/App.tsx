@@ -82,6 +82,7 @@ import ProjectContextBar from './components/ProjectContextBar';
 import AIAssistantPanel from './components/AIAssistantPanel';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import TmsConfigSettings from './components/TmsConfigSettings';
+import CicdConfigSettings from './components/CicdConfigSettings';
 import { apiUrl } from '@/src/config/api';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
@@ -340,7 +341,8 @@ export default function App() {
     'rag-kb' |
     'workflow-builder' |
     'defect-impact' |
-    'settings'
+    'settings' |
+    'cicd-settings'
   >('agentic');
   
   // Sprint context — active sprint for current project
@@ -762,7 +764,7 @@ LATEST QE DASHBOARD RESULTS:
     setMobileMenuOpen(false);
   };
 
-  // navigate-tab custom event — fired by TmsSyncBar "Configure in Settings →" link
+  // navigate-tab custom event — fired by TmsSyncBar + CICDTab "Configure in Settings →" links
   useEffect(() => {
     const handler = (e: Event) => {
       const tab = (e as CustomEvent).detail as string;
@@ -1015,8 +1017,9 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {/* ── Section: Settings & Integrations ────────────────────── */}
           <SidebarGroup label="Settings & Integrations">
             {[
-              { id: 'settings',     label: 'TMS Settings',       icon: Settings2 },
-              { id: 'integrations', label: 'Connect Tools',     icon: Link },
+              { id: 'settings',      label: 'TMS Settings',       icon: Settings2 },
+              { id: 'cicd-settings', label: 'CI/CD Settings',      icon: GitBranch },
+              { id: 'integrations',  label: 'Connect Tools',       icon: Link },
               { id: 'workflow-builder', label: 'Workflow Builder', icon: GitBranch },
               { id: 'cicd',         label: 'CI/CD Pipeline',    icon: GitBranch },
               { id: 'scheduler',    label: 'Scheduled Runs',    icon: Clock },
@@ -1372,6 +1375,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           )}
           {activeTab === 'manual-execution' && <ManualExecutionTab />}
           {activeTab === 'settings' && <TmsConfigSettings />}
+          {activeTab === 'cicd-settings' && <CicdConfigSettings />}
           {activeTab === 'llm-config' && <LLMConfigTab />}
           {activeTab === 'cicd' && <CICDTab />}
           {activeTab === 'integrations' && (
