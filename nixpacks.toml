@@ -41,3 +41,4 @@ cmds = [
 
 [start]
 cmd = "mkdir -p data && node dist/server.cjs"
+# Build timestamp: 2026-06-06 — forced redeploy after SQLite fix
