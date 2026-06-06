@@ -360,7 +360,7 @@ sqliteDb.exec(`
     trigger_source TEXT NOT NULL,  -- manual | webhook | schedule
     trigger_event TEXT DEFAULT '', -- push | pr | merge | manual
     branch TEXT DEFAULT '',
-    commit TEXT DEFAULT '',
+    "commit" TEXT DEFAULT '',
     author TEXT DEFAULT '',
     test_suite TEXT DEFAULT 'all',
     status TEXT DEFAULT 'queued',  -- queued | running | passed | failed | skipped

@@ -2046,7 +2046,7 @@ app.post("/api/quality/cicd/webhook", async (req, res) => {
     try {
       sqliteDb.prepare(`
         INSERT INTO cicd_trigger_log
-          (id, cicd_config_id, trigger_source, trigger_event, branch, commit, author, test_suite, status, detail, created_at)
+          (id, cicd_config_id, trigger_source, trigger_event, branch, "commit", author, test_suite, status, detail, created_at)
         VALUES (?, ?, 'webhook', ?, ?, ?, ?, ?, 'running', ?, datetime('now'))
       `).run(
         logRunId,
