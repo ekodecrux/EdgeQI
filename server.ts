@@ -10300,6 +10300,229 @@ app.get('/api/saas/payments/summary', requireSuperAdmin, (req: any, res: any) =>
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ═══════════════════════════════════════════════════════════════════
+// ORG ADMIN MANAGEMENT — Super Admin creates/manages org admins & orgs
+// ═══════════════════════════════════════════════════════════════════
+
+// Ensure license_requests and org_admins tables exist
+try {
+  sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS license_requests (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      tenant_name TEXT NOT NULL,
+      requested_by TEXT NOT NULL,
+      request_type TEXT DEFAULT 'additional_seats',
+      current_seats INTEGER DEFAULT 0,
+      requested_seats INTEGER DEFAULT 0,
+      reason TEXT,
+      status TEXT DEFAULT 'pending',
+      reviewed_by TEXT,
+      reviewed_at DATETIME,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS org_admins (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      tenant_id TEXT REFERENCES tenants(id),
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      phone TEXT,
+      company TEXT NOT NULL,
+      country TEXT DEFAULT 'US',
+      timezone TEXT DEFAULT 'UTC',
+      license_pack_id TEXT REFERENCES license_packs(id),
+      status TEXT DEFAULT 'active',
+      activation_date DATETIME,
+      license_fee_usd REAL DEFAULT 0,
+      billing_cycle TEXT DEFAULT 'monthly',
+      next_billing_date DATETIME,
+      last_login DATETIME,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+} catch(e) {}
+
+// GET /api/saas/org-admins — list all org admins with details
+app.get('/api/saas/org-admins', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const rows = sqliteDb.prepare(`
+      SELECT
+        oa.*,
+        lp.name as pack_name,
+        lp.tier as pack_tier,
+        lp.price_usd as pack_price,
+        lp.max_users,
+        lp.max_concurrent,
+        (SELECT COUNT(*) FROM tenant_users tu WHERE tu.tenant_id = oa.tenant_id AND tu.status = 'active') as active_users,
+        (SELECT COUNT(*) FROM tenant_users tu WHERE tu.tenant_id = oa.tenant_id) as total_users,
+        (SELECT COUNT(*) FROM license_requests lr WHERE lr.tenant_id = oa.tenant_id AND lr.status = 'pending') as pending_requests,
+        t.status as tenant_status,
+        t.plan_tier,
+        t.trial_ends_at,
+        t.currency
+      FROM org_admins oa
+      LEFT JOIN license_packs lp ON lp.id = oa.license_pack_id
+      LEFT JOIN tenants t ON t.id = oa.tenant_id
+      ORDER BY oa.created_at DESC
+    `).all();
+    res.json(rows);
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/saas/org-admins/:id — single org admin with usage trends
+app.get('/api/saas/org-admins/:id', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const oa = sqliteDb.prepare(`
+      SELECT oa.*, lp.name as pack_name, lp.tier as pack_tier, lp.price_usd as pack_price,
+        lp.max_users, lp.max_concurrent, lp.features,
+        t.status as tenant_status, t.plan_tier, t.trial_ends_at, t.currency, t.country,
+        (SELECT COUNT(*) FROM tenant_users tu WHERE tu.tenant_id = oa.tenant_id AND tu.status = 'active') as active_users,
+        (SELECT COUNT(*) FROM tenant_users tu WHERE tu.tenant_id = oa.tenant_id) as total_users
+      FROM org_admins oa
+      LEFT JOIN license_packs lp ON lp.id = oa.license_pack_id
+      LEFT JOIN tenants t ON t.id = oa.tenant_id
+      WHERE oa.id = ?
+    `).get(req.params.id) as any;
+    if (!oa) return res.status(404).json({ error: 'Not found' });
+
+    const trend = sqliteDb.prepare(`
+      SELECT metric_date, peak_concurrent, total_api_calls, ai_tokens_used, test_runs
+      FROM usage_metrics WHERE tenant_id = ?
+      ORDER BY metric_date ASC LIMIT 30
+    `).all(oa.tenant_id || '');
+
+    const licenseRequests = sqliteDb.prepare(
+      `SELECT * FROM license_requests WHERE tenant_id = ? ORDER BY created_at DESC`
+    ).all(oa.tenant_id || '');
+
+    const invoices = sqliteDb.prepare(`
+      SELECT id, invoice_number, status, total, currency, created_at
+      FROM invoices WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 10
+    `).all(oa.tenant_id || '');
+
+    const users = sqliteDb.prepare(`
+      SELECT id, name, email, role, status, last_active, created_at
+      FROM tenant_users WHERE tenant_id = ? ORDER BY created_at DESC
+    `).all(oa.tenant_id || '');
+
+    res.json({ ...oa, trend, licenseRequests, invoices, users });
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/saas/org-admins — create new org admin + tenant + user account
+app.post('/api/saas/org-admins', requireSuperAdmin, async (req: any, res: any) => {
+  try {
+    const { name, email, password, phone, company, country, timezone, license_pack_id, billing_cycle, notes } = req.body;
+    if (!name || !email || !company) return res.status(400).json({ error: 'name, email, company required' });
+
+    const existing = sqliteDb.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) return res.status(409).json({ error: 'Email already registered' });
+
+    const bcrypt = await import('bcryptjs');
+    const pwd = password || 'EdgeQI2026!';
+    const hash = await bcrypt.hash(pwd, 10);
+    const userId = sqliteDb.prepare(
+      `INSERT INTO users (email, name, password_hash, role) VALUES (?,?,?,'org_admin')`
+    ).run(email, name, hash).lastInsertRowid;
+
+    const tenantId = genId();
+    const slug = company.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-') + '-' + tenantId.slice(0,6);
+    const pack = license_pack_id
+      ? sqliteDb.prepare('SELECT * FROM license_packs WHERE id = ?').get(license_pack_id) as any
+      : sqliteDb.prepare("SELECT * FROM license_packs WHERE tier='starter' LIMIT 1").get() as any;
+
+    sqliteDb.prepare(`
+      INSERT INTO tenants (id, name, slug, country, status, plan_tier, max_users, max_concurrent, billing_email)
+      VALUES (?,?,?,?,'active',?,?,?,?)
+    `).run(tenantId, company, slug, country||'US', pack?.tier||'starter', pack?.max_users||5, pack?.max_concurrent||2, email);
+
+    const subId = genId();
+    const now = new Date();
+    const ends = new Date(now);
+    ends.setMonth(ends.getMonth() + (billing_cycle === 'annual' ? 12 : 1));
+    sqliteDb.prepare(`
+      INSERT INTO tenant_subscriptions (id, tenant_id, pack_id, status, starts_at, ends_at, auto_renew, activated_by)
+      VALUES (?,?,?,'active',?,?,1,?)
+    `).run(subId, tenantId, pack?.id||'', now.toISOString(), ends.toISOString(), req.user?.id);
+
+    const oaId = genId();
+    sqliteDb.prepare(`
+      INSERT INTO org_admins (id, user_id, tenant_id, name, email, phone, company, country, timezone,
+        license_pack_id, status, activation_date, license_fee_usd, billing_cycle, next_billing_date, notes)
+      VALUES (?,?,?,?,?,?,?,?,?,?,'active',?,?,?,?,?)
+    `).run(oaId, userId, tenantId, name, email, phone||'', company, country||'US', timezone||'UTC',
+      pack?.id||'', now.toISOString(), pack?.price_usd||0, billing_cycle||'monthly',
+      ends.toISOString(), notes||'');
+
+    sqliteDb.prepare(`
+      INSERT INTO tenant_users (id, tenant_id, user_id, email, name, role, status)
+      VALUES (?,?,?,?,?,'tenant_admin','active')
+    `).run(genId(), tenantId, userId, email, name);
+
+    res.json({ success: true, id: oaId, tenantId, userId, message: `Org admin ${name} created successfully` });
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/saas/org-admins/:id — update org admin
+app.patch('/api/saas/org-admins/:id', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { status, license_pack_id, notes, billing_cycle, next_billing_date } = req.body;
+    const fields: string[] = [];
+    const vals: any[] = [];
+    if (status !== undefined) { fields.push('status=?'); vals.push(status); }
+    if (license_pack_id !== undefined) { fields.push('license_pack_id=?'); vals.push(license_pack_id); }
+    if (notes !== undefined) { fields.push('notes=?'); vals.push(notes); }
+    if (billing_cycle !== undefined) { fields.push('billing_cycle=?'); vals.push(billing_cycle); }
+    if (next_billing_date !== undefined) { fields.push('next_billing_date=?'); vals.push(next_billing_date); }
+    if (!fields.length) return res.status(400).json({ error: 'Nothing to update' });
+    fields.push('updated_at=CURRENT_TIMESTAMP');
+    vals.push(req.params.id);
+    sqliteDb.prepare(`UPDATE org_admins SET ${fields.join(',')} WHERE id=?`).run(...vals);
+    res.json({ success: true });
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/saas/org-admins/:id/activate — activate or suspend
+app.post('/api/saas/org-admins/:id/activate', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { action } = req.body;
+    const newStatus = action === 'activate' ? 'active' : 'suspended';
+    const oa = sqliteDb.prepare('SELECT * FROM org_admins WHERE id=?').get(req.params.id) as any;
+    if (!oa) return res.status(404).json({ error: 'Not found' });
+    sqliteDb.prepare(`UPDATE org_admins SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(newStatus, req.params.id);
+    sqliteDb.prepare(`UPDATE tenants SET status=? WHERE id=?`).run(newStatus, oa.tenant_id);
+    sqliteDb.prepare(`UPDATE users SET role=? WHERE id=?`).run(action === 'activate' ? 'org_admin' : 'suspended', oa.user_id);
+    res.json({ success: true, status: newStatus });
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/saas/license-requests — all license requests
+app.get('/api/saas/license-requests', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const rows = sqliteDb.prepare(`SELECT * FROM license_requests ORDER BY created_at DESC`).all();
+    res.json(rows);
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/saas/license-requests/:id — approve or reject
+app.patch('/api/saas/license-requests/:id', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { status, notes } = req.body;
+    sqliteDb.prepare(`UPDATE license_requests SET status=?, notes=?, reviewed_by=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?`)
+      .run(status, notes||'', req.user?.email||'super_admin', req.params.id);
+    if (status === 'approved') {
+      const lr = sqliteDb.prepare('SELECT * FROM license_requests WHERE id=?').get(req.params.id) as any;
+      if (lr) sqliteDb.prepare(`UPDATE tenants SET max_users=? WHERE id=?`).run(lr.requested_seats, lr.tenant_id);
+    }
+    res.json({ success: true });
+  } catch(e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // SPA CATCH-ALL — MUST be last, after ALL API routes
 // Serves the React SPA for any non-API request in monolith mode.
 // ══════════════════════════════════════════════════════════════════════════════
