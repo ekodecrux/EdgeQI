@@ -28,17 +28,17 @@ cmds = [
   "node_modules/.bin/playwright install chromium --with-deps 2>/dev/null || true",
   # Pre-download Trivy DB to avoid first-run delay
   "trivy image --download-db-only 2>/dev/null || true",
+  # Install esbuild explicitly as a production dep so it is available in build phase
+  "npm install --no-save esbuild@latest",
 ]
 
 [phases.build]
 cmds = [
-  # Install esbuild for server bundling (it's a devDep, not in --omit=dev)
-  "npm install --no-save esbuild 2>/dev/null || npx --yes esbuild --version",
-  # Rebuild server bundle from source so Railway always has latest routes
-  "npx esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx",
-  "echo 'Server build complete:' && ls -lh dist/server.cjs",
+  # Use pre-built dist/server.cjs if it exists (committed to git), otherwise rebuild
+  "if [ -f dist/server.cjs ]; then echo 'Using pre-built dist/server.cjs'; else npx --yes esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx; fi",
+  "echo 'Build complete:' && ls -lh dist/server.cjs",
 ]
 
 [start]
 cmd = "mkdir -p data && node dist/server.cjs"
-# Build timestamp: 2026-06-06 — forced redeploy after SQLite fix
+# Build timestamp: 2026-06-07 — fixed esbuild not found + use pre-built bundle
