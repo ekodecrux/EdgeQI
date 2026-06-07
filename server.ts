@@ -5337,9 +5337,20 @@ app.post('/api/tms/pull/requirements', async (req, res) => {
         { id: `${projectKey}-5`, title: 'API Rate Limiting', type: 'User Story', status: 'To Do', priority: 'Low', source: cfg.tool, demo: true },
       ];
     }
+    // ── Save pulled items to EdgeQI DB (always, not just on saveToDb flag) ──
+    const savedReqIds: string[] = [];
+    for (const item of items) {
+      const reqId = `REQ-TMS-${item.id || Date.now()}`;
+      const existing = sqliteDb.prepare('SELECT id FROM requirements WHERE id=?').get(reqId);
+      if (!existing) {
+        sqliteDb.prepare(`INSERT OR IGNORE INTO requirements (id,title,description,priority,status,module,source,raw_json) VALUES (?,?,?,?,?,?,?,?)`)
+          .run(reqId, item.title || item.summary || 'Untitled', item.description || item.body || '', item.priority || 'Medium', item.status || 'Active', item.type || 'User Story', cfg.tool, JSON.stringify(item));
+        savedReqIds.push(reqId);
+      }
+    }
     logTmsSync(cfg.id, 'requirements', 'pull', 'ok', items.length, `Pulled ${items.length} items from ${cfg.tool}`);
     sqliteDb.prepare(`UPDATE tms_configs SET last_synced_at=CURRENT_TIMESTAMP WHERE id=?`).run(cfg.id);
-    res.json({ success: true, tool: cfg.tool, label: cfg.label, items, count: items.length, demo: items[0]?.demo || false });
+    res.json({ success: true, tool: cfg.tool, label: cfg.label, items, count: items.length, saved: savedReqIds.length, demo: items[0]?.demo || false });
   } catch (e: any) {
     const items = [
       { id: `${projectKey}-1`, title: 'User Login with SSO', type: 'User Story', status: 'In Progress', priority: 'High', source: cfg.tool, demo: true },
@@ -5379,8 +5390,19 @@ app.post('/api/tms/pull/testcases', async (req, res) => {
         { id: `${projectKey}-TC-05`, title: 'Verify role-based menu visibility', status: 'Active', priority: 'High', source: cfg.tool, demo: true },
       ];
     }
+    // ── Save pulled test cases to EdgeQI DB ──
+    const savedTcIds: string[] = [];
+    for (const item of items) {
+      const tcId = `TC-TMS-${item.id || Date.now()}`;
+      const existing = sqliteDb.prepare('SELECT id FROM test_cases WHERE id=?').get(tcId);
+      if (!existing) {
+        sqliteDb.prepare(`INSERT OR IGNORE INTO test_cases (id,title,description,priority,type,automation_status,confidence_score,module,source,raw_json) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+          .run(tcId, item.title || item.name || 'Untitled TC', item.description || '', item.priority || 'P2', 'Functional', 'Automatable', 80, item.module || 'General', cfg.tool, JSON.stringify(item));
+        savedTcIds.push(tcId);
+      }
+    }
     logTmsSync(cfg.id, 'testcases', 'pull', 'ok', items.length, `Pulled ${items.length} TCs from ${cfg.tool}`);
-    res.json({ success: true, tool: cfg.tool, label: cfg.label, items, count: items.length, demo: items[0]?.demo || false });
+    res.json({ success: true, tool: cfg.tool, label: cfg.label, items, count: items.length, saved: savedTcIds.length, demo: items[0]?.demo || false });
   } catch (e: any) {
     const items = [
       { id: `${projectKey}-TC-01`, title: 'Verify login with valid credentials', status: 'Active', priority: 'High', source: cfg.tool, demo: true },
@@ -5421,8 +5443,21 @@ app.post('/api/tms/pull/defects', async (req, res) => {
         { id: `${projectKey}-BUG-5`, title: 'API returns 500 on empty filter', severity: 'High', status: 'Open', module: 'API', type: 'Bug', source: cfg.tool, demo: true },
       ];
     }
+    // ── Save pulled defects to EdgeQI DB ──
+    const savedDefectIds: string[] = [];
+    for (const item of items) {
+      const defId = `DEF-TMS-${item.id || Date.now()}`;
+      try {
+        const existing = sqliteDb.prepare('SELECT id FROM defects WHERE id=?').get(defId);
+        if (!existing) {
+          sqliteDb.prepare(`INSERT OR IGNORE INTO defects (id,title,severity,status,module,description,source,raw_json) VALUES (?,?,?,?,?,?,?,?)`)
+            .run(defId, item.title || item.summary || 'Untitled Defect', item.severity || 'Medium', item.status || 'Open', item.module || 'General', item.description || '', cfg.tool, JSON.stringify(item));
+          savedDefectIds.push(defId);
+        }
+      } catch { /* defects table may have different schema on some installs */ }
+    }
     logTmsSync(cfg.id, 'defects', 'pull', 'ok', items.length, `Pulled ${items.length} defects from ${cfg.tool}`);
-    res.json({ success: true, tool: cfg.tool, label: cfg.label, items, count: items.length, demo: items[0]?.demo || false });
+    res.json({ success: true, tool: cfg.tool, label: cfg.label, items, count: items.length, saved: savedDefectIds.length, demo: items[0]?.demo || false });
   } catch (e: any) {
     const items = [
       { id: `${projectKey}-BUG-1`, title: 'Login fails on Safari iOS 17', severity: 'Critical', status: 'Open', module: 'Authentication', type: 'Bug', source: cfg.tool, demo: true },

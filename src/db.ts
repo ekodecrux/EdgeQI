@@ -494,6 +494,81 @@ if (projCount === 0) {
     .run('PROJ-DEFAULT', 'My First Application', 'Default project — rename to your application name', '', 'React / Node.js / REST API', 'team@company.com', '#1e96df', '🚀');
 }
 
+// ─── TEST DATA MANAGER TABLES ─────────────────────────────────────────────
+sqliteDb.exec(`
+  -- Test Data Sets: a named collection of test data records for a specific environment
+  CREATE TABLE IF NOT EXISTS test_data_sets (
+    id TEXT PRIMARY KEY,
+    project_id TEXT DEFAULT 'global',
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    environment TEXT DEFAULT 'test',   -- dev | test | pre-prod | uat | performance | staging | prod
+    strategy TEXT NOT NULL,            -- anonymize | api | synthetic | conditions | rag | scrape | erp
+    status TEXT DEFAULT 'draft',       -- draft | pending_approval | approved | rejected | active
+    approved_by TEXT DEFAULT '',
+    approved_at DATETIME,
+    rejection_reason TEXT DEFAULT '',
+    linked_test_case_ids TEXT DEFAULT '[]',  -- JSON array of test case IDs
+    linked_execution_run_id TEXT DEFAULT '', -- execution run that used this set
+    record_count INTEGER DEFAULT 0,
+    tags TEXT DEFAULT '[]',
+    source_config TEXT DEFAULT '{}',   -- JSON: strategy-specific config (url, api spec, conditions, etc.)
+    created_by TEXT DEFAULT 'system',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Individual test data records within a set
+  CREATE TABLE IF NOT EXISTS test_data_records (
+    id TEXT PRIMARY KEY,
+    set_id TEXT NOT NULL,
+    field_name TEXT NOT NULL,
+    field_value TEXT,
+    field_type TEXT DEFAULT 'string',  -- string | number | boolean | date | email | phone | uuid | masked
+    is_masked INTEGER DEFAULT 0,
+    mask_pattern TEXT DEFAULT '',      -- e.g. "***-**-XXXX" for SSN
+    is_pii INTEGER DEFAULT 0,
+    notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(set_id) REFERENCES test_data_sets(id) ON DELETE CASCADE
+  );
+
+  -- Approval workflow audit trail
+  CREATE TABLE IF NOT EXISTS test_data_approvals (
+    id TEXT PRIMARY KEY,
+    set_id TEXT NOT NULL,
+    action TEXT NOT NULL,              -- submitted | approved | rejected | revoked
+    actor_email TEXT NOT NULL,
+    comment TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(set_id) REFERENCES test_data_sets(id) ON DELETE CASCADE
+  );
+
+  -- ERP connection configs (SAP, Oracle, Dynamics, Salesforce, etc.)
+  CREATE TABLE IF NOT EXISTS erp_configs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT DEFAULT 'global',
+    name TEXT NOT NULL,
+    erp_type TEXT NOT NULL,            -- sap | oracle | dynamics365 | salesforce | netsuite | custom
+    base_url TEXT NOT NULL,
+    auth_type TEXT DEFAULT 'basic',    -- basic | oauth2 | apikey | saml
+    username TEXT DEFAULT '',
+    password_hint TEXT DEFAULT '',     -- never store plaintext; hint only
+    api_key TEXT DEFAULT '',
+    client_id TEXT DEFAULT '',
+    client_secret_hint TEXT DEFAULT '',
+    extra_config TEXT DEFAULT '{}',
+    is_active INTEGER DEFAULT 1,
+    last_tested_at DATETIME,
+    last_tested_ok INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Safe migrations for test_data tables
+try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN sprint_id TEXT DEFAULT ''`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN version INTEGER DEFAULT 1`); } catch {}
+
 // ─── SEED DEFAULT PROMPT TEMPLATES ─────────────────────────────────────────
 const templateCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM prompt_templates").get() as any).c;
 if (templateCount === 0) {
