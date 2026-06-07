@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
+// vite is dev-only — imported dynamically below to keep it out of the production bundle
 import { GoogleGenAI, Type } from "@google/genai";
 import Groq from "groq-sdk";
 import multer from "multer";
@@ -8443,7 +8443,8 @@ async function startServer() {
   });
 
   if (process.env.NODE_ENV !== "production") {
-    // Full-stack dev: serve React via Vite middleware
+    // Full-stack dev: serve React via Vite middleware (dynamic import keeps vite out of prod bundle)
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
