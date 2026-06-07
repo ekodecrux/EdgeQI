@@ -6,7 +6,7 @@ interface RbacRole { id: string; role_name: string; display_name: string; descri
 interface Issue { id: string; ticket_ref: string; tenant_name: string; reporter_email: string; title: string; description: string; category: string; priority: string; status: string; assigned_to: string; resolution: string; sla_hours: number; created_at: string; updated_at: string; }
 interface EmailTrigger { id: string; event_type: string; trigger_name: string; description: string; threshold_value: number; threshold_unit: string; template_subject: string; template_body: string; recipient_type: string; is_active: number; last_fired_at?: string; fire_count: number; }
 interface TenantConfig { tenant_id: string; tenant_name?: string; plan?: string; feature_flags: string; max_users: number; max_projects: number; max_api_calls_day: number; max_ai_tokens_day: number; custom_domain: string; sso_enforced: number; data_retention_days: number; branding_primary_color: string; notification_email: string; timezone: string; }
-interface Tenant { id: string; name: string; plan: string; status: string; contact_email: string; }
+interface Tenant { id: string; name: string; plan: string; plan_tier?: string; pack_name?: string; status: string; contact_email: string; country?: string; geo_region?: string; created_at?: string; active_users: number; concurrent_now?: number; ends_at?: string; sub_status?: string; }
 interface AnalyticsTrend { date: string; api_calls: number; active_users: number; revenue: number; test_runs: number; }
 interface GeoData { geo_region: string; api_calls: number; active_users: number; revenue: number; tenants: number; }
 interface CustomerData { tenant_name: string; company_size: string; license_tier: string; geo_region: string; api_calls: number; revenue: number; test_runs: number; }
@@ -14,6 +14,7 @@ interface OverviewStats { totalTenants: number; totalUsers: number; mrr: number;
 
 const TABS = [
   { id: 'overview',  label: 'Business Dashboard', icon: '📊' },
+  { id: 'orgs',      label: 'Active Orgs',         icon: '🏢' },
   { id: 'analytics', label: 'Analytics & Trends',  icon: '📈' },
   { id: 'rbac',      label: 'RBAC & Permissions',  icon: '🔐' },
   { id: 'users',     label: 'User Management',     icon: '👥' },
@@ -692,7 +693,176 @@ export default function SuperAdminPortal({ token }: { token: string }) {
     </div>
   );
 
-  const tabContent: Record<string, () => JSX.Element> = { overview: renderOverview, analytics: renderAnalytics, rbac: renderRbac, users: renderUsers, payments: renderPayments, licenses: renderLicenses, wizard: renderWizard, triggers: renderTriggers, issues: renderIssues };
+  // ── Tab: Active Orgs ─────────────────────────────────────────────────────
+  const [orgSearch, setOrgSearch] = useState('');
+  const [orgStatusFilter, setOrgStatusFilter] = useState('');
+  const [selectedOrg, setSelectedOrg] = useState<Tenant | null>(null);
+  const [orgDetail, setOrgDetail] = useState<any>(null);
+
+  const loadOrgDetail = async (orgId: string) => {
+    const r = await fetch(`${API}/api/saas/tenants/${orgId}`, { headers: authH() });
+    if (r.ok) setOrgDetail(await r.json());
+  };
+
+  const updateOrgStatus = async (orgId: string, status: string) => {
+    const r = await fetch(`${API}/api/saas/tenants/${orgId}/status`, { method: 'PATCH', headers: authH(), body: JSON.stringify({ status }) });
+    if (r.ok) { showToast(`Org status → ${status}`); fetchAll(); setOrgDetail(null); setSelectedOrg(null); } else showToast('Failed', 'error');
+  };
+
+  const filteredOrgs = tenants.filter(t =>
+    (!orgSearch || t.name?.toLowerCase().includes(orgSearch.toLowerCase()) || t.contact_email?.toLowerCase().includes(orgSearch.toLowerCase())) &&
+    (!orgStatusFilter || t.status === orgStatusFilter)
+  );
+
+  const STATUS_ORG_COLORS: Record<string, string> = { active: '#22c55e', trial: '#f59e0b', suspended: '#ef4444', cancelled: '#6b7280', inactive: '#6b7280' };
+
+  const renderOrgs = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Summary KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        {[
+          { label: 'Total Orgs', value: tenants.length, color: '#6366f1', icon: '🏢' },
+          { label: 'Active', value: tenants.filter(t => t.status === 'active').length, color: '#22c55e', icon: '✅' },
+          { label: 'Trial', value: tenants.filter(t => t.status === 'trial').length, color: '#f59e0b', icon: '🔄' },
+          { label: 'Total Users', value: tenants.reduce((s, t) => s + (t.active_users || 0), 0), color: '#a78bfa', icon: '👥' },
+        ].map(k => (
+          <div key={k.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '14px 18px' }}>
+            <div style={{ color: '#9ca3af', fontSize: 12, marginBottom: 4 }}>{k.icon} {k.label}</div>
+            <div style={{ color: k.color, fontSize: 24, fontWeight: 700 }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input placeholder="Search org name or email…" value={orgSearch} onChange={e => setOrgSearch(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
+        <select value={orgStatusFilter} onChange={e => setOrgStatusFilter(e.target.value)} style={selStyle}>
+          <option value=''>All Statuses</option>
+          <option value='active'>Active</option>
+          <option value='trial'>Trial</option>
+          <option value='suspended'>Suspended</option>
+          <option value='cancelled'>Cancelled</option>
+        </select>
+        <span style={{ color: '#6b7280', fontSize: 13, whiteSpace: 'nowrap' }}>{filteredOrgs.length} orgs</span>
+      </div>
+
+      {/* Orgs Table */}
+      <div style={{ overflowX: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+              {['Organisation', 'Contact', 'License Tier', 'Status', 'Users', 'Concurrent', 'Expires', 'Actions'].map(h => (
+                <th key={h} style={{ color: '#6b7280', fontWeight: 600, textAlign: 'left', padding: '12px 14px', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredOrgs.length === 0 && (
+              <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>No organisations found. Create one in the Customer Config tab.</td></tr>
+            )}
+            {filteredOrgs.map(org => (
+              <tr key={org.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <td style={{ padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{org.name?.[0]?.toUpperCase() || '?'}</div>
+                    <div>
+                      <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{org.name}</div>
+                      <div style={{ color: '#6b7280', fontSize: 11 }}>{org.country || org.geo_region || 'Global'}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding: '14px', color: '#9ca3af', fontSize: 12 }}>{org.contact_email || '—'}</td>
+                <td style={{ padding: '14px' }}>
+                  <Badge label={org.pack_name || org.plan_tier || org.plan || 'No Plan'} color={TIER_COLORS[org.plan_tier || org.plan || ''] || '#6b7280'} />
+                </td>
+                <td style={{ padding: '14px' }}>
+                  <Badge label={org.status || 'unknown'} color={STATUS_ORG_COLORS[org.status || ''] || '#6b7280'} />
+                </td>
+                <td style={{ padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 16 }}>{org.active_users || 0}</span>
+                    <span style={{ color: '#6b7280', fontSize: 11 }}>active</span>
+                  </div>
+                </td>
+                <td style={{ padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: (org.concurrent_now || 0) > 0 ? '#22c55e' : '#374151', boxShadow: (org.concurrent_now || 0) > 0 ? '0 0 6px #22c55e' : 'none' }} />
+                    <span style={{ color: '#9ca3af', fontSize: 13 }}>{org.concurrent_now || 0} live</span>
+                  </div>
+                </td>
+                <td style={{ padding: '14px', color: org.ends_at && new Date(org.ends_at) < new Date(Date.now() + 30*24*60*60*1000) ? '#ef4444' : '#6b7280', fontSize: 12 }}>
+                  {org.ends_at ? new Date(org.ends_at).toLocaleDateString() : '—'}
+                </td>
+                <td style={{ padding: '14px' }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => { setSelectedOrg(org); loadOrgDetail(org.id); }} style={{ ...btnStyle('#6366f1'), padding: '5px 10px', fontSize: 11 }}>View</button>
+                    {org.status === 'active' && <button onClick={() => updateOrgStatus(org.id, 'suspended')} style={{ ...btnStyle('#ef4444'), padding: '5px 10px', fontSize: 11 }}>Suspend</button>}
+                    {org.status === 'suspended' && <button onClick={() => updateOrgStatus(org.id, 'active')} style={{ ...btnStyle('#22c55e'), padding: '5px 10px', fontSize: 11 }}>Activate</button>}
+                    {org.status === 'trial' && <button onClick={() => updateOrgStatus(org.id, 'active')} style={{ ...btnStyle('#22c55e'), padding: '5px 10px', fontSize: 11 }}>Activate</button>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Org Detail Drawer */}
+      {selectedOrg && orgDetail && (
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 24, marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 16 }}>🏢 {selectedOrg.name} — Details</div>
+            <button onClick={() => { setSelectedOrg(null); setOrgDetail(null); }} style={{ background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 18 }}>✕</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 14 }}>
+              <div style={{ color: '#6b7280', fontSize: 11, marginBottom: 4 }}>SUBSCRIPTION</div>
+              <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{orgDetail.subscription?.pack_name || 'None'}</div>
+              <div style={{ color: '#9ca3af', fontSize: 11 }}>{orgDetail.subscription?.billing_cycle || ''}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 14 }}>
+              <div style={{ color: '#6b7280', fontSize: 11, marginBottom: 4 }}>SEAT USAGE</div>
+              <div style={{ color: '#e2e8f0', fontWeight: 600 }}>{orgDetail.users?.length || 0} / {orgDetail.subscription?.max_users || '∞'}</div>
+              <div style={{ color: '#9ca3af', fontSize: 11 }}>users / max seats</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 14 }}>
+              <div style={{ color: '#6b7280', fontSize: 11, marginBottom: 4 }}>REVENUE</div>
+              <div style={{ color: '#22c55e', fontWeight: 600 }}>${Number(orgDetail.subscription?.price_usd || 0).toLocaleString()}</div>
+              <div style={{ color: '#9ca3af', fontSize: 11 }}>per {orgDetail.subscription?.billing_cycle || 'period'}</div>
+            </div>
+          </div>
+          <div style={{ color: '#9ca3af', fontSize: 13, fontWeight: 600, marginBottom: 10 }}>👥 Users in this Org</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  {['Name', 'Email', 'Role', 'Status', 'Joined'].map(h => <th key={h} style={{ color: '#6b7280', textAlign: 'left', padding: '8px 10px' }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {(orgDetail.users || []).map((u: any) => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <td style={{ padding: '8px 10px', color: '#e2e8f0' }}>{u.name || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: '#9ca3af' }}>{u.email}</td>
+                    <td style={{ padding: '8px 10px' }}><Badge label={u.role || 'member'} color='#6366f1' /></td>
+                    <td style={{ padding: '8px 10px' }}><Badge label={u.status || 'active'} color={STATUS_ORG_COLORS[u.status || 'active'] || '#22c55e'} /></td>
+                    <td style={{ padding: '8px 10px', color: '#6b7280' }}>{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+                {(!orgDetail.users || orgDetail.users.length === 0) && (
+                  <tr><td colSpan={5} style={{ padding: 16, color: '#6b7280', textAlign: 'center' }}>No users in this org yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const tabContent: Record<string, () => JSX.Element> = { overview: renderOverview, orgs: renderOrgs, analytics: renderAnalytics, rbac: renderRbac, users: renderUsers, payments: renderPayments, licenses: renderLicenses, wizard: renderWizard, triggers: renderTriggers, issues: renderIssues };
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)', color: '#e2e8f0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>

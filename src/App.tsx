@@ -37,7 +37,8 @@ import {
   GitMerge,
   Menu,
   Crown,
-  Building2
+  Building2,
+  Users
 } from 'lucide-react';
 
 import { 
@@ -88,6 +89,7 @@ import CicdConfigSettings from './components/CicdConfigSettings';
 import TestDataManager from './components/TestDataManager';
 import SuperAdminPortal from './components/SuperAdminPortal';
 import TenantAdminPortal from './components/TenantAdminPortal';
+import OrgUserManagement from './components/OrgUserManagement';
 import { apiUrl } from '@/src/config/api';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
@@ -1128,6 +1130,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           {authUser?.role === 'org_admin' && (
             <SidebarGroup label="Administration">
               <SidebarItem id="org-admin" label="Org Admin" Icon={Building2} active={activeTab === 'org-admin'} onClick={() => handleTabChange('org-admin' as any)} />
+              <SidebarItem id="user-management" label="User Management" Icon={Users} active={activeTab === 'user-management'} onClick={() => handleTabChange('user-management' as any)} />
             </SidebarGroup>
           )}
 
@@ -1539,6 +1542,10 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
 
           {activeTab === 'org-admin' && authUser?.role === 'org_admin' && (
             <TenantAdminPortal token={authToken} />
+          )}
+
+          {activeTab === 'user-management' && authUser?.role === 'org_admin' && (
+            <OrgUserManagement token={authToken} />
           )}
 
           {activeTab === 'rag-kb' && (

@@ -9145,6 +9145,43 @@ app.delete('/api/tenant/users/:id', requireTenantAdmin, (req: any, res: any) => 
   res.json({ success: true });
 });
 
+// Org Admin: change user role within org
+app.patch('/api/tenant/users/:id/role', requireTenantAdmin, (req: any, res: any) => {
+  const { role } = req.body;
+  const allowed = ['org_admin','qa_lead','qa_engineer','viewer'];
+  if (!allowed.includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  sqliteDb.prepare('UPDATE tenant_users SET role=? WHERE id=? AND tenant_id=?').run(role, req.params.id, req.user.tenant_id);
+  res.json({ success: true });
+});
+
+// Org Admin: get license/seat usage summary
+app.get('/api/tenant/license-summary', requireTenantAdmin, (req: any, res: any) => {
+  const tenantId = req.user.tenant_id;
+  const tenant = sqliteDb.prepare('SELECT * FROM tenants WHERE id=?').get(tenantId) as any;
+  const sub = sqliteDb.prepare(`SELECT ts.*, lp.name as pack_name, lp.tier, lp.max_users, lp.max_concurrent, lp.price_usd, lp.billing_cycle, lp.features
+    FROM tenant_subscriptions ts JOIN license_packs lp ON lp.id=ts.pack_id WHERE ts.tenant_id=? AND ts.status='active'`).get(tenantId) as any;
+  const activeUsers = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenant_users WHERE tenant_id=? AND status='active'").get(tenantId) as any).c;
+  const invitedUsers = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenant_users WHERE tenant_id=? AND status='invited'").get(tenantId) as any).c;
+  const suspendedUsers = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenant_users WHERE tenant_id=? AND status='suspended'").get(tenantId) as any).c;
+  const concurrent = (sqliteDb.prepare('SELECT COUNT(*) as c FROM active_sessions WHERE tenant_id=? AND expires_at > CURRENT_TIMESTAMP').get(tenantId) as any).c;
+  res.json({
+    tenant_name: tenant?.name,
+    pack_name: sub?.pack_name || 'No active subscription',
+    tier: sub?.tier,
+    max_users: sub?.max_users || tenant?.max_users || 0,
+    max_concurrent: sub?.max_concurrent || 0,
+    price_usd: sub?.price_usd || 0,
+    billing_cycle: sub?.billing_cycle,
+    ends_at: sub?.ends_at,
+    active_users: activeUsers,
+    invited_users: invitedUsers,
+    suspended_users: suspendedUsers,
+    concurrent_now: concurrent,
+    seats_used: activeUsers,
+    seats_available: Math.max(0, (sub?.max_users || tenant?.max_users || 0) - activeUsers)
+  });
+});
+
 // SSO Configuration
 app.get('/api/tenant/sso', requireTenantAdmin, (req: any, res: any) => {
   const sso = sqliteDb.prepare("SELECT * FROM sso_configs WHERE tenant_id=?").get(req.user.tenant_id);
@@ -9287,6 +9324,30 @@ app.patch('/api/saas/users/:id/promote', requireSuperAdmin, (req: any, res: any)
 
 app.get('/api/saas/users', requireSuperAdmin, (req: any, res: any) => {
   res.json(sqliteDb.prepare("SELECT id,email,name,role,created_at,last_login FROM users ORDER BY created_at DESC").all());
+});
+
+// Super Admin: reset any user's password
+app.post('/api/saas/users/:id/reset-password', requireSuperAdmin, async (req: any, res: any) => {
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const hash = await bcrypt.hash(newPassword, 10);
+  const result = sqliteDb.prepare('UPDATE users SET password_hash=? WHERE id=?').run(hash, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
+  logSuperAdminAudit(req.user.id, 'RESET_PASSWORD', 'user', req.params.id, 'Password reset by super admin', req.ip);
+  res.json({ success: true, message: 'Password reset successfully' });
+});
+
+// Super Admin: update user email and/or password
+app.put('/api/saas/users/:id', requireSuperAdmin, async (req: any, res: any) => {
+  const { email, name, password, role } = req.body;
+  const user = sqliteDb.prepare('SELECT * FROM users WHERE id=?').get(req.params.id) as any;
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  let hash = user.password_hash;
+  if (password && password.length >= 6) hash = await bcrypt.hash(password, 10);
+  sqliteDb.prepare('UPDATE users SET email=COALESCE(?,email), name=COALESCE(?,name), role=COALESCE(?,role), password_hash=? WHERE id=?')
+    .run(email || null, name || null, role || null, hash, req.params.id);
+  logSuperAdminAudit(req.user.id, 'UPDATE_USER', 'user', req.params.id, `Updated: ${JSON.stringify({email,name,role})}`, req.ip);
+  res.json({ success: true, message: 'User updated successfully' });
 });
 
 // ─── SUPER ADMIN: Force DB migrations (safe, idempotent) ─────────────────────
