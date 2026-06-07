@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Plus, Play, Pause, Trash2, RefreshCw, CheckCircle, XCircle, AlertCircle, Calendar, Settings2, Bell, X } from 'lucide-react';
 import { apiUrl } from '@/src/config/api';
+import { TmsSyncBar } from './TmsSyncBar';
 
 interface Schedule {
   id: string;
@@ -25,7 +26,11 @@ const CRON_PRESETS = [
   { label: 'Daily (midnight)', value: '@daily' },
 ];
 
-export default function SchedulerTab() {
+interface SchedulerTabProps {
+  currentProjectId?: string;
+}
+
+export default function SchedulerTab({ currentProjectId = 'global' }: SchedulerTabProps) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -215,6 +220,24 @@ export default function SchedulerTab() {
           </div>
         </div>
       )}
+
+      {/* TMS Integration Bar — push scheduled run configs */}
+      <TmsSyncBar
+        module="scheduler"
+        ops={['push']}
+        onPush={async () => {
+          const token = localStorage.getItem('iq_token') || '';
+          const res = await fetch('/api/tms/push/scheduler', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ projectId: currentProjectId, schedules }),
+          });
+          return res.json();
+        }}
+        pushLabel={`Push ${schedules.length} Schedule${schedules.length !== 1 ? 's' : ''} to TMS`}
+        pushDisabled={schedules.length === 0}
+        projectId={currentProjectId}
+      />
 
       {/* Page Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #E2E8F0'}}>

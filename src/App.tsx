@@ -1388,8 +1388,8 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             />
           )}
           {activeTab === 'feedback' && <FeedbackTemplatesTab />}
-          {activeTab === 'scheduler' && <SchedulerTab />}
-          {activeTab === 'analytics' && <AnalyticsTab />}
+          {activeTab === 'scheduler' && <SchedulerTab currentProjectId={currentProjectId === 'ALL' ? 'global' : currentProjectId} />}
+          {activeTab === 'analytics' && <AnalyticsTab currentProjectId={currentProjectId === 'ALL' ? 'global' : currentProjectId} />}
           {activeTab === 'workflow-builder' && (
             <WorkflowBuilder
               currentProjectId={currentProjectId}

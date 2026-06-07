@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AreaChart, TrendingUp, Cpu, Server, Play, ShieldAlert, CheckCircle2, Sliders, HelpCircle, RefreshCw, History, ArrowRight, CheckCircle, TableProperties, Download, Sparkles, Zap, FileCode } from 'lucide-react';
 import { PerformanceConfig, TestCase } from '../types';
+import { TmsSyncBar } from './TmsSyncBar';
 
 interface PerformanceProps {
   configs: PerformanceConfig[];
@@ -15,6 +16,7 @@ interface PerformanceProps {
   ) => Promise<void>;
   isExecuting: boolean;
   onNavigateToDashboard?: () => void;
+  currentProjectId?: string;
 }
 
 export default function PerformanceTab({
@@ -23,6 +25,7 @@ export default function PerformanceTab({
   onExecutePerformanceTest,
   isExecuting,
   onNavigateToDashboard,
+  currentProjectId = 'global',
 }: PerformanceProps) {
   const [testType, setTestType] = useState<'Browser' | 'API'>('API');
   const [endpointOrJourney, setEndpointOrJourney] = useState('POST /api/v1/checkout/charge');
@@ -337,6 +340,24 @@ export function handleSummary(data) {
 
   const hasRunBefore = configs.length > 0;
 
+  // TMS push handler for performance results
+  const handleTmsPerfPush = async () => {
+    const token = localStorage.getItem('iq_token') || '';
+    const metrics = activeMetric.metrics || {};
+    const res = await fetch('/api/tms/push/performance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({
+        projectId: currentProjectId,
+        endpoint: endpointOrJourney,
+        virtualUsers,
+        durationSeconds,
+        metrics,
+      }),
+    });
+    return res.json();
+  };
+
   return (
     <div className="space-y-4">
 
@@ -400,6 +421,16 @@ export function handleSummary(data) {
         </div>
       </div>
     )}
+
+    {/* TMS Integration Bar */}
+    <TmsSyncBar
+      module="performance"
+      ops={['push']}
+      onPush={handleTmsPerfPush}
+      pushLabel={`Push Perf Results to TMS`}
+      pushDisabled={!hasRunBefore && configs.length === 0}
+      projectId={currentProjectId}
+    />
 
     {/* Test case quick-pick */}
     {testCases.length > 0 && (

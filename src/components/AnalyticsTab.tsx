@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Cpu, Clock, DollarSign, RefreshCw, Zap, AlertCircle, CheckCircle } from 'lucide-react';
 import { apiUrl } from '@/src/config/api';
+import { TmsSyncBar } from './TmsSyncBar';
 
 interface TrendEntry {
   date: string;
@@ -66,7 +67,11 @@ function BarChart({
   );
 }
 
-export default function AnalyticsTab() {
+interface AnalyticsTabProps {
+  currentProjectId?: string;
+}
+
+export default function AnalyticsTab({ currentProjectId = 'global' }: AnalyticsTabProps) {
   const [data, setData] = useState<ServerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
@@ -112,6 +117,28 @@ export default function AnalyticsTab() {
 
   return (
     <div className="space-y-6">
+
+      {/* TMS Integration Bar — push KPI snapshot */}
+      <TmsSyncBar
+        module="analytics"
+        ops={['push']}
+        onPush={async () => {
+          const token = localStorage.getItem('iq_token') || '';
+          const res = await fetch('/api/tms/push/analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({
+              projectId: currentProjectId,
+              period: `${days}d`,
+              summary: data?.summary ?? {},
+            }),
+          });
+          return res.json();
+        }}
+        pushLabel="Push KPI Snapshot to TMS"
+        pushDisabled={!data || loading}
+        projectId={currentProjectId}
+      />
 
       {/* Page Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingBottom:20,marginBottom:4,borderBottom:'1px solid #E2E8F0'}}>

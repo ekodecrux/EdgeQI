@@ -105,6 +105,7 @@ ${filtered.length === 0 ? '<p>No findings related to ' + standard + '. System is
 
 import { SecurityVulnerability, TestCase } from '../types';
 import { apiUrl } from '@/src/config/api';
+import { TmsSyncBar } from './TmsSyncBar';
 
 interface SecurityProps {
   vulnerabilities: SecurityVulnerability[];
@@ -112,6 +113,7 @@ interface SecurityProps {
   onApplyRemediation: (vulnerabilityId: string) => Promise<void>;
   isRemediating: string | null;
   onNavigateToDashboard?: () => void;
+  currentProjectId?: string;
 }
 
 export default function SecurityTab({
@@ -120,6 +122,7 @@ export default function SecurityTab({
   onApplyRemediation,
   isRemediating,
   onNavigateToDashboard,
+  currentProjectId = 'global',
 }: SecurityProps) {
   const [selectedVulId, setSelectedVulId] = useState<string | null>(vulnerabilities[0]?.id || null);
 
@@ -335,6 +338,24 @@ export default function SecurityTab({
         <BarChart2 className="w-4 h-4" /> Compliance Reports
       </button>
     </div>
+
+    {/* TMS Integration Bar — push OWASP vulns as bugs */}
+    <TmsSyncBar
+      module="security"
+      ops={['push']}
+      onPush={async () => {
+        const token = localStorage.getItem('iq_token') || '';
+        const res = await fetch('/api/tms/push/security', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ projectId: currentProjectId, vulnerabilities: mergedVulns.filter(v => v.status === 'Open').slice(0, 20) }),
+        });
+        return res.json();
+      }}
+      pushLabel={`Push ${mergedVulns.filter(v => v.status === 'Open').length} Open Vulns to TMS`}
+      pushDisabled={mergedVulns.filter(v => v.status === 'Open').length === 0}
+      projectId={currentProjectId}
+    />
 
     {/* Test case quick-pick */}
     {testCases.length > 0 && (

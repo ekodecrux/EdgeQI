@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TableProperties, Plus, X, RefreshCw, FolderOpen, CheckSquare } from 'lucide-react';
 import { apiUrl } from '@/src/config/api';
+import { TmsSyncBar } from './TmsSyncBar';
 
 interface TestPlansTabProps {
   currentProjectId?: string;
@@ -134,6 +135,31 @@ export default function TestPlansTab({ currentProjectId = 'ALL', currentSprintId
 
   return (
     <div className="space-y-5 animate-fadeInUp">
+
+      {/* TMS Integration Bar — pull/push test plans */}
+      <TmsSyncBar
+        module="testplans"
+        ops={['pull', 'push']}
+        onPull={(items) => {
+          if (items && items.length > 0) {
+            setFeedback(`✅ Pulled ${items.length} test plan(s) from TMS`);
+            setTimeout(() => setFeedback(''), 5000);
+          }
+        }}
+        onPush={async () => {
+          const token = localStorage.getItem('iq_token') || '';
+          const res = await fetch('/api/tms/push/testplans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ projectId: currentProjectId, plans }),
+          });
+          return res.json();
+        }}
+        pushLabel={`Push ${plans.length} Plan${plans.length !== 1 ? 's' : ''} to TMS`}
+        pushDisabled={plans.length === 0}
+        projectId={currentProjectId === 'ALL' ? 'global' : currentProjectId}
+      />
+
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-4">
           <div>

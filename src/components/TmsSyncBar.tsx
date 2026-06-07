@@ -33,6 +33,12 @@ const MODULE_LABELS: Record<string, string> = {
   defects:      'Defect Dump',
   regression:   'Regression Suite',
   results:      'Execution Results',
+  performance:  'Perf Results',
+  security:     'Security Vulns',
+  scripts:      'Automation Scripts',
+  testplans:    'Test Plans',
+  scheduler:    'Scheduled Runs',
+  analytics:    'KPI Snapshot',
 };
 
 const PULL_ENDPOINT: Record<string, string> = {
@@ -40,14 +46,21 @@ const PULL_ENDPOINT: Record<string, string> = {
   testcases:    '/api/tms/pull/testcases',
   defects:      '/api/tms/pull/defects',
   regression:   '/api/tms/pull/regression',
+  testplans:    '/api/tms/pull/testplans',
 };
 const PUSH_ENDPOINT: Record<string, string> = {
   testcases:    '/api/tms/push/testcases',
   results:      '/api/tms/push/results',
+  performance:  '/api/tms/push/performance',
+  security:     '/api/tms/push/security',
+  scripts:      '/api/tms/push/scripts',
+  testplans:    '/api/tms/push/testplans',
+  scheduler:    '/api/tms/push/scheduler',
+  analytics:    '/api/tms/push/analytics',
 };
 
 interface TmsSyncBarProps {
-  module: 'requirements' | 'testcases' | 'defects' | 'regression' | 'results';
+  module: 'requirements' | 'testcases' | 'defects' | 'regression' | 'results' | 'performance' | 'security' | 'scripts' | 'testplans' | 'scheduler' | 'analytics';
   ops?: ('pull' | 'push')[];
   onPull?: (items: any[]) => void;
   onPush?: () => Promise<any>;  // caller provides push data via callback

@@ -24,6 +24,7 @@ import {
 import { TestCase, ScriptFile } from '../types';
 import VoicePromptBar from './VoicePromptBar';
 import { apiUrl } from '@/src/config/api';
+import { TmsSyncBar } from './TmsSyncBar';
 
 interface ScriptProps {
   testCases: TestCase[];
@@ -492,6 +493,32 @@ export default function ScriptTab({
         onPromptSubmit={(text) => {
           console.log('[ScriptTab] Prompt:', text);
         }}
+      />
+
+      {/* TMS Integration Bar — push generated scripts as automated test cases */}
+      <TmsSyncBar
+        module="scripts"
+        ops={['push']}
+        onPush={async () => {
+          const token = localStorage.getItem('iq_token') || '';
+          const scriptPayload = scripts.slice(0, 20).map(s => ({
+            id: s.id,
+            name: s.name || s.title || `Script ${s.id}`,
+            framework,
+            language,
+            testCaseIds: Array.from(selectedTestCaseIds),
+            createdAt: s.createdAt || new Date().toISOString(),
+          }));
+          const res = await fetch('/api/tms/push/scripts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ projectId: currentProjectId, scripts: scriptPayload }),
+          });
+          return res.json();
+        }}
+        pushLabel={`Push ${scripts.length} Script${scripts.length !== 1 ? 's' : ''} to TMS`}
+        pushDisabled={scripts.length === 0}
+        projectId={currentProjectId}
       />
 
       {/* Tab Switcher: Suite Compiler | API Tests */}
