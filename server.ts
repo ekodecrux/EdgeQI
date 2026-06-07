@@ -9624,7 +9624,7 @@ app.post('/api/test-data/generate/rag', requireAuth, async (req: any, res: any) 
   try {
     const { name, environment, project_id, query, test_case_ids, linked_test_case_ids } = req.body;
     // Fetch relevant RAG documents
-    const ragDocs = sqliteDb.prepare("SELECT name, content, summary FROM rag_documents ORDER BY created_at DESC LIMIT 5").all() as any[];
+    const ragDocs = sqliteDb.prepare("SELECT name, content, summary FROM rag_documents ORDER BY ingested_at DESC LIMIT 5").all() as any[];
     // Fetch linked test cases
     const testCases = test_case_ids?.length
       ? sqliteDb.prepare(`SELECT title, steps, expected_result FROM test_cases WHERE id IN (${test_case_ids.map(() => '?').join(',')}) LIMIT 10`).all(...test_case_ids) as any[]
