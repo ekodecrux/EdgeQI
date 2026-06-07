@@ -8493,17 +8493,7 @@ async function startServer() {
     const publicPath = path.join(process.cwd(), 'public');
     app.use(express.static(distPath));
     app.use(express.static(publicPath)); // pre-built frontend assets live in public/assets/
-    app.get('*', (req, res) => {
-      const apiBase = process.env.API_BASE_URL ?? '';
-      const indexPath = path.join(distPath, 'index.html');
-      let html = fs.readFileSync(indexPath, 'utf8');
-      html = html.replace(
-        '<script type="module"',
-        `<script>window.__API_BASE__="${apiBase}";</script>\n    <script type="module"`
-      );
-      res.setHeader('Content-Type', 'text/html');
-      res.send(html);
-    });
+    // SPA catch-all is registered at the end of the file, after all API routes
   }
   // Hybrid mode: FRONTEND_ORIGIN is set → backend is API-only, no static files
 
@@ -8776,3 +8766,1022 @@ function gracefulShutdown(signal: string) {
 }
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAAS LICENSING — SUPER ADMIN & TENANT ADMIN ROUTES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function genId(): string { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+function requireSuperAdmin(req: any, res: any, next: any) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
+    if (payload.role !== 'super_admin') return res.status(403).json({ error: 'Super admin only' });
+    req.user = payload;
+    next();
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
+function requireTenantAdmin(req: any, res: any, next: any) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
+    if (!['super_admin', 'tenant_admin'].includes(payload.role)) return res.status(403).json({ error: 'Tenant admin required' });
+    req.user = payload;
+    next();
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
+function requireAuth2(req: any, res: any, next: any) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
+    req.user = payload;
+    next();
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
+function convertCurrency(amountUsd: number, toCurrency: string): number {
+  const rate = (sqliteDb.prepare("SELECT rate_vs_usd FROM currency_rates WHERE currency = ?").get(toCurrency) as any);
+  return rate ? Math.round(amountUsd * rate.rate_vs_usd * 100) / 100 : amountUsd;
+}
+
+function getCurrencySymbol(currency: string): string {
+  const row = sqliteDb.prepare("SELECT symbol FROM currency_rates WHERE currency = ?").get(currency) as any;
+  return row ? row.symbol : currency;
+}
+
+function generateInvoiceNumber(): string {
+  const count = (sqliteDb.prepare("SELECT COUNT(*) as c FROM invoices").get() as any).c + 1;
+  return `INV-${new Date().getFullYear()}-${String(count).padStart(5, '0')}`;
+}
+
+function generateReceiptNumber(): string {
+  const count = (sqliteDb.prepare("SELECT COUNT(*) as c FROM receipts").get() as any).c + 1;
+  return `RCP-${new Date().getFullYear()}-${String(count).padStart(5, '0')}`;
+}
+
+function logSuperAdminAudit(adminId: number, action: string, entityType: string, entityId: string, details: string, ip = '') {
+  sqliteDb.prepare("INSERT INTO superadmin_audit (id,admin_id,action,entity_type,entity_id,details,ip_address) VALUES (?,?,?,?,?,?,?)")
+    .run(genId(), adminId, action, entityType, entityId, details, ip);
+}
+
+// ─── LICENSE PACKS (Super Admin) ──────────────────────────────────────────────
+app.get('/api/saas/license-packs', requireAuth2, (req: any, res: any) => {
+  const packs = sqliteDb.prepare("SELECT * FROM license_packs ORDER BY sort_order ASC").all();
+  res.json(packs.map((p: any) => ({ ...p, features: JSON.parse(p.features || '[]'), currency_prices: JSON.parse(p.currency_prices || '{}') })));
+});
+
+app.post('/api/saas/license-packs', requireSuperAdmin, (req: any, res: any) => {
+  const { name, description, tier, max_users, max_concurrent, price_usd, billing_cycle, currency_prices, features, is_popular, sort_order } = req.body;
+  const id = genId();
+  sqliteDb.prepare(`INSERT INTO license_packs (id,name,description,tier,max_users,max_concurrent,price_usd,billing_cycle,currency_prices,features,is_popular,sort_order)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(id, name, description||'', tier, max_users, max_concurrent, price_usd, billing_cycle||'monthly',
+      JSON.stringify(currency_prices||{}), JSON.stringify(features||[]), is_popular?1:0, sort_order||0);
+  logSuperAdminAudit(req.user.id, 'CREATE_PACK', 'license_pack', id, `Created pack: ${name}`, req.ip);
+  res.json({ success: true, id });
+});
+
+app.put('/api/saas/license-packs/:id', requireSuperAdmin, (req: any, res: any) => {
+  const { name, description, tier, max_users, max_concurrent, price_usd, billing_cycle, currency_prices, features, is_active, is_popular, sort_order } = req.body;
+  sqliteDb.prepare(`UPDATE license_packs SET name=?,description=?,tier=?,max_users=?,max_concurrent=?,price_usd=?,billing_cycle=?,currency_prices=?,features=?,is_active=?,is_popular=?,sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .run(name, description||'', tier, max_users, max_concurrent, price_usd, billing_cycle,
+      JSON.stringify(currency_prices||{}), JSON.stringify(features||[]), is_active?1:0, is_popular?1:0, sort_order||0, req.params.id);
+  logSuperAdminAudit(req.user.id, 'UPDATE_PACK', 'license_pack', req.params.id, `Updated pack: ${name}`, req.ip);
+  res.json({ success: true });
+});
+
+app.delete('/api/saas/license-packs/:id', requireSuperAdmin, (req: any, res: any) => {
+  sqliteDb.prepare("UPDATE license_packs SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?").run(req.params.id);
+  logSuperAdminAudit(req.user.id, 'DEACTIVATE_PACK', 'license_pack', req.params.id, 'Deactivated pack', req.ip);
+  res.json({ success: true });
+});
+
+// ─── CURRENCY RATES (Super Admin) ─────────────────────────────────────────────
+app.get('/api/saas/currencies', requireAuth2, (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT * FROM currency_rates ORDER BY currency").all());
+});
+
+app.put('/api/saas/currencies/:currency', requireSuperAdmin, (req: any, res: any) => {
+  const { rate_vs_usd, symbol, name } = req.body;
+  sqliteDb.prepare("INSERT OR REPLACE INTO currency_rates (currency,rate_vs_usd,symbol,name,updated_at) VALUES (?,?,?,?,CURRENT_TIMESTAMP)")
+    .run(req.params.currency, rate_vs_usd, symbol, name);
+  res.json({ success: true });
+});
+
+// ─── TENANTS (Super Admin) ────────────────────────────────────────────────────
+app.get('/api/saas/tenants', requireSuperAdmin, (req: any, res: any) => {
+  const tenants = sqliteDb.prepare(`
+    SELECT t.*, ts.status as sub_status, ts.ends_at, lp.name as pack_name, lp.tier,
+           (SELECT COUNT(*) FROM tenant_users tu WHERE tu.tenant_id=t.id AND tu.status='active') as active_users,
+           (SELECT COUNT(*) FROM active_sessions s WHERE s.tenant_id=t.id AND s.expires_at > CURRENT_TIMESTAMP) as concurrent_now
+    FROM tenants t
+    LEFT JOIN tenant_subscriptions ts ON ts.tenant_id=t.id AND ts.status='active'
+    LEFT JOIN license_packs lp ON lp.id=ts.pack_id
+    ORDER BY t.created_at DESC
+  `).all();
+  res.json(tenants);
+});
+
+app.get('/api/saas/tenants/:id', requireSuperAdmin, (req: any, res: any) => {
+  const tenant = sqliteDb.prepare("SELECT * FROM tenants WHERE id=?").get(req.params.id);
+  if (!tenant) return res.status(404).json({ error: 'Not found' });
+  const sub = sqliteDb.prepare(`SELECT ts.*, lp.name as pack_name, lp.tier, lp.max_users, lp.max_concurrent, lp.price_usd, lp.billing_cycle
+    FROM tenant_subscriptions ts JOIN license_packs lp ON lp.id=ts.pack_id WHERE ts.tenant_id=? AND ts.status='active'`).get(req.params.id);
+  const users = sqliteDb.prepare("SELECT * FROM tenant_users WHERE tenant_id=? ORDER BY created_at DESC").all(req.params.id);
+  const invoices = sqliteDb.prepare("SELECT * FROM invoices WHERE tenant_id=? ORDER BY created_at DESC LIMIT 10").all(req.params.id);
+  const usage = sqliteDb.prepare("SELECT * FROM usage_metrics WHERE tenant_id=? ORDER BY metric_date DESC LIMIT 30").all(req.params.id);
+  res.json({ tenant, subscription: sub, users, invoices, usage });
+});
+
+app.post('/api/saas/tenants', requireSuperAdmin, (req: any, res: any) => {
+  const { name, domain, country, currency, billing_email, billing_address, tax_id, notes } = req.body;
+  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  const id = genId();
+  sqliteDb.prepare(`INSERT INTO tenants (id,name,slug,domain,country,currency,billing_email,billing_address,tax_id,notes,status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,'trial')`)
+    .run(id, name, slug+'-'+id.slice(-4), domain||'', country||'US', currency||'USD', billing_email||'', billing_address||'', tax_id||'', notes||'');
+  logSuperAdminAudit(req.user.id, 'CREATE_TENANT', 'tenant', id, `Created tenant: ${name}`, req.ip);
+  res.json({ success: true, id, slug });
+});
+
+app.put('/api/saas/tenants/:id', requireSuperAdmin, (req: any, res: any) => {
+  const { name, domain, country, currency, status, billing_email, billing_address, tax_id, notes } = req.body;
+  sqliteDb.prepare(`UPDATE tenants SET name=?,domain=?,country=?,currency=?,status=?,billing_email=?,billing_address=?,tax_id=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .run(name, domain||'', country||'US', currency||'USD', status||'active', billing_email||'', billing_address||'', tax_id||'', notes||'', req.params.id);
+  logSuperAdminAudit(req.user.id, 'UPDATE_TENANT', 'tenant', req.params.id, `Updated tenant: ${name}`, req.ip);
+  res.json({ success: true });
+});
+
+app.patch('/api/saas/tenants/:id/status', requireSuperAdmin, (req: any, res: any) => {
+  const { status } = req.body;
+  sqliteDb.prepare("UPDATE tenants SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(status, req.params.id);
+  logSuperAdminAudit(req.user.id, 'TENANT_STATUS', 'tenant', req.params.id, `Status → ${status}`, req.ip);
+  res.json({ success: true });
+});
+
+// ─── SUBSCRIPTIONS (Super Admin assigns license to tenant) ────────────────────
+app.post('/api/saas/tenants/:tenantId/subscribe', requireSuperAdmin, (req: any, res: any) => {
+  const { pack_id, starts_at, ends_at, auto_renew, notes } = req.body;
+  const pack = sqliteDb.prepare("SELECT * FROM license_packs WHERE id=?").get(pack_id) as any;
+  if (!pack) return res.status(404).json({ error: 'Pack not found' });
+  // Deactivate existing subscription
+  sqliteDb.prepare("UPDATE tenant_subscriptions SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND status='active'").run(req.params.tenantId);
+  const id = genId();
+  sqliteDb.prepare(`INSERT INTO tenant_subscriptions (id,tenant_id,pack_id,status,starts_at,ends_at,auto_renew,activated_by,notes)
+    VALUES (?,?,?,'active',?,?,?,?,?)`)
+    .run(id, req.params.tenantId, pack_id, starts_at||new Date().toISOString(), ends_at||null, auto_renew?1:1, req.user.id, notes||'');
+  // Update tenant limits
+  sqliteDb.prepare("UPDATE tenants SET max_users=?,max_concurrent=?,plan_tier=?,status='active',updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .run(pack.max_users, pack.max_concurrent, pack.tier, req.params.tenantId);
+  logSuperAdminAudit(req.user.id, 'ASSIGN_LICENSE', 'subscription', id, `Assigned ${pack.name} to tenant ${req.params.tenantId}`, req.ip);
+  res.json({ success: true, subscription_id: id });
+});
+
+app.get('/api/saas/tenants/:tenantId/subscriptions', requireSuperAdmin, (req: any, res: any) => {
+  const subs = sqliteDb.prepare(`SELECT ts.*, lp.name as pack_name, lp.tier, lp.price_usd, lp.billing_cycle
+    FROM tenant_subscriptions ts JOIN license_packs lp ON lp.id=ts.pack_id WHERE ts.tenant_id=? ORDER BY ts.created_at DESC`).all(req.params.tenantId);
+  res.json(subs);
+});
+
+// ─── INVOICES (Super Admin) ───────────────────────────────────────────────────
+app.get('/api/saas/invoices', requireSuperAdmin, (req: any, res: any) => {
+  const { tenant_id, status } = req.query as any;
+  let q = "SELECT i.*, t.name as tenant_name, t.currency FROM invoices i JOIN tenants t ON t.id=i.tenant_id WHERE 1=1";
+  const params: any[] = [];
+  if (tenant_id) { q += " AND i.tenant_id=?"; params.push(tenant_id); }
+  if (status) { q += " AND i.status=?"; params.push(status); }
+  q += " ORDER BY i.created_at DESC LIMIT 100";
+  res.json(sqliteDb.prepare(q).all(...params));
+});
+
+app.post('/api/saas/invoices', requireSuperAdmin, (req: any, res: any) => {
+  const { tenant_id, subscription_id, line_items, tax_rate, discount_amount, due_date, notes } = req.body;
+  const tenant = sqliteDb.prepare("SELECT * FROM tenants WHERE id=?").get(tenant_id) as any;
+  if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+  const currency = tenant.currency || 'USD';
+  const items = line_items || [];
+  const subtotalUsd = items.reduce((s: number, i: any) => s + (i.unit_price * i.qty), 0);
+  const subtotal = currency === 'USD' ? subtotalUsd : convertCurrency(subtotalUsd, currency);
+  const taxAmt = Math.round(subtotal * (tax_rate||0) / 100 * 100) / 100;
+  const discount = discount_amount || 0;
+  const total = Math.round((subtotal + taxAmt - discount) * 100) / 100;
+  const id = genId();
+  const invoice_number = generateInvoiceNumber();
+  sqliteDb.prepare(`INSERT INTO invoices (id,invoice_number,tenant_id,subscription_id,status,currency,subtotal,tax_rate,tax_amount,discount_amount,total,line_items,due_date,notes)
+    VALUES (?,?,?,?,'draft',?,?,?,?,?,?,?,?,?)`)
+    .run(id, invoice_number, tenant_id, subscription_id||null, currency, subtotal, tax_rate||0, taxAmt, discount, total, JSON.stringify(items), due_date||null, notes||'');
+  logSuperAdminAudit(req.user.id, 'CREATE_INVOICE', 'invoice', id, `Invoice ${invoice_number} for tenant ${tenant_id}`, req.ip);
+  res.json({ success: true, id, invoice_number, total, currency });
+});
+
+app.patch('/api/saas/invoices/:id/status', requireSuperAdmin, (req: any, res: any) => {
+  const { status, payment_method, payment_reference } = req.body;
+  sqliteDb.prepare("UPDATE invoices SET status=?,payment_method=?,payment_reference=?,paid_at=CASE WHEN ?='paid' THEN CURRENT_TIMESTAMP ELSE paid_at END,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .run(status, payment_method||null, payment_reference||null, status, req.params.id);
+  // Auto-generate receipt on payment
+  if (status === 'paid') {
+    const inv = sqliteDb.prepare("SELECT * FROM invoices WHERE id=?").get(req.params.id) as any;
+    if (inv) {
+      const rid = genId();
+      sqliteDb.prepare(`INSERT INTO receipts (id,receipt_number,invoice_id,tenant_id,amount,currency,payment_method,payment_reference)
+        VALUES (?,?,?,?,?,?,?,?)`)
+        .run(rid, generateReceiptNumber(), inv.id, inv.tenant_id, inv.total, inv.currency, payment_method||'', payment_reference||'');
+    }
+  }
+  logSuperAdminAudit(req.user.id, 'UPDATE_INVOICE', 'invoice', req.params.id, `Status → ${status}`, req.ip);
+  res.json({ success: true });
+});
+
+app.get('/api/saas/invoices/:id', requireAuth2, (req: any, res: any) => {
+  const inv = sqliteDb.prepare("SELECT i.*, t.name as tenant_name, t.billing_address, t.tax_id FROM invoices i JOIN tenants t ON t.id=i.tenant_id WHERE i.id=?").get(req.params.id) as any;
+  if (!inv) return res.status(404).json({ error: 'Not found' });
+  res.json({ ...inv, line_items: JSON.parse(inv.line_items||'[]') });
+});
+
+// ─── RECEIPTS ─────────────────────────────────────────────────────────────────
+app.get('/api/saas/receipts', requireSuperAdmin, (req: any, res: any) => {
+  const { tenant_id } = req.query as any;
+  let q = "SELECT r.*, t.name as tenant_name FROM receipts r JOIN tenants t ON t.id=r.tenant_id WHERE 1=1";
+  const params: any[] = [];
+  if (tenant_id) { q += " AND r.tenant_id=?"; params.push(tenant_id); }
+  q += " ORDER BY r.created_at DESC LIMIT 100";
+  res.json(sqliteDb.prepare(q).all(...params));
+});
+
+app.get('/api/saas/receipts/:id', requireAuth2, (req: any, res: any) => {
+  const r = sqliteDb.prepare("SELECT r.*, t.name as tenant_name, t.billing_address, i.invoice_number FROM receipts r JOIN tenants t ON t.id=r.tenant_id JOIN invoices i ON i.id=r.invoice_id WHERE r.id=?").get(req.params.id);
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  res.json(r);
+});
+
+// ─── SUPPORT TICKETS ──────────────────────────────────────────────────────────
+app.get('/api/saas/support', requireSuperAdmin, (req: any, res: any) => {
+  const { status, category } = req.query as any;
+  let q = "SELECT st.*, t.name as tenant_name FROM support_tickets st LEFT JOIN tenants t ON t.id=st.tenant_id WHERE 1=1";
+  const params: any[] = [];
+  if (status) { q += " AND st.status=?"; params.push(status); }
+  if (category) { q += " AND st.category=?"; params.push(category); }
+  q += " ORDER BY CASE st.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, st.created_at DESC";
+  res.json(sqliteDb.prepare(q).all(...params));
+});
+
+app.get('/api/saas/support/:id', requireAuth2, (req: any, res: any) => {
+  const ticket = sqliteDb.prepare("SELECT st.*, t.name as tenant_name FROM support_tickets st LEFT JOIN tenants t ON t.id=st.tenant_id WHERE st.id=?").get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Not found' });
+  const messages = sqliteDb.prepare("SELECT * FROM support_messages WHERE ticket_id=? ORDER BY created_at ASC").all(req.params.id);
+  res.json({ ticket, messages });
+});
+
+app.post('/api/saas/support', requireAuth2, async (req: any, res: any) => {
+  const { tenant_id, category, priority, subject, description } = req.body;
+  const id = genId();
+  // AI suggest response
+  let aiSuggested = '';
+  try {
+    aiSuggested = await callAI(`You are a SaaS support agent for EdgeQI, an AI-powered QA platform. A customer has submitted a support ticket. Provide a helpful, professional response in 3-5 sentences.\n\nCategory: ${category}\nSubject: ${subject}\nDescription: ${description}`, 300);
+  } catch {}
+  sqliteDb.prepare(`INSERT INTO support_tickets (id,tenant_id,user_id,category,priority,status,subject,description,ai_suggested_response)
+    VALUES (?,?,?,?,?,'open',?,?,?)`)
+    .run(id, tenant_id||null, req.user?.id||null, category||'general', priority||'medium', subject, description, aiSuggested);
+  // Add first message
+  sqliteDb.prepare("INSERT INTO support_messages (id,ticket_id,sender_id,sender_role,message) VALUES (?,?,?,?,?)")
+    .run(genId(), id, req.user?.id||null, 'user', description);
+  if (aiSuggested) {
+    sqliteDb.prepare("INSERT INTO support_messages (id,ticket_id,sender_id,sender_role,message) VALUES (?,?,?,?,?)")
+      .run(genId(), id, null, 'ai', aiSuggested);
+  }
+  res.json({ success: true, id, ai_suggested: aiSuggested });
+});
+
+app.post('/api/saas/support/:id/reply', requireAuth2, (req: any, res: any) => {
+  const { message, sender_role } = req.body;
+  sqliteDb.prepare("INSERT INTO support_messages (id,ticket_id,sender_id,sender_role,message) VALUES (?,?,?,?,?)")
+    .run(genId(), req.params.id, req.user?.id||null, sender_role||'user', message);
+  sqliteDb.prepare("UPDATE support_tickets SET updated_at=CURRENT_TIMESTAMP WHERE id=?").run(req.params.id);
+  res.json({ success: true });
+});
+
+app.patch('/api/saas/support/:id/status', requireSuperAdmin, (req: any, res: any) => {
+  const { status, assigned_to } = req.body;
+  sqliteDb.prepare("UPDATE support_tickets SET status=?,assigned_to=?,resolved_at=CASE WHEN ?='resolved' THEN CURRENT_TIMESTAMP ELSE resolved_at END,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+    .run(status, assigned_to||null, status, req.params.id);
+  res.json({ success: true });
+});
+
+// ─── SUPER ADMIN DASHBOARD STATS ─────────────────────────────────────────────
+app.get('/api/saas/stats', requireSuperAdmin, (req: any, res: any) => {
+  const totalTenants = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenants").get() as any).c;
+  const activeTenants = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenants WHERE status='active'").get() as any).c;
+  const trialTenants = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenants WHERE status='trial'").get() as any).c;
+  const totalUsers = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenant_users WHERE status='active'").get() as any).c;
+  const concurrentNow = (sqliteDb.prepare("SELECT COUNT(*) as c FROM active_sessions WHERE expires_at > CURRENT_TIMESTAMP").get() as any).c;
+  const totalRevenue = (sqliteDb.prepare("SELECT COALESCE(SUM(total),0) as s FROM invoices WHERE status='paid' AND currency='USD'").get() as any).s;
+  const mrr = (sqliteDb.prepare(`SELECT COALESCE(SUM(lp.price_usd),0) as s FROM tenant_subscriptions ts JOIN license_packs lp ON lp.id=ts.pack_id WHERE ts.status='active' AND lp.billing_cycle='monthly'`).get() as any).s;
+  const openTickets = (sqliteDb.prepare("SELECT COUNT(*) as c FROM support_tickets WHERE status IN ('open','in_progress')").get() as any).c;
+  const recentTenants = sqliteDb.prepare("SELECT t.name, t.status, t.created_at, lp.name as pack FROM tenants t LEFT JOIN tenant_subscriptions ts ON ts.tenant_id=t.id AND ts.status='active' LEFT JOIN license_packs lp ON lp.id=ts.pack_id ORDER BY t.created_at DESC LIMIT 5").all();
+  const packDist = sqliteDb.prepare("SELECT lp.name, lp.tier, COUNT(ts.id) as count FROM tenant_subscriptions ts JOIN license_packs lp ON lp.id=ts.pack_id WHERE ts.status='active' GROUP BY lp.id").all();
+  const revenueByMonth = sqliteDb.prepare("SELECT strftime('%Y-%m',created_at) as month, SUM(total) as revenue FROM invoices WHERE status='paid' AND currency='USD' GROUP BY month ORDER BY month DESC LIMIT 12").all();
+  res.json({ totalTenants, activeTenants, trialTenants, totalUsers, concurrentNow, totalRevenue, mrr, openTickets, recentTenants, packDist, revenueByMonth });
+});
+
+app.get('/api/saas/audit', requireSuperAdmin, (req: any, res: any) => {
+  const logs = sqliteDb.prepare("SELECT sa.*, u.name as admin_name FROM superadmin_audit sa LEFT JOIN users u ON u.id=sa.admin_id ORDER BY sa.created_at DESC LIMIT 100").all();
+  res.json(logs);
+});
+
+// ─── TENANT ADMIN ROUTES ──────────────────────────────────────────────────────
+// Get own tenant info + license
+app.get('/api/tenant/me', requireTenantAdmin, (req: any, res: any) => {
+  const tenantId = req.user.tenant_id;
+  if (!tenantId) return res.status(400).json({ error: 'No tenant associated' });
+  const tenant = sqliteDb.prepare("SELECT * FROM tenants WHERE id=?").get(tenantId) as any;
+  const sub = sqliteDb.prepare(`SELECT ts.*, lp.name as pack_name, lp.tier, lp.max_users, lp.max_concurrent, lp.price_usd, lp.billing_cycle, lp.features
+    FROM tenant_subscriptions ts JOIN license_packs lp ON lp.id=ts.pack_id WHERE ts.tenant_id=? AND ts.status='active'`).get(tenantId) as any;
+  const users = sqliteDb.prepare("SELECT * FROM tenant_users WHERE tenant_id=? ORDER BY created_at DESC").all(tenantId);
+  const concurrent = (sqliteDb.prepare("SELECT COUNT(*) as c FROM active_sessions WHERE tenant_id=? AND expires_at > CURRENT_TIMESTAMP").get(tenantId) as any).c;
+  const invoices = sqliteDb.prepare("SELECT * FROM invoices WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20").all(tenantId);
+  const receipts = sqliteDb.prepare("SELECT * FROM receipts WHERE tenant_id=? ORDER BY created_at DESC LIMIT 20").all(tenantId);
+  if (sub) sub.features = JSON.parse(sub.features || '[]');
+  res.json({ tenant, subscription: sub, users, concurrent, invoices, receipts });
+});
+
+// Tenant user management
+app.get('/api/tenant/users', requireTenantAdmin, (req: any, res: any) => {
+  const tenantId = req.user.tenant_id;
+  res.json(sqliteDb.prepare("SELECT * FROM tenant_users WHERE tenant_id=? ORDER BY created_at DESC").all(tenantId));
+});
+
+app.post('/api/tenant/users/invite', requireTenantAdmin, (req: any, res: any) => {
+  const { email, name, role } = req.body;
+  const tenantId = req.user.tenant_id;
+  const tenant = sqliteDb.prepare("SELECT * FROM tenants WHERE id=?").get(tenantId) as any;
+  if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+  const userCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenant_users WHERE tenant_id=? AND status='active'").get(tenantId) as any).c;
+  if (userCount >= tenant.max_users) return res.status(400).json({ error: `License limit reached: max ${tenant.max_users} users` });
+  const existing = sqliteDb.prepare("SELECT id FROM tenant_users WHERE tenant_id=? AND email=?").get(tenantId, email);
+  if (existing) return res.status(400).json({ error: 'User already in tenant' });
+  const id = genId();
+  const invite_token = genId() + genId();
+  sqliteDb.prepare("INSERT INTO tenant_users (id,tenant_id,email,name,role,status,invite_token) VALUES (?,?,?,?,?,'invited',?)")
+    .run(id, tenantId, email, name, role||'qa_engineer', invite_token);
+  res.json({ success: true, id, invite_token, invite_url: `/accept-invite?token=${invite_token}` });
+});
+
+app.patch('/api/tenant/users/:id/status', requireTenantAdmin, (req: any, res: any) => {
+  const { status } = req.body;
+  sqliteDb.prepare("UPDATE tenant_users SET status=? WHERE id=? AND tenant_id=?").run(status, req.params.id, req.user.tenant_id);
+  res.json({ success: true });
+});
+
+app.delete('/api/tenant/users/:id', requireTenantAdmin, (req: any, res: any) => {
+  sqliteDb.prepare("UPDATE tenant_users SET status='suspended' WHERE id=? AND tenant_id=?").run(req.params.id, req.user.tenant_id);
+  res.json({ success: true });
+});
+
+// SSO Configuration
+app.get('/api/tenant/sso', requireTenantAdmin, (req: any, res: any) => {
+  const sso = sqliteDb.prepare("SELECT * FROM sso_configs WHERE tenant_id=?").get(req.user.tenant_id);
+  res.json(sso || null);
+});
+
+app.post('/api/tenant/sso', requireTenantAdmin, (req: any, res: any) => {
+  const { protocol, provider, client_id, client_secret, issuer_url, saml_metadata_url, saml_cert, attribute_mapping } = req.body;
+  const tenantId = req.user.tenant_id;
+  const existing = sqliteDb.prepare("SELECT id FROM sso_configs WHERE tenant_id=?").get(tenantId);
+  const callbackUrl = `${process.env.API_BASE_URL || ''}/api/auth/sso/callback/${tenantId}`;
+  if (existing) {
+    sqliteDb.prepare(`UPDATE sso_configs SET protocol=?,provider=?,client_id=?,client_secret=?,issuer_url=?,saml_metadata_url=?,saml_cert=?,attribute_mapping=?,callback_url=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=?`)
+      .run(protocol, provider, client_id, client_secret||'', issuer_url||'', saml_metadata_url||'', saml_cert||'', JSON.stringify(attribute_mapping||{}), callbackUrl, tenantId);
+  } else {
+    sqliteDb.prepare(`INSERT INTO sso_configs (id,tenant_id,protocol,provider,client_id,client_secret,issuer_url,saml_metadata_url,saml_cert,attribute_mapping,callback_url) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(genId(), tenantId, protocol, provider, client_id, client_secret||'', issuer_url||'', saml_metadata_url||'', saml_cert||'', JSON.stringify(attribute_mapping||{}), callbackUrl);
+  }
+  res.json({ success: true, callback_url: callbackUrl });
+});
+
+app.patch('/api/tenant/sso/toggle', requireTenantAdmin, (req: any, res: any) => {
+  const { is_active } = req.body;
+  sqliteDb.prepare("UPDATE sso_configs SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=?").run(is_active?1:0, req.user.tenant_id);
+  res.json({ success: true });
+});
+
+// SSO Login callback (OIDC simulation)
+app.post('/api/auth/sso/callback/:tenantId', async (req: any, res: any) => {
+  const { tenantId } = req.params;
+  const { email, name, sso_token } = req.body;
+  const sso = sqliteDb.prepare("SELECT * FROM sso_configs WHERE tenant_id=? AND is_active=1").get(tenantId) as any;
+  if (!sso) return res.status(400).json({ error: 'SSO not configured or inactive for this tenant' });
+  // Find or create tenant user
+  let tu = sqliteDb.prepare("SELECT * FROM tenant_users WHERE tenant_id=? AND email=?").get(tenantId, email) as any;
+  if (!tu) {
+    const tenant = sqliteDb.prepare("SELECT * FROM tenants WHERE id=?").get(tenantId) as any;
+    const userCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM tenant_users WHERE tenant_id=? AND status='active'").get(tenantId) as any).c;
+    if (userCount >= (tenant?.max_users || 5)) return res.status(403).json({ error: 'License seat limit reached' });
+    const id = genId();
+    sqliteDb.prepare("INSERT INTO tenant_users (id,tenant_id,email,name,role,status) VALUES (?,?,?,?,'qa_engineer','active')").run(id, tenantId, email, name||email);
+    tu = { id, tenant_id: tenantId, email, name: name||email, role: 'qa_engineer' };
+  }
+  // Find or create system user
+  let user = sqliteDb.prepare("SELECT * FROM users WHERE email=?").get(email) as any;
+  if (!user) {
+    const hash = require('bcryptjs').hashSync(genId(), 10);
+    const result = sqliteDb.prepare("INSERT INTO users (email,name,password_hash,role) VALUES (?,?,?,'qa_engineer')").run(email, name||email, hash);
+    user = { id: result.lastInsertRowid, email, name: name||email, role: 'qa_engineer' };
+  }
+  sqliteDb.prepare("UPDATE tenant_users SET last_active=CURRENT_TIMESTAMP WHERE id=?").run(tu.id);
+  const token = jwt.sign({ id: user.id, email, name: user.name, role: tu.role, tenant_id: tenantId }, JWT_SECRET, { expiresIn: '8h' });
+  res.json({ success: true, token, user: { id: user.id, email, name: user.name, role: tu.role, tenant_id: tenantId } });
+});
+
+// Tenant billing / invoices (read-only for tenant admin)
+app.get('/api/tenant/invoices', requireTenantAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT * FROM invoices WHERE tenant_id=? ORDER BY created_at DESC").all(req.user.tenant_id));
+});
+
+app.get('/api/tenant/receipts', requireTenantAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT * FROM receipts WHERE tenant_id=? ORDER BY created_at DESC").all(req.user.tenant_id));
+});
+
+// Tenant support tickets
+app.get('/api/tenant/support', requireTenantAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT * FROM support_tickets WHERE tenant_id=? ORDER BY created_at DESC").all(req.user.tenant_id));
+});
+
+// Usage metrics
+app.get('/api/tenant/usage', requireTenantAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT * FROM usage_metrics WHERE tenant_id=? ORDER BY metric_date DESC LIMIT 90").all(req.user.tenant_id));
+});
+
+// Concurrent session check
+app.get('/api/tenant/sessions', requireTenantAdmin, (req: any, res: any) => {
+  const sessions = sqliteDb.prepare(`SELECT s.*, u.name, u.email FROM active_sessions s JOIN users u ON u.id=s.user_id WHERE s.tenant_id=? AND s.expires_at > CURRENT_TIMESTAMP ORDER BY s.last_seen DESC`).all(req.user.tenant_id);
+  res.json(sessions);
+});
+
+app.delete('/api/tenant/sessions/:id', requireTenantAdmin, (req: any, res: any) => {
+  sqliteDb.prepare("DELETE FROM active_sessions WHERE id=? AND tenant_id=?").run(req.params.id, req.user.tenant_id);
+  res.json({ success: true });
+});
+
+// ─── CONCURRENT SESSION ENFORCEMENT MIDDLEWARE ────────────────────────────────
+// Track and enforce concurrent user limits per tenant
+app.use('/api/', (req: any, res: any, next: any) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return next();
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
+    if (!payload.tenant_id) return next();
+    const tenantId = payload.tenant_id;
+    const tenant = sqliteDb.prepare("SELECT max_concurrent, status FROM tenants WHERE id=?").get(tenantId) as any;
+    if (!tenant || tenant.status === 'suspended') return res.status(403).json({ error: 'Tenant account suspended' });
+    // Upsert session
+    const tokenHash = require('crypto').createHash('sha256').update(auth.slice(7)).digest('hex').slice(0, 32);
+    const existing = sqliteDb.prepare("SELECT id FROM active_sessions WHERE token_hash=?").get(tokenHash);
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+    if (existing) {
+      sqliteDb.prepare("UPDATE active_sessions SET last_seen=CURRENT_TIMESTAMP, expires_at=? WHERE token_hash=?").run(expiresAt, tokenHash);
+    } else {
+      // Clean expired sessions first
+      sqliteDb.prepare("DELETE FROM active_sessions WHERE expires_at < CURRENT_TIMESTAMP").run();
+      const concurrent = (sqliteDb.prepare("SELECT COUNT(*) as c FROM active_sessions WHERE tenant_id=? AND expires_at > CURRENT_TIMESTAMP").get(tenantId) as any).c;
+      if (concurrent >= tenant.max_concurrent) {
+        return res.status(429).json({ error: `Concurrent user limit reached (${tenant.max_concurrent} max). Please ask another user to log out or upgrade your license.`, code: 'CONCURRENT_LIMIT' });
+      }
+      sqliteDb.prepare("INSERT INTO active_sessions (id,tenant_id,user_id,token_hash,ip_address,user_agent,expires_at) VALUES (?,?,?,?,?,?,?)")
+        .run(genId(), tenantId, payload.id, tokenHash, req.ip||'', req.headers['user-agent']||'', expiresAt);
+    }
+    // Update daily usage metrics
+    const today = new Date().toISOString().slice(0, 10);
+    const concurrent2 = (sqliteDb.prepare("SELECT COUNT(*) as c FROM active_sessions WHERE tenant_id=? AND expires_at > CURRENT_TIMESTAMP").get(tenantId) as any).c;
+    sqliteDb.prepare(`INSERT INTO usage_metrics (id,tenant_id,metric_date,peak_concurrent,total_api_calls) VALUES (?,?,?,?,1)
+      ON CONFLICT(tenant_id,metric_date) DO UPDATE SET peak_concurrent=MAX(peak_concurrent,?), total_api_calls=total_api_calls+1`)
+      .run(genId(), tenantId, today, concurrent2, concurrent2);
+  } catch {}
+  next();
+});
+
+// ─── PUBLIC: License packs for pricing page ───────────────────────────────────
+app.get('/api/public/pricing', (req: any, res: any) => {
+  const packs = sqliteDb.prepare("SELECT * FROM license_packs WHERE is_active=1 ORDER BY sort_order ASC").all();
+  res.json(packs.map((p: any) => ({ ...p, features: JSON.parse(p.features||'[]'), currency_prices: JSON.parse(p.currency_prices||'{}') })));
+});
+
+app.get('/api/public/currencies', (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT * FROM currency_rates ORDER BY currency").all());
+});
+
+// ─── SUPER ADMIN: Promote user to super_admin ─────────────────────────────────
+app.patch('/api/saas/users/:id/promote', requireSuperAdmin, (req: any, res: any) => {
+  const { role } = req.body; // super_admin | tenant_admin
+  sqliteDb.prepare("UPDATE users SET role=? WHERE id=?").run(role, req.params.id);
+  logSuperAdminAudit(req.user.id, 'PROMOTE_USER', 'user', req.params.id, `Role → ${role}`, req.ip);
+  res.json({ success: true });
+});
+
+app.get('/api/saas/users', requireSuperAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare("SELECT id,email,name,role,created_at,last_login FROM users ORDER BY created_at DESC").all());
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST DATA MANAGER — ALL BACKEND ROUTES
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── GET stats ────────────────────────────────────────────────────────────────
+app.get('/api/test-data/stats', requireAuth, (req: any, res: any) => {
+  try {
+    const projectId = req.query.projectId || null;
+    const where = projectId ? 'WHERE project_id=?' : '';
+    const args = projectId ? [projectId] : [];
+    const total = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_data_sets ${where}`).get(...args) as any).c;
+    const approved = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_data_sets ${where ? where + ' AND status=?' : 'WHERE status=?'}`).get(...(projectId ? [projectId, 'approved'] : ['approved'])) as any).c;
+    const pending = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_data_sets ${where ? where + ' AND status=?' : 'WHERE status=?'}`).get(...(projectId ? [projectId, 'pending_approval'] : ['pending_approval'])) as any).c;
+    const records = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM test_data_records`).get() as any).c;
+    const byEnv = sqliteDb.prepare(`SELECT environment, COUNT(*) as count FROM test_data_sets ${where} GROUP BY environment`).all(...args);
+    const byStrategy = sqliteDb.prepare(`SELECT strategy, COUNT(*) as count FROM test_data_sets ${where} GROUP BY strategy`).all(...args);
+    const recent = sqliteDb.prepare(`SELECT id,name,strategy,environment,status,created_at FROM test_data_sets ${where} ORDER BY created_at DESC LIMIT 5`).all(...args);
+    res.json({ total, approved, pending, records, byEnv, byStrategy, recent });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── LIST sets ────────────────────────────────────────────────────────────────
+app.get('/api/test-data/sets', requireAuth, (req: any, res: any) => {
+  try {
+    const { projectId, environment, status, search } = req.query;
+    let sql = 'SELECT * FROM test_data_sets WHERE 1=1';
+    const args: any[] = [];
+    if (projectId) { sql += ' AND project_id=?'; args.push(projectId); }
+    if (environment && environment !== 'all') { sql += ' AND environment=?'; args.push(environment); }
+    if (status && status !== 'all') { sql += ' AND status=?'; args.push(status); }
+    if (search) { sql += ' AND (name LIKE ? OR description LIKE ?)'; args.push(`%${search}%`, `%${search}%`); }
+    sql += ' ORDER BY created_at DESC LIMIT 200';
+    const sets = sqliteDb.prepare(sql).all(...args);
+    res.json(sets.map((s: any) => ({ ...s, tags: JSON.parse(s.tags || '[]'), linked_test_case_ids: JSON.parse(s.linked_test_case_ids || '[]') })));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── CREATE set ───────────────────────────────────────────────────────────────
+app.post('/api/test-data/sets', requireAuth, (req: any, res: any) => {
+  try {
+    const { name, description, strategy, environment, project_id, tags, linked_test_case_ids } = req.body;
+    if (!name || !strategy || !environment) return res.status(400).json({ error: 'name, strategy, environment required' });
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,created_by,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, name, description || '', strategy, environment, project_id || null,
+      'draft', JSON.stringify(tags || []), JSON.stringify(linked_test_case_ids || []),
+      (req.user as any).id, new Date().toISOString(), new Date().toISOString()
+    );
+    const set = sqliteDb.prepare('SELECT * FROM test_data_sets WHERE id=?').get(id) as any;
+    res.json({ ...set, tags: JSON.parse(set.tags || '[]'), linked_test_case_ids: JSON.parse(set.linked_test_case_ids || '[]') });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GET set detail ───────────────────────────────────────────────────────────
+app.get('/api/test-data/sets/:id', requireAuth, (req: any, res: any) => {
+  try {
+    const set = sqliteDb.prepare('SELECT * FROM test_data_sets WHERE id=?').get(req.params.id) as any;
+    if (!set) return res.status(404).json({ error: 'Not found' });
+    const records = sqliteDb.prepare('SELECT * FROM test_data_records WHERE set_id=? ORDER BY created_at ASC').all(req.params.id);
+    const approvals = sqliteDb.prepare('SELECT * FROM test_data_approvals WHERE set_id=? ORDER BY created_at DESC').all(req.params.id);
+    res.json({
+      ...set,
+      tags: JSON.parse(set.tags || '[]'),
+      linked_test_case_ids: JSON.parse(set.linked_test_case_ids || '[]'),
+      records: records.map((r: any) => ({ ...r, data: JSON.parse(r.data || '{}'), metadata: JSON.parse(r.metadata || '{}') })),
+      approvals
+    });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── DELETE set ───────────────────────────────────────────────────────────────
+app.delete('/api/test-data/sets/:id', requireAuth, (req: any, res: any) => {
+  try {
+    sqliteDb.prepare('DELETE FROM test_data_records WHERE set_id=?').run(req.params.id);
+    sqliteDb.prepare('DELETE FROM test_data_approvals WHERE set_id=?').run(req.params.id);
+    sqliteDb.prepare('DELETE FROM test_data_sets WHERE id=?').run(req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── SUBMIT for approval ──────────────────────────────────────────────────────
+app.post('/api/test-data/sets/:id/submit', requireAuth, (req: any, res: any) => {
+  try {
+    sqliteDb.prepare("UPDATE test_data_sets SET status='pending_approval',updated_at=? WHERE id=?").run(new Date().toISOString(), req.params.id);
+    const apId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_approvals (id,set_id,action,actor_id,comment,created_at) VALUES (?,?,?,?,?,?)`).run(apId, req.params.id, 'submitted', (req.user as any).id, req.body.comment || '', new Date().toISOString());
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── APPROVE set ──────────────────────────────────────────────────────────────
+app.post('/api/test-data/sets/:id/approve', requireAuth, (req: any, res: any) => {
+  try {
+    sqliteDb.prepare("UPDATE test_data_sets SET status='approved',approved_by=?,approved_at=?,updated_at=? WHERE id=?").run((req.user as any).id, new Date().toISOString(), new Date().toISOString(), req.params.id);
+    const apId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_approvals (id,set_id,action,actor_id,comment,created_at) VALUES (?,?,?,?,?,?)`).run(apId, req.params.id, 'approved', (req.user as any).id, req.body.comment || '', new Date().toISOString());
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── REJECT set ───────────────────────────────────────────────────────────────
+app.post('/api/test-data/sets/:id/reject', requireAuth, (req: any, res: any) => {
+  try {
+    sqliteDb.prepare("UPDATE test_data_sets SET status='rejected',updated_at=? WHERE id=?").run(new Date().toISOString(), req.params.id);
+    const apId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_approvals (id,set_id,action,actor_id,comment,created_at) VALUES (?,?,?,?,?,?)`).run(apId, req.params.id, 'rejected', (req.user as any).id, req.body.comment || 'Rejected', new Date().toISOString());
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── CLONE set to another environment ─────────────────────────────────────────
+app.post('/api/test-data/sets/:id/clone', requireAuth, (req: any, res: any) => {
+  try {
+    const src = sqliteDb.prepare('SELECT * FROM test_data_sets WHERE id=?').get(req.params.id) as any;
+    if (!src) return res.status(404).json({ error: 'Not found' });
+    const newId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const targetEnv = req.body.environment || src.environment;
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,created_by,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      newId, `${src.name} (${targetEnv})`, src.description, src.strategy, targetEnv, src.project_id,
+      'draft', src.tags, src.linked_test_case_ids, (req.user as any).id, new Date().toISOString(), new Date().toISOString()
+    );
+    // Clone records
+    const records = sqliteDb.prepare('SELECT * FROM test_data_records WHERE set_id=?').all(req.params.id);
+    for (const r of records as any[]) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,original_value,masked_value,data,metadata,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(rId, newId, r.field_name, r.field_type, r.original_value, r.masked_value, r.data, r.metadata, r.is_masked, new Date().toISOString());
+    }
+    res.json({ success: true, newId });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── LINK to execution run ────────────────────────────────────────────────────
+app.post('/api/test-data/sets/:id/link-run', requireAuth, (req: any, res: any) => {
+  try {
+    const { run_id } = req.body;
+    sqliteDb.prepare("UPDATE test_data_sets SET linked_run_id=?,updated_at=? WHERE id=?").run(run_id, new Date().toISOString(), req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── EXPORT set ───────────────────────────────────────────────────────────────
+app.get('/api/test-data/sets/:id/export', requireAuth, (req: any, res: any) => {
+  try {
+    const set = sqliteDb.prepare('SELECT * FROM test_data_sets WHERE id=?').get(req.params.id) as any;
+    if (!set) return res.status(404).json({ error: 'Not found' });
+    const records = sqliteDb.prepare('SELECT * FROM test_data_records WHERE set_id=?').all(req.params.id) as any[];
+    const format = req.query.format || 'json';
+    if (format === 'csv') {
+      const headers = ['field_name', 'field_type', 'masked_value', 'is_masked'];
+      const rows = records.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','));
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${set.name}.csv"`);
+      res.send([headers.join(','), ...rows].join('\n'));
+    } else {
+      res.setHeader('Content-Disposition', `attachment; filename="${set.name}.json"`);
+      res.json({ set: { ...set, tags: JSON.parse(set.tags || '[]') }, records: records.map(r => ({ ...r, data: JSON.parse(r.data || '{}') })) });
+    }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: Anonymize ──────────────────────────────────────────────────────
+app.post('/api/test-data/generate/anonymize', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, source_data, masking_rules, linked_test_case_ids } = req.body;
+    const prompt = `You are a test data anonymization expert. Given this production data sample, apply masking rules and return anonymized test data.
+
+Source data: ${JSON.stringify(source_data || {}).slice(0, 2000)}
+Masking rules: ${JSON.stringify(masking_rules || { email: 'mask', phone: 'mask', name: 'fake', ssn: 'redact', credit_card: 'redact' })}
+
+Return JSON array of 10 anonymized records. Each record should have realistic-looking but fake values.
+Format: [{"field": "value", ...}, ...]`;
+    let records: any[] = [];
+    try {
+      const aiText = await generateAI(prompt, true, 2000);
+      const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      records = JSON.parse(cleaned);
+      if (!Array.isArray(records)) records = [records];
+    } catch {
+      // Demo fallback
+      records = Array.from({ length: 10 }, (_, i) => ({
+        id: `USR-${String(i + 1).padStart(4, '0')}`, name: `Test User ${i + 1}`,
+        email: `testuser${i + 1}@example.com`, phone: `+1-555-${String(1000 + i).padStart(4, '0')}`,
+        address: `${100 + i} Test Street, Test City, TC 10001`, dob: `19${70 + i % 30}-01-01`
+      }));
+    }
+    // Save set and records
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || 'Anonymized Data Set', 'Generated via anonymization strategy', 'anonymize', environment || 'test', project_id || null, 'draft', '["anonymized","pii-masked"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, 'record', 'object', JSON.stringify(rec), JSON.stringify(rec), 1, new Date().toISOString());
+    }
+    sqliteDb.prepare('UPDATE test_data_sets SET record_count=? WHERE id=?').run(records.length, setId);
+    res.json({ success: true, setId, records, count: records.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: API Definition ─────────────────────────────────────────────────
+app.post('/api/test-data/generate/api-definition', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, api_spec, spec_type, scenarios, linked_test_case_ids } = req.body;
+    const prompt = `You are a test data generation expert. Given this API specification, generate comprehensive test data covering all scenarios.
+
+API Spec (${spec_type || 'OpenAPI'}):
+${(api_spec || '').slice(0, 3000)}
+
+Generate test data for these scenarios: ${(scenarios || ['happy_path', 'edge_cases', 'negative']).join(', ')}
+
+Return JSON: {"records": [{"scenario": "happy_path|edge_case|negative", "endpoint": "/path", "method": "GET|POST", "request_body": {}, "expected_response": {}, "description": "..."}]}`;
+    let records: any[] = [];
+    try {
+      const aiText = await generateAI(prompt, true, 3000);
+      const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      records = parsed.records || parsed;
+      if (!Array.isArray(records)) records = [records];
+    } catch {
+      records = [
+        { scenario: 'happy_path', endpoint: '/api/users', method: 'POST', request_body: { name: 'Test User', email: 'test@example.com' }, expected_response: { id: 1, status: 'created' }, description: 'Valid user creation' },
+        { scenario: 'edge_case', endpoint: '/api/users', method: 'POST', request_body: { name: '', email: 'invalid-email' }, expected_response: { error: 'Validation failed' }, description: 'Invalid email format' },
+        { scenario: 'negative', endpoint: '/api/users/99999', method: 'GET', request_body: {}, expected_response: { error: 'Not found' }, description: 'Non-existent user' }
+      ];
+    }
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || 'API-Based Data Set', `Generated from ${spec_type || 'API'} spec`, 'api_definition', environment || 'test', project_id || null, 'draft', '["api-generated","spec-based"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, rec.scenario || 'record', 'api_test', JSON.stringify(rec), JSON.stringify(rec), 0, new Date().toISOString());
+    }
+    res.json({ success: true, setId, records, count: records.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: Synthetic ──────────────────────────────────────────────────────
+app.post('/api/test-data/generate/synthetic', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, schema, count, locale, linked_test_case_ids } = req.body;
+    const recordCount = Math.min(count || 20, 100);
+    const prompt = `Generate ${recordCount} synthetic test data records matching this schema for locale ${locale || 'en-US'}.
+
+Schema: ${JSON.stringify(schema || { name: 'string', email: 'email', age: 'number(18-65)', role: 'enum(admin,user,guest)', created_at: 'date' })}
+
+Return JSON array of ${recordCount} records with realistic, varied values. No real PII.`;
+    let records: any[] = [];
+    try {
+      const aiText = await generateAI(prompt, true, 3000);
+      const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      records = JSON.parse(cleaned);
+      if (!Array.isArray(records)) records = [records];
+    } catch {
+      records = Array.from({ length: recordCount }, (_, i) => ({
+        name: `Synthetic User ${i + 1}`, email: `synth${i + 1}@testdata.com`,
+        age: 20 + (i % 45), role: ['admin', 'user', 'guest'][i % 3],
+        created_at: new Date(Date.now() - i * 86400000).toISOString().split('T')[0]
+      }));
+    }
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || 'Synthetic Data Set', `${recordCount} synthetic records for ${locale || 'en-US'}`, 'synthetic', environment || 'test', project_id || null, 'draft', '["synthetic","ai-generated"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, 'record', 'synthetic', JSON.stringify(rec), JSON.stringify(rec), 0, new Date().toISOString());
+    }
+    res.json({ success: true, setId, records, count: records.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: Conditions ─────────────────────────────────────────────────────
+app.post('/api/test-data/generate/conditions', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, conditions, linked_test_case_ids } = req.body;
+    const prompt = `Generate test data records satisfying ALL of these conditions:
+
+${(conditions || []).map((c: any, i: number) => `${i + 1}. Field "${c.field}" ${c.operator} "${c.value}"`).join('\n')}
+
+Generate 15 records. Return JSON array: [{"field1": "value", ...}]`;
+    let records: any[] = [];
+    try {
+      const aiText = await generateAI(prompt, true, 2000);
+      const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      records = JSON.parse(cleaned);
+      if (!Array.isArray(records)) records = [records];
+    } catch {
+      records = Array.from({ length: 15 }, (_, i) => {
+        const rec: any = {};
+        for (const c of (conditions || [])) { rec[c.field] = c.value; }
+        rec._index = i + 1;
+        return rec;
+      });
+    }
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || 'Conditions-Based Data Set', `Generated with ${(conditions || []).length} conditions`, 'conditions', environment || 'test', project_id || null, 'draft', '["conditions","rule-based"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, 'record', 'conditional', JSON.stringify(rec), JSON.stringify(rec), 0, new Date().toISOString());
+    }
+    res.json({ success: true, setId, records, count: records.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: RAG / Knowledge Base ──────────────────────────────────────────
+app.post('/api/test-data/generate/rag', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, query, test_case_ids, linked_test_case_ids } = req.body;
+    // Fetch relevant RAG documents
+    const ragDocs = sqliteDb.prepare("SELECT name, content, summary FROM rag_documents ORDER BY created_at DESC LIMIT 5").all() as any[];
+    // Fetch linked test cases
+    const testCases = test_case_ids?.length
+      ? sqliteDb.prepare(`SELECT title, steps, expected_result FROM test_cases WHERE id IN (${test_case_ids.map(() => '?').join(',')}) LIMIT 10`).all(...test_case_ids) as any[]
+      : sqliteDb.prepare("SELECT title, steps, expected_result FROM test_cases ORDER BY created_at DESC LIMIT 5").all() as any[];
+    const prompt = `You are a test data expert. Based on the knowledge base documents and test cases below, suggest suitable test data for testing.
+
+Query: ${query || 'Generate test data for the existing test cases'}
+
+Knowledge Base Documents:
+${ragDocs.map(d => `- ${d.name}: ${d.summary || d.content?.slice(0, 200)}`).join('\n') || 'No documents in KB yet'}
+
+Test Cases:
+${testCases.map((tc: any) => `- ${tc.title}: ${tc.steps?.slice(0, 100)}`).join('\n') || 'No test cases found'}
+
+Generate 10 test data records. Return JSON: [{"test_case": "TC title", "field": "value", "rationale": "why this data"}]`;
+    let records: any[] = [];
+    try {
+      const aiText = await generateAI(prompt, true, 2000);
+      const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      records = JSON.parse(cleaned);
+      if (!Array.isArray(records)) records = [records];
+    } catch {
+      records = testCases.slice(0, 10).map((tc: any, i: number) => ({
+        test_case: tc.title, field: 'test_input', value: `Sample data ${i + 1}`, rationale: 'Based on test case requirements'
+      }));
+    }
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || 'RAG-Suggested Data Set', `Generated from KB + test cases`, 'rag', environment || 'test', project_id || null, 'draft', '["rag","kb-based"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, rec.field || 'record', 'rag', JSON.stringify(rec), JSON.stringify(rec), 0, new Date().toISOString());
+    }
+    res.json({ success: true, setId, records, count: records.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: URL Scraper ────────────────────────────────────────────────────
+app.post('/api/test-data/generate/url-scrape', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, url, scrape_depth, linked_test_case_ids } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL required' });
+    // Fetch the URL content
+    let pageContent = '';
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'EdgeQI-TestDataBot/1.0' } });
+      const html = await response.text();
+      // Strip HTML tags
+      pageContent = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000);
+    } catch (e: any) {
+      pageContent = `Could not fetch URL: ${e.message}`;
+    }
+    const prompt = `You are a test data expert. Analyze this web application page content and suggest suitable test data for each form field, input, or interactive element found.
+
+URL: ${url}
+Page content (truncated): ${pageContent}
+
+Generate test data suggestions. Return JSON: [{"element": "field/button name", "test_data": "suggested value", "scenario": "happy_path|edge_case|negative", "rationale": "why"}]`;
+    let records: any[] = [];
+    try {
+      const aiText = await generateAI(prompt, true, 2000);
+      const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+      records = JSON.parse(cleaned);
+      if (!Array.isArray(records)) records = [records];
+    } catch {
+      records = [
+        { element: 'username', test_data: 'testuser@example.com', scenario: 'happy_path', rationale: 'Valid email format' },
+        { element: 'password', test_data: 'SecurePass123!', scenario: 'happy_path', rationale: 'Meets complexity requirements' },
+        { element: 'username', test_data: 'a'.repeat(256), scenario: 'edge_case', rationale: 'Max length boundary test' }
+      ];
+    }
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || `Scraped: ${url.slice(0, 50)}`, `Scraped from ${url}`, 'url_scrape', environment || 'test', project_id || null, 'draft', '["scraped","url-based"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, rec.element || 'field', 'scraped', JSON.stringify(rec.test_data), JSON.stringify(rec), 0, new Date().toISOString());
+    }
+    res.json({ success: true, setId, records, count: records.length, pageContent: pageContent.slice(0, 500) });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── GENERATE: ERP Integration ────────────────────────────────────────────────
+app.post('/api/test-data/generate/erp', requireAuth, async (req: any, res: any) => {
+  try {
+    const { name, environment, project_id, erp_config_id, module, entity_type, filters, linked_test_case_ids } = req.body;
+    const cfg = erp_config_id ? sqliteDb.prepare('SELECT * FROM erp_configs WHERE id=?').get(erp_config_id) as any : null;
+    let records: any[] = [];
+    if (cfg?.base_url && cfg?.api_key) {
+      try {
+        const erpRes = await fetch(`${cfg.base_url}/api/${module || 'data'}/${entity_type || 'records'}?${new URLSearchParams(filters || {})}`, {
+          headers: { 'Authorization': `Bearer ${cfg.api_key}`, 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(10000)
+        });
+        const data = await erpRes.json() as any;
+        records = Array.isArray(data) ? data : data.records || data.data || data.value || [];
+      } catch { /* fall through to AI generation */ }
+    }
+    if (!records.length) {
+      const erpSystem = cfg?.erp_type || 'SAP';
+      const prompt = `Generate 10 sample ${entity_type || 'master data'} records from ${erpSystem} ${module || 'Finance'} module for testing purposes.
+Return JSON array: [{"field1": "value", ...}]`;
+      try {
+        const aiText = await generateAI(prompt, true, 2000);
+        const cleaned = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+        records = JSON.parse(cleaned);
+        if (!Array.isArray(records)) records = [records];
+      } catch {
+        records = Array.from({ length: 10 }, (_, i) => ({
+          record_id: `ERP-${String(i + 1).padStart(6, '0')}`, entity: entity_type || 'Customer',
+          module: module || 'Finance', value: `Test Value ${i + 1}`, status: 'Active'
+        }));
+      }
+    }
+    const setId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare(`INSERT INTO test_data_sets (id,name,description,strategy,environment,project_id,status,tags,linked_test_case_ids,record_count,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(setId, name || `ERP Data: ${module || 'Finance'}`, `From ${cfg?.erp_type || 'ERP'} ${module || ''} module`, 'erp', environment || 'test', project_id || null, 'draft', '["erp","integration"]', JSON.stringify(linked_test_case_ids || []), records.length, (req.user as any).id, new Date().toISOString(), new Date().toISOString());
+    for (const rec of records) {
+      const rId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO test_data_records (id,set_id,field_name,field_type,masked_value,data,is_masked,created_at) VALUES (?,?,?,?,?,?,?,?)').run(rId, setId, 'record', 'erp', JSON.stringify(rec), JSON.stringify(rec), 0, new Date().toISOString());
+    }
+    res.json({ success: true, setId, records, count: records.length });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── ERP CONFIGS ──────────────────────────────────────────────────────────────
+app.get('/api/test-data/erp-configs', requireAuth, (req: any, res: any) => {
+  try {
+    const configs = sqliteDb.prepare('SELECT id,name,erp_type,base_url,description,is_active,created_at FROM erp_configs WHERE created_by=? OR 1=1 ORDER BY created_at DESC').all((req.user as any).id);
+    res.json(configs);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/test-data/erp-configs', requireAuth, (req: any, res: any) => {
+  try {
+    const { name, erp_type, base_url, api_key, username, password, description } = req.body;
+    if (!name || !erp_type || !base_url) return res.status(400).json({ error: 'name, erp_type, base_url required' });
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sqliteDb.prepare('INSERT INTO erp_configs (id,name,erp_type,base_url,api_key,username,password_enc,description,is_active,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(id, name, erp_type, base_url, api_key || '', username || '', password || '', description || '', 1, (req.user as any).id, new Date().toISOString());
+    res.json({ success: true, id });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/test-data/erp-configs/:id', requireAuth, (req: any, res: any) => {
+  try {
+    sqliteDb.prepare('DELETE FROM erp_configs WHERE id=?').run(req.params.id);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/test-data/erp-configs/:id/test', requireAuth, async (req: any, res: any) => {
+  try {
+    const cfg = sqliteDb.prepare('SELECT * FROM erp_configs WHERE id=?').get(req.params.id) as any;
+    if (!cfg) return res.status(404).json({ error: 'Not found' });
+    try {
+      const r = await fetch(`${cfg.base_url}/health`, { signal: AbortSignal.timeout(5000), headers: { 'Authorization': `Bearer ${cfg.api_key}` } });
+      res.json({ success: r.ok, status: r.status, message: r.ok ? 'Connection successful' : `HTTP ${r.status}` });
+    } catch (e: any) {
+      res.json({ success: false, message: `Connection failed: ${e.message}` });
+    }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// SPA CATCH-ALL — MUST be last, after ALL API routes
+// Serves the React SPA for any non-API request in monolith mode.
+// ══════════════════════════════════════════════════════════════════════════════
+if (!process.env.FRONTEND_ORIGIN) {
+  app.get('*', (req: any, res: any) => {
+    const distPath = path.join(process.cwd(), 'dist');
+    const apiBase = process.env.API_BASE_URL ?? '';
+    const indexPath = path.join(distPath, 'index.html');
+    try {
+      let html = fs.readFileSync(indexPath, 'utf8');
+      html = html.replace(
+        '<script type="module"',
+        `<script>window.__API_BASE__="${apiBase}";</script>\n    <script type="module"`
+      );
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch {
+      res.status(500).send('Frontend not found. Run: npm run build:client');
+    }
+  });
+}

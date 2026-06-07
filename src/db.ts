@@ -622,3 +622,281 @@ export function hydrateRow(row: any): any {
 }
 
 console.log(`[DB] SQLite connected: ${DB_PATH}`);
+
+// ─── SAAS LICENSING SCHEMA ────────────────────────────────────────────────────
+sqliteDb.exec(`
+
+  -- Tenants (organisations that buy licenses)
+  CREATE TABLE IF NOT EXISTS tenants (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    domain TEXT,
+    country TEXT DEFAULT 'US',
+    currency TEXT DEFAULT 'USD',
+    status TEXT DEFAULT 'active',         -- active | suspended | trial | cancelled
+    plan_tier TEXT DEFAULT 'starter',     -- starter | professional | enterprise | custom
+    max_users INTEGER DEFAULT 5,
+    max_concurrent INTEGER DEFAULT 2,
+    trial_ends_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    billing_email TEXT,
+    billing_address TEXT,
+    tax_id TEXT,
+    notes TEXT
+  );
+
+  -- License packs (super admin defines these)
+  CREATE TABLE IF NOT EXISTS license_packs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    tier TEXT NOT NULL,                   -- starter | professional | enterprise | custom
+    max_users INTEGER NOT NULL,
+    max_concurrent INTEGER NOT NULL,
+    price_usd REAL NOT NULL,
+    billing_cycle TEXT DEFAULT 'monthly', -- monthly | annual | perpetual
+    currency_prices TEXT DEFAULT '{}',    -- JSON: {"EUR":90,"GBP":80,"INR":8500,...}
+    features TEXT DEFAULT '[]',           -- JSON array of feature flags
+    is_active INTEGER DEFAULT 1,
+    is_popular INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Tenant subscriptions (which pack a tenant is on)
+  CREATE TABLE IF NOT EXISTS tenant_subscriptions (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    pack_id TEXT NOT NULL REFERENCES license_packs(id),
+    status TEXT DEFAULT 'active',         -- active | expired | cancelled | pending
+    seats_used INTEGER DEFAULT 0,
+    starts_at DATETIME NOT NULL,
+    ends_at DATETIME,
+    auto_renew INTEGER DEFAULT 1,
+    activated_by TEXT,                    -- super admin user id
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Users extended with tenant linkage
+  CREATE TABLE IF NOT EXISTS tenant_users (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    user_id INTEGER REFERENCES users(id),
+    email TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT DEFAULT 'qa_engineer',      -- tenant_admin | qa_engineer | viewer | manager
+    status TEXT DEFAULT 'active',         -- active | suspended | invited
+    invite_token TEXT,
+    last_active DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Concurrent session tracking
+  CREATE TABLE IF NOT EXISTS active_sessions (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL
+  );
+
+  -- SSO configurations per tenant
+  CREATE TABLE IF NOT EXISTS sso_configs (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT UNIQUE NOT NULL REFERENCES tenants(id),
+    protocol TEXT DEFAULT 'oidc',         -- oidc | saml
+    provider TEXT,                        -- azure_ad | okta | google | ping | custom
+    client_id TEXT,
+    client_secret TEXT,
+    issuer_url TEXT,
+    saml_metadata_url TEXT,
+    saml_cert TEXT,
+    callback_url TEXT,
+    attribute_mapping TEXT DEFAULT '{}',  -- JSON: {"email":"email","name":"displayName",...}
+    is_active INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Invoices
+  CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY,
+    invoice_number TEXT UNIQUE NOT NULL,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    subscription_id TEXT REFERENCES tenant_subscriptions(id),
+    status TEXT DEFAULT 'draft',          -- draft | sent | paid | overdue | void
+    currency TEXT DEFAULT 'USD',
+    subtotal REAL NOT NULL,
+    tax_rate REAL DEFAULT 0,
+    tax_amount REAL DEFAULT 0,
+    discount_amount REAL DEFAULT 0,
+    total REAL NOT NULL,
+    line_items TEXT DEFAULT '[]',         -- JSON array of {description, qty, unit_price, amount}
+    due_date DATETIME,
+    paid_at DATETIME,
+    payment_method TEXT,
+    payment_reference TEXT,
+    notes TEXT,
+    pdf_path TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Receipts
+  CREATE TABLE IF NOT EXISTS receipts (
+    id TEXT PRIMARY KEY,
+    receipt_number TEXT UNIQUE NOT NULL,
+    invoice_id TEXT NOT NULL REFERENCES invoices(id),
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    amount REAL NOT NULL,
+    currency TEXT DEFAULT 'USD',
+    payment_method TEXT,
+    payment_reference TEXT,
+    paid_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    pdf_path TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Support tickets
+  CREATE TABLE IF NOT EXISTS support_tickets (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT REFERENCES tenants(id),
+    user_id INTEGER REFERENCES users(id),
+    category TEXT DEFAULT 'billing',      -- billing | license | technical | general
+    priority TEXT DEFAULT 'medium',       -- low | medium | high | critical
+    status TEXT DEFAULT 'open',           -- open | in_progress | resolved | closed
+    subject TEXT NOT NULL,
+    description TEXT NOT NULL,
+    ai_suggested_response TEXT,
+    assigned_to TEXT,
+    resolved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Support ticket messages (thread)
+  CREATE TABLE IF NOT EXISTS support_messages (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL REFERENCES support_tickets(id),
+    sender_id INTEGER REFERENCES users(id),
+    sender_role TEXT DEFAULT 'user',      -- user | support | ai
+    message TEXT NOT NULL,
+    attachments TEXT DEFAULT '[]',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Usage metrics (for billing and analytics)
+  CREATE TABLE IF NOT EXISTS usage_metrics (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    metric_date TEXT NOT NULL,            -- YYYY-MM-DD
+    peak_concurrent INTEGER DEFAULT 0,
+    total_api_calls INTEGER DEFAULT 0,
+    ai_tokens_used INTEGER DEFAULT 0,
+    test_runs INTEGER DEFAULT 0,
+    storage_mb REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tenant_id, metric_date)
+  );
+
+  -- Currency exchange rates cache
+  CREATE TABLE IF NOT EXISTS currency_rates (
+    currency TEXT PRIMARY KEY,
+    rate_vs_usd REAL NOT NULL,
+    symbol TEXT NOT NULL,
+    name TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Super admin activity log
+  CREATE TABLE IF NOT EXISTS superadmin_audit (
+    id TEXT PRIMARY KEY,
+    admin_id INTEGER REFERENCES users(id),
+    action TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id TEXT,
+    details TEXT,
+    ip_address TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Seed default currency rates
+const rateCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM currency_rates").get() as any).c;
+if (rateCount === 0) {
+  const defaultRates = [
+    { currency: 'USD', rate: 1.0,    symbol: '$',  name: 'US Dollar' },
+    { currency: 'EUR', rate: 0.92,   symbol: '€',  name: 'Euro' },
+    { currency: 'GBP', rate: 0.79,   symbol: '£',  name: 'British Pound' },
+    { currency: 'INR', rate: 83.5,   symbol: '₹',  name: 'Indian Rupee' },
+    { currency: 'AUD', rate: 1.53,   symbol: 'A$', name: 'Australian Dollar' },
+    { currency: 'CAD', rate: 1.36,   symbol: 'C$', name: 'Canadian Dollar' },
+    { currency: 'SGD', rate: 1.34,   symbol: 'S$', name: 'Singapore Dollar' },
+    { currency: 'AED', rate: 3.67,   symbol: 'د.إ', name: 'UAE Dirham' },
+    { currency: 'JPY', rate: 149.5,  symbol: '¥',  name: 'Japanese Yen' },
+    { currency: 'BRL', rate: 4.97,   symbol: 'R$', name: 'Brazilian Real' },
+    { currency: 'MXN', rate: 17.15,  symbol: 'MX$', name: 'Mexican Peso' },
+    { currency: 'ZAR', rate: 18.6,   symbol: 'R',  name: 'South African Rand' },
+  ];
+  const ins = sqliteDb.prepare("INSERT OR IGNORE INTO currency_rates (currency, rate_vs_usd, symbol, name) VALUES (?,?,?,?)");
+  for (const r of defaultRates) ins.run(r.currency, r.rate, r.symbol, r.name);
+}
+
+// Seed default license packs
+const packCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM license_packs").get() as any).c;
+if (packCount === 0) {
+  const { v4: uuidv4 } = require('crypto');
+  const genId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const packs = [
+    {
+      id: genId(), name: 'Starter', tier: 'starter',
+      description: 'Perfect for small QA teams getting started with intelligent testing.',
+      max_users: 5, max_concurrent: 2, price_usd: 49,
+      billing_cycle: 'monthly', is_popular: 0, sort_order: 1,
+      features: JSON.stringify(['Requirements AI','Test Case Generator','Manual Testing','Basic Reports']),
+      currency_prices: JSON.stringify({ EUR: 45, GBP: 39, INR: 4099, AUD: 75, CAD: 67, SGD: 66 }),
+    },
+    {
+      id: genId(), name: 'Professional', tier: 'professional',
+      description: 'Full QA automation suite for growing engineering teams.',
+      max_users: 25, max_concurrent: 10, price_usd: 199,
+      billing_cycle: 'monthly', is_popular: 1, sort_order: 2,
+      features: JSON.stringify(['All Starter features','Test Automation','Performance Testing','Security Scan','TMS Integration','Test Data Manager','AI Copilot','SSO']),
+      currency_prices: JSON.stringify({ EUR: 183, GBP: 157, INR: 16599, AUD: 305, CAD: 271, SGD: 267 }),
+    },
+    {
+      id: genId(), name: 'Enterprise', tier: 'enterprise',
+      description: 'Unlimited scale for large organisations with custom SLAs.',
+      max_users: 100, max_concurrent: 50, price_usd: 799,
+      billing_cycle: 'monthly', is_popular: 0, sort_order: 3,
+      features: JSON.stringify(['All Professional features','Unlimited Projects','Custom Integrations','ERP Connectors','Dedicated Support','Custom SLA','On-premise Option','Audit Logs','SAML SSO']),
+      currency_prices: JSON.stringify({ EUR: 735, GBP: 631, INR: 66699, AUD: 1223, CAD: 1087, SGD: 1071 }),
+    },
+    {
+      id: genId(), name: 'Enterprise Annual', tier: 'enterprise',
+      description: 'Enterprise plan billed annually — 2 months free.',
+      max_users: 100, max_concurrent: 50, price_usd: 7990,
+      billing_cycle: 'annual', is_popular: 0, sort_order: 4,
+      features: JSON.stringify(['All Enterprise features','Annual billing discount','Priority onboarding']),
+      currency_prices: JSON.stringify({ EUR: 7350, GBP: 6310, INR: 666990, AUD: 12230, CAD: 10870, SGD: 10710 }),
+    },
+  ];
+  const ins2 = sqliteDb.prepare(`INSERT OR IGNORE INTO license_packs
+    (id,name,tier,description,max_users,max_concurrent,price_usd,billing_cycle,is_popular,sort_order,features,currency_prices)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
+  for (const p of packs) ins2.run(p.id,p.name,p.tier,p.description,p.max_users,p.max_concurrent,p.price_usd,p.billing_cycle,p.is_popular,p.sort_order,p.features,p.currency_prices);
+}
+
+// Ensure super_admin role exists for the first admin user
+try {
+  sqliteDb.prepare("UPDATE users SET role = 'super_admin' WHERE id = 1 AND role = 'admin'").run();
+} catch {}

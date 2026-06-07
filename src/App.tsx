@@ -35,7 +35,9 @@ import {
   Brain,
   Target,
   GitMerge,
-  Menu
+  Menu,
+  Crown,
+  Building2
 } from 'lucide-react';
 
 import { 
@@ -83,6 +85,9 @@ import AIAssistantPanel from './components/AIAssistantPanel';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import TmsConfigSettings from './components/TmsConfigSettings';
 import CicdConfigSettings from './components/CicdConfigSettings';
+import TestDataManager from './components/TestDataManager';
+import SuperAdminPortal from './components/SuperAdminPortal';
+import TenantAdminPortal from './components/TenantAdminPortal';
 import { apiUrl } from '@/src/config/api';
 
 // ── Sidebar helper components ────────────────────────────────────────────────
@@ -342,7 +347,10 @@ export default function App() {
     'workflow-builder' |
     'defect-impact' |
     'settings' |
-    'cicd-settings'
+    'cicd-settings' |
+    'test-data' |
+    'super-admin' |
+    'org-admin'
   >('agentic');
   
   // Sprint context — active sprint for current project
@@ -998,6 +1006,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'testcases',     label: 'Test Cases',             icon: TableProperties },
               { id: 'traceability',  label: 'Traceability Matrix',    icon: Table },
               { id: 'scripts',       label: 'Test Automation',        icon: Settings2 },
+              { id: 'test-data',     label: 'Test Data Manager',      icon: Database },
               { id: 'defect-impact', label: 'Defect & Impact AI',     icon: Target },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => handleTabChange(p.id)} />)}
           </SidebarGroup>
@@ -1030,6 +1039,18 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
               { id: 'audit',        label: 'Activity Log',      icon: History },
             ].map(p => <SidebarItem key={p.id} id={p.id} label={p.label} Icon={p.icon} active={activeTab === p.id} onClick={() => handleTabChange(p.id)} />)}
           </SidebarGroup>
+
+          {/* ── Section: Administration (role-gated) ─────────────────── */}
+          {(authUser?.role === 'super_admin' || authUser?.role === 'admin' || authUser?.role === 'tenant_admin') && (
+            <SidebarGroup label="Administration">
+              {authUser?.role === 'super_admin' && (
+                <SidebarItem id="super-admin" label="Super Admin" Icon={Crown} active={activeTab === 'super-admin'} onClick={() => handleTabChange('super-admin' as any)} />
+              )}
+              {(authUser?.role === 'admin' || authUser?.role === 'tenant_admin') && (
+                <SidebarItem id="org-admin" label="Org Admin" Icon={Building2} active={activeTab === 'org-admin'} onClick={() => handleTabChange('org-admin' as any)} />
+              )}
+            </SidebarGroup>
+          )}
 
         </div>
 
@@ -1429,6 +1450,18 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             </div>
           )}
           
+          {activeTab === 'test-data' && (
+            <TestDataManager currentProjectId={currentProjectId} token={authToken} />
+          )}
+
+          {activeTab === 'super-admin' && authUser?.role === 'super_admin' && (
+            <SuperAdminPortal token={authToken} />
+          )}
+
+          {activeTab === 'org-admin' && (authUser?.role === 'tenant_admin' || authUser?.role === 'admin') && (
+            <TenantAdminPortal token={authToken} />
+          )}
+
           {activeTab === 'rag-kb' && (
             <RAGKnowledgeBase
               currentProjectId={currentProjectId}
