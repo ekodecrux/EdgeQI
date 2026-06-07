@@ -9289,6 +9289,30 @@ app.get('/api/saas/users', requireSuperAdmin, (req: any, res: any) => {
   res.json(sqliteDb.prepare("SELECT id,email,name,role,created_at,last_login FROM users ORDER BY created_at DESC").all());
 });
 
+// ─── SUPER ADMIN: Force DB migrations (safe, idempotent) ─────────────────────
+app.post('/api/saas/run-migrations', requireSuperAdmin, (req: any, res: any) => {
+  const results: string[] = [];
+  const migrations = [
+    `ALTER TABLE test_data_records ADD COLUMN masked_value TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_records ADD COLUMN original_value TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_records ADD COLUMN data TEXT DEFAULT '{}'`,
+    `ALTER TABLE test_data_records ADD COLUMN metadata TEXT DEFAULT '{}'`,
+    `ALTER TABLE test_data_records ADD COLUMN actor_id TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_approvals ADD COLUMN actor_id TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_sets ADD COLUMN sprint_id TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_sets ADD COLUMN version INTEGER DEFAULT 1`,
+    `ALTER TABLE test_data_sets ADD COLUMN linked_run_id TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_sets ADD COLUMN rejection_reason TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_sets ADD COLUMN approved_by TEXT DEFAULT ''`,
+    `ALTER TABLE test_data_sets ADD COLUMN approved_at DATETIME`,
+  ];
+  for (const sql of migrations) {
+    try { sqliteDb.exec(sql); results.push(`OK: ${sql.slice(0,60)}`); }
+    catch (e: any) { results.push(`SKIP (${e.message?.slice(0,40)}): ${sql.slice(0,40)}`); }
+  }
+  res.json({ success: true, results });
+});
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════════════════
 // TEST DATA MANAGER — ALL BACKEND ROUTES
