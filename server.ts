@@ -8790,7 +8790,7 @@ function requireTenantAdmin(req: any, res: any, next: any) {
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
-    if (!['super_admin', 'tenant_admin'].includes(payload.role)) return res.status(403).json({ error: 'Tenant admin required' });
+    if (!['super_admin', 'tenant_admin', 'org_admin'].includes(payload.role)) return res.status(403).json({ error: 'Tenant admin required' });
     req.user = payload;
     next();
   } catch { res.status(401).json({ error: 'Invalid token' }); }

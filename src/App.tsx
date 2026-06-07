@@ -1041,12 +1041,12 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
           </SidebarGroup>
 
           {/* ── Section: Administration (role-gated) ─────────────────── */}
-          {(authUser?.role === 'super_admin' || authUser?.role === 'admin' || authUser?.role === 'tenant_admin') && (
+          {(authUser?.role === 'super_admin' || authUser?.role === 'org_admin') && (
             <SidebarGroup label="Administration">
               {authUser?.role === 'super_admin' && (
                 <SidebarItem id="super-admin" label="Super Admin" Icon={Crown} active={activeTab === 'super-admin'} onClick={() => handleTabChange('super-admin' as any)} />
               )}
-              {(authUser?.role === 'admin' || authUser?.role === 'tenant_admin') && (
+              {authUser?.role === 'org_admin' && (
                 <SidebarItem id="org-admin" label="Org Admin" Icon={Building2} active={activeTab === 'org-admin'} onClick={() => handleTabChange('org-admin' as any)} />
               )}
             </SidebarGroup>
@@ -1458,7 +1458,7 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
             <SuperAdminPortal token={authToken} />
           )}
 
-          {activeTab === 'org-admin' && (authUser?.role === 'tenant_admin' || authUser?.role === 'admin') && (
+          {activeTab === 'org-admin' && authUser?.role === 'org_admin' && (
             <TenantAdminPortal token={authToken} />
           )}
 

@@ -20,7 +20,9 @@ const TIERS = ['starter','professional','enterprise','custom'];
 const STATUS_COLORS: Record<string, string> = { active: 'text-green-400 bg-green-900/30', trial: 'text-yellow-400 bg-yellow-900/30', suspended: 'text-red-400 bg-red-900/30', cancelled: 'text-gray-400 bg-gray-800', paid: 'text-green-400 bg-green-900/30', draft: 'text-gray-400 bg-gray-800', sent: 'text-blue-400 bg-blue-900/30', overdue: 'text-red-400 bg-red-900/30', open: 'text-yellow-400 bg-yellow-900/30', in_progress: 'text-blue-400 bg-blue-900/30', resolved: 'text-green-400 bg-green-900/30', critical: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
 
 export default function SuperAdminPortal({ token }: { token: string }) {
-  const [tab, setTab] = useState<'dashboard'|'packs'|'tenants'|'invoices'|'support'|'currencies'|'audit'>('dashboard');
+  const [tab, setTab] = useState<'dashboard'|'packs'|'tenants'|'users'|'invoices'|'support'|'currencies'|'audit'>('dashboard');
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [userSearch, setUserSearch] = useState('');
   const [stats, setStats] = useState<Stats | null>(null);
   const [packs, setPacks] = useState<LicensePack[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -58,10 +60,17 @@ export default function SuperAdminPortal({ token }: { token: string }) {
   const loadTickets = useCallback(async () => { const d = await api('/api/saas/support'); setTickets(Array.isArray(d) ? d : []); }, [api]);
   const loadCurrencies = useCallback(async () => { const d = await api('/api/saas/currencies'); setCurrencies(Array.isArray(d) ? d : []); }, [api]);
   const loadAudit = useCallback(async () => { const d = await api('/api/saas/audit'); setAudit(Array.isArray(d) ? d : []); }, [api]);
+  const loadAllUsers = useCallback(async () => { const d = await api('/api/saas/users'); setAllUsers(Array.isArray(d) ? d : []); }, [api]);
+
+  const promoteUser = async (userId: number, role: string) => {
+    await api(`/api/saas/users/${userId}/promote`, { method: 'PATCH', body: JSON.stringify({ role }) });
+    await loadAllUsers(); showToast(`User role updated to ${role}`);
+  };
 
   useEffect(() => { loadStats(); loadPacks(); }, []);
   useEffect(() => {
     if (tab === 'tenants') loadTenants();
+    if (tab === 'users') loadAllUsers();
     if (tab === 'invoices') loadInvoices();
     if (tab === 'support') loadTickets();
     if (tab === 'currencies') loadCurrencies();
@@ -160,6 +169,7 @@ export default function SuperAdminPortal({ token }: { token: string }) {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
     { id: 'packs', label: 'License Packs', icon: Package },
     { id: 'tenants', label: 'Tenants', icon: Building2 },
+    { id: 'users', label: 'Users & Access', icon: Users },
     { id: 'invoices', label: 'Invoices & Receipts', icon: FileText },
     { id: 'support', label: 'Support', icon: LifeBuoy },
     { id: 'currencies', label: 'Currencies', icon: Globe },
@@ -461,6 +471,77 @@ export default function SuperAdminPortal({ token }: { token: string }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── USERS & ACCESS ── */}
+        {tab === 'users' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Users &amp; Access Management</h2>
+                <p className="text-sm text-gray-400 mt-0.5">Manage all platform users, assign roles, and control access across organisations.</p>
+              </div>
+              <button onClick={loadAllUsers} className="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg text-sm"><RefreshCw size={13} />Refresh</button>
+            </div>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Search users by name, email or role…" className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:border-purple-500" />
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-800 text-gray-400 text-xs">
+                  <tr>{['User','Email','Role','Joined','Actions'].map(h => <th key={h} className="text-left px-4 py-3">{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {allUsers.filter(u => JSON.stringify(u).toLowerCase().includes(userSearch.toLowerCase())).map(u => (
+                    <tr key={u.id} className="border-t border-gray-800 hover:bg-gray-800/40">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">{(u.name||'?').charAt(0).toUpperCase()}</div>
+                          <span className="font-medium">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">{u.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          u.role === 'super_admin' ? 'bg-purple-900/40 text-purple-300' :
+                          u.role === 'org_admin' ? 'bg-blue-900/40 text-blue-300' :
+                          'bg-gray-800 text-gray-300'
+                        }`}>{u.role?.replace(/_/g,' ')}</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(u.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {u.role !== 'super_admin' && (
+                            <>
+                              {u.role !== 'org_admin' ? (
+                                <button onClick={() => promoteUser(u.id, 'org_admin')} className="text-xs bg-blue-900/30 hover:bg-blue-900/60 text-blue-300 border border-blue-800 px-2 py-1 rounded-lg transition-colors" title="Promote to Org Admin">→ Org Admin</button>
+                              ) : (
+                                <button onClick={() => promoteUser(u.id, 'qa_engineer')} className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-2 py-1 rounded-lg transition-colors" title="Demote to QA Engineer">→ QA Engineer</button>
+                              )}
+                              <button onClick={() => promoteUser(u.id, 'super_admin')} className="text-xs bg-purple-900/30 hover:bg-purple-900/60 text-purple-300 border border-purple-800 px-2 py-1 rounded-lg transition-colors" title="Promote to Super Admin">→ Super Admin</button>
+                            </>
+                          )}
+                          {u.role === 'super_admin' && (
+                            <button onClick={() => promoteUser(u.id, 'qa_engineer')} className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-2 py-1 rounded-lg transition-colors">→ Demote</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {allUsers.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No users found</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Shield size={14} className="text-purple-400" />Role Reference</h3>
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div className="bg-gray-800 rounded-lg p-3"><div className="font-semibold text-purple-300 mb-1">super_admin</div><div className="text-gray-400">Full platform control — license packs, tenants, invoices, all users, currencies, audit log.</div></div>
+                <div className="bg-gray-800 rounded-lg p-3"><div className="font-semibold text-blue-300 mb-1">org_admin</div><div className="text-gray-400">Manages users within their organisation, configures SSO, views billing, raises support tickets.</div></div>
+                <div className="bg-gray-800 rounded-lg p-3"><div className="font-semibold text-gray-300 mb-1">qa_engineer</div><div className="text-gray-400">Standard QA access — all testing modules, test data, defects, performance, security scans.</div></div>
+              </div>
             </div>
           </div>
         )}

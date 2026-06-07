@@ -529,6 +529,11 @@ sqliteDb.exec(`
     mask_pattern TEXT DEFAULT '',      -- e.g. "***-**-XXXX" for SSN
     is_pii INTEGER DEFAULT 0,
     notes TEXT DEFAULT '',
+    masked_value TEXT DEFAULT '',
+    original_value TEXT DEFAULT '',
+    data TEXT DEFAULT '{}',
+    metadata TEXT DEFAULT '{}',
+    actor_id TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(set_id) REFERENCES test_data_sets(id) ON DELETE CASCADE
   );
@@ -538,7 +543,8 @@ sqliteDb.exec(`
     id TEXT PRIMARY KEY,
     set_id TEXT NOT NULL,
     action TEXT NOT NULL,              -- submitted | approved | rejected | revoked
-    actor_email TEXT NOT NULL,
+    actor_email TEXT DEFAULT '',
+    actor_id TEXT DEFAULT '',
     comment TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(set_id) REFERENCES test_data_sets(id) ON DELETE CASCADE
@@ -568,6 +574,18 @@ sqliteDb.exec(`
 // Safe migrations for test_data tables
 try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN sprint_id TEXT DEFAULT ''`); } catch {}
 try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN version INTEGER DEFAULT 1`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN linked_run_id TEXT DEFAULT ''`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN rejection_reason TEXT DEFAULT ''`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN approved_by TEXT DEFAULT ''`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_sets ADD COLUMN approved_at DATETIME`); } catch {}
+// Migrate test_data_records to add columns used by generate routes
+try { sqliteDb.exec(`ALTER TABLE test_data_records ADD COLUMN masked_value TEXT DEFAULT ''`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_records ADD COLUMN original_value TEXT DEFAULT ''`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_records ADD COLUMN data TEXT DEFAULT '{}'`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_records ADD COLUMN metadata TEXT DEFAULT '{}'`); } catch {}
+try { sqliteDb.exec(`ALTER TABLE test_data_records ADD COLUMN actor_id TEXT DEFAULT ''`); } catch {}
+// Migrate test_data_approvals to add actor_id column
+try { sqliteDb.exec(`ALTER TABLE test_data_approvals ADD COLUMN actor_id TEXT DEFAULT ''`); } catch {}
 
 // ─── SEED DEFAULT PROMPT TEMPLATES ─────────────────────────────────────────
 const templateCount = (sqliteDb.prepare("SELECT COUNT(*) as c FROM prompt_templates").get() as any).c;
