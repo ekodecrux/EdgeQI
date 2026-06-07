@@ -8495,6 +8495,15 @@ async function startServer() {
     app.use(express.static(publicPath)); // pre-built frontend assets live in public/assets/
     // SPA catch-all is registered at the end of the file, after all API routes
   }
+  // ─── TEMP: One-time super admin password reset ────────────────────────────
+  app.post('/api/temp/reset-super-admin', async (req: any, res: any) => {
+    const { secret, email, newPassword } = req.body;
+    if (secret !== 'EdgeQI-Reset-2026-XK9') return res.status(403).json({ error: 'Forbidden' });
+    const bcryptLib = await import('bcryptjs');
+    const hash = await bcryptLib.hash(newPassword || 'SuperAdmin@2026!', 10);
+    const result = sqliteDb.prepare("UPDATE users SET password_hash=? WHERE email=? AND role='super_admin'").run(hash, email || 'superadmin@edgeqi.com');
+    res.json({ success: true, changes: result.changes, email: email || 'superadmin@edgeqi.com', newPassword: newPassword || 'SuperAdmin@2026!' });
+  });
   // Hybrid mode: FRONTEND_ORIGIN is set → backend is API-only, no static files
 
   app.listen(PORT, "0.0.0.0", () => {
