@@ -9788,6 +9788,457 @@ app.post('/api/test-data/erp-configs/:id/test', requireAuth, async (req: any, re
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// SUPER ADMIN — BUSINESS CONTROL PLANE (v2)
+// All routes here are purely SaaS business operations.
+// QA platform features are NOT exposed here.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── DB: Create new Super Admin tables ───────────────────────────────────────
+try {
+  sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS saas_analytics_daily (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      tenant_id TEXT,
+      tenant_name TEXT DEFAULT '',
+      geo_region TEXT DEFAULT 'Unknown',
+      country TEXT DEFAULT '',
+      license_tier TEXT DEFAULT 'starter',
+      company_size TEXT DEFAULT 'small',
+      api_calls INTEGER DEFAULT 0,
+      active_users INTEGER DEFAULT 0,
+      storage_bytes INTEGER DEFAULT 0,
+      ai_tokens INTEGER DEFAULT 0,
+      test_runs INTEGER DEFAULT 0,
+      revenue_usd REAL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS saas_email_triggers (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      trigger_name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      threshold_value INTEGER DEFAULT 0,
+      threshold_unit TEXT DEFAULT 'days',
+      template_subject TEXT NOT NULL,
+      template_body TEXT NOT NULL,
+      recipient_type TEXT DEFAULT 'tenant_admin',
+      is_active INTEGER DEFAULT 1,
+      last_fired_at DATETIME,
+      fire_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS saas_tenant_configs (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL UNIQUE,
+      feature_flags TEXT DEFAULT '{}',
+      max_users INTEGER DEFAULT 5,
+      max_projects INTEGER DEFAULT 10,
+      max_api_calls_day INTEGER DEFAULT 1000,
+      max_ai_tokens_day INTEGER DEFAULT 50000,
+      custom_domain TEXT DEFAULT '',
+      sso_enforced INTEGER DEFAULT 0,
+      data_retention_days INTEGER DEFAULT 90,
+      allowed_geo_regions TEXT DEFAULT '["ALL"]',
+      branding_logo_url TEXT DEFAULT '',
+      branding_primary_color TEXT DEFAULT '#6366f1',
+      notification_email TEXT DEFAULT '',
+      timezone TEXT DEFAULT 'UTC',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS saas_rbac_roles (
+      id TEXT PRIMARY KEY,
+      role_name TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      permissions TEXT DEFAULT '[]',
+      is_system INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS saas_rbac_assignments (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      role_id TEXT NOT NULL,
+      tenant_id TEXT,
+      assigned_by TEXT,
+      assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS saas_issues (
+      id TEXT PRIMARY KEY,
+      ticket_ref TEXT NOT NULL,
+      tenant_id TEXT,
+      tenant_name TEXT DEFAULT '',
+      reporter_email TEXT DEFAULT '',
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      category TEXT DEFAULT 'general',
+      priority TEXT DEFAULT 'medium',
+      status TEXT DEFAULT 'open',
+      assigned_to TEXT DEFAULT '',
+      resolution TEXT DEFAULT '',
+      sla_hours INTEGER DEFAULT 24,
+      sla_breach INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolved_at DATETIME
+    );
+    CREATE TABLE IF NOT EXISTS saas_email_log (
+      id TEXT PRIMARY KEY,
+      trigger_id TEXT,
+      tenant_id TEXT,
+      recipient_email TEXT,
+      subject TEXT,
+      body TEXT,
+      status TEXT DEFAULT 'sent',
+      sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  // Seed default RBAC roles
+  const roleCount = (sqliteDb.prepare('SELECT COUNT(*) as c FROM saas_rbac_roles').get() as any).c;
+  if (roleCount === 0) {
+    const roles = [
+      { id: 'role_super_admin', role_name: 'super_admin', display_name: 'Super Admin', description: 'Full platform control — all tenants, billing, RBAC, analytics', permissions: JSON.stringify(['*']), is_system: 1 },
+      { id: 'role_org_admin', role_name: 'org_admin', display_name: 'Org Admin', description: 'Manages users within their organisation, SSO, billing, support', permissions: JSON.stringify(['org:read','org:write','users:manage','sso:configure','billing:view','support:raise']), is_system: 1 },
+      { id: 'role_qa_lead', role_name: 'qa_lead', display_name: 'QA Lead', description: 'Full QA access plus team management and reporting', permissions: JSON.stringify(['qa:*','reports:*','team:view']), is_system: 1 },
+      { id: 'role_qa_engineer', role_name: 'qa_engineer', display_name: 'QA Engineer', description: 'Standard QA access — all testing modules', permissions: JSON.stringify(['qa:*']), is_system: 1 },
+      { id: 'role_viewer', role_name: 'viewer', display_name: 'Viewer', description: 'Read-only access to dashboards and reports', permissions: JSON.stringify(['qa:read','reports:read']), is_system: 1 },
+    ];
+    for (const r of roles) sqliteDb.prepare('INSERT OR IGNORE INTO saas_rbac_roles (id,role_name,display_name,description,permissions,is_system) VALUES (?,?,?,?,?,?)').run(r.id, r.role_name, r.display_name, r.description, r.permissions, r.is_system);
+  }
+  // Seed default email triggers
+  const trigCount = (sqliteDb.prepare('SELECT COUNT(*) as c FROM saas_email_triggers').get() as any).c;
+  if (trigCount === 0) {
+    const triggers = [
+      { id: 'trig_lic_exp_30', event_type: 'license_expiry', trigger_name: 'License Expiry — 30 Days', description: 'Sent 30 days before license expires', threshold_value: 30, threshold_unit: 'days', template_subject: 'Your EdgeQI license expires in 30 days', template_body: 'Dear {{tenant_name}},\n\nYour EdgeQI {{license_tier}} license will expire on {{expiry_date}}.\n\nPlease renew at https://edgeqi.com/billing to avoid service interruption.\n\nBest regards,\nEdgeQI Team', recipient_type: 'tenant_admin', is_active: 1 },
+      { id: 'trig_lic_exp_7', event_type: 'license_expiry', trigger_name: 'License Expiry — 7 Days', description: 'Sent 7 days before license expires', threshold_value: 7, threshold_unit: 'days', template_subject: 'URGENT: Your EdgeQI license expires in 7 days', template_body: 'Dear {{tenant_name}},\n\nThis is an urgent reminder that your EdgeQI license expires in 7 days on {{expiry_date}}.\n\nRenew now: https://edgeqi.com/billing\n\nEdgeQI Team', recipient_type: 'tenant_admin', is_active: 1 },
+      { id: 'trig_usage_80', event_type: 'usage_spike', trigger_name: 'API Usage at 80%', description: 'Alert when daily API calls reach 80% of limit', threshold_value: 80, threshold_unit: 'percent', template_subject: 'EdgeQI Usage Alert: 80% of API limit reached', template_body: 'Dear {{tenant_name}},\n\nYour organisation has used 80% of its daily API call limit.\n\nCurrent usage: {{current_usage}} / {{limit}} calls.\n\nConsider upgrading your plan to avoid throttling.\n\nEdgeQI Team', recipient_type: 'tenant_admin', is_active: 1 },
+      { id: 'trig_payment_fail', event_type: 'payment_failed', trigger_name: 'Payment Failed', description: 'Alert when a payment attempt fails', threshold_value: 0, threshold_unit: 'event', template_subject: 'Payment Failed — Action Required', template_body: 'Dear {{tenant_name}},\n\nWe were unable to process your payment of {{amount}} for your EdgeQI subscription.\n\nPlease update your payment method at https://edgeqi.com/billing.\n\nEdgeQI Team', recipient_type: 'tenant_admin', is_active: 1 },
+      { id: 'trig_new_tenant', event_type: 'new_tenant', trigger_name: 'New Tenant Welcome', description: 'Welcome email sent to new tenants', threshold_value: 0, threshold_unit: 'event', template_subject: 'Welcome to EdgeQI — Your Account is Ready', template_body: 'Dear {{tenant_name}},\n\nWelcome to EdgeQI Quality Intelligence Platform!\n\nYour {{license_tier}} account has been activated.\n\nGet started: https://edgeqi.com\n\nEdgeQI Team', recipient_type: 'tenant_admin', is_active: 1 },
+      { id: 'trig_user_limit', event_type: 'user_limit', trigger_name: 'User Seat Limit Reached', description: 'Alert when all user seats are occupied', threshold_value: 100, threshold_unit: 'percent', template_subject: 'EdgeQI: All user seats are occupied', template_body: 'Dear {{tenant_name}},\n\nAll {{max_users}} user seats in your plan are now occupied.\n\nUpgrade your plan to add more users: https://edgeqi.com/billing\n\nEdgeQI Team', recipient_type: 'tenant_admin', is_active: 1 },
+    ];
+    for (const t of triggers) sqliteDb.prepare('INSERT OR IGNORE INTO saas_email_triggers (id,event_type,trigger_name,description,threshold_value,threshold_unit,template_subject,template_body,recipient_type,is_active) VALUES (?,?,?,?,?,?,?,?,?,?)').run(t.id, t.event_type, t.trigger_name, t.description, t.threshold_value, t.threshold_unit, t.template_subject, t.template_body, t.recipient_type, t.is_active);
+  }
+  // Seed demo analytics data for charts
+  const analyticsCount = (sqliteDb.prepare('SELECT COUNT(*) as c FROM saas_analytics_daily').get() as any).c;
+  if (analyticsCount === 0) {
+    const geoRegions = ['NA', 'EU', 'APAC', 'MENA', 'LATAM'];
+    const countries = { NA: ['US', 'CA'], EU: ['UK', 'DE', 'FR', 'NL'], APAC: ['IN', 'SG', 'AU', 'JP'], MENA: ['AE', 'SA'], LATAM: ['BR', 'MX'] };
+    const tiers = ['starter', 'professional', 'enterprise'];
+    const sizes = ['small', 'medium', 'large', 'enterprise'];
+    const tenantNames = ['Acme Corp', 'TechFlow Ltd', 'QA Dynamics', 'DevOps Hub', 'TestSphere', 'CloudQA', 'AgileTest', 'BugBuster'];
+    for (let d = 29; d >= 0; d--) {
+      const date = new Date(); date.setDate(date.getDate() - d);
+      const dateStr = date.toISOString().split('T')[0];
+      for (let t = 0; t < tenantNames.length; t++) {
+        const geo = geoRegions[t % geoRegions.length];
+        const countryList = (countries as any)[geo];
+        const country = countryList[t % countryList.length];
+        const tier = tiers[t % tiers.length];
+        const size = sizes[t % sizes.length];
+        const id = `anal_${d}_${t}_${Date.now()}`;
+        const revenue = tier === 'starter' ? 49 : tier === 'professional' ? 199 : 799;
+        sqliteDb.prepare('INSERT OR IGNORE INTO saas_analytics_daily (id,date,tenant_id,tenant_name,geo_region,country,license_tier,company_size,api_calls,active_users,storage_bytes,ai_tokens,test_runs,revenue_usd) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+          id, dateStr, `tenant_${t+1}`, tenantNames[t], geo, country, tier, size,
+          Math.floor(Math.random() * 800 + 100),
+          Math.floor(Math.random() * 8 + 1),
+          Math.floor(Math.random() * 500000000),
+          Math.floor(Math.random() * 5000),
+          Math.floor(Math.random() * 50 + 5),
+          d === 0 ? revenue : 0
+        );
+      }
+    }
+  }
+  // Seed demo issues
+  const issueCount = (sqliteDb.prepare('SELECT COUNT(*) as c FROM saas_issues').get() as any).c;
+  if (issueCount === 0) {
+    const issues = [
+      { id: 'iss_001', ticket_ref: 'EQI-001', tenant_name: 'Acme Corp', reporter_email: 'admin@acme.com', title: 'Cannot connect Jira TMS', description: 'Getting 401 error when connecting to Jira Cloud', category: 'integration', priority: 'high', status: 'open', sla_hours: 8 },
+      { id: 'iss_002', ticket_ref: 'EQI-002', tenant_name: 'TechFlow Ltd', reporter_email: 'qa@techflow.io', title: 'AI Auto-Test not generating scripts', description: 'The AI pipeline runs but produces empty scripts', category: 'ai_feature', priority: 'medium', status: 'in_progress', assigned_to: 'support@edgeqi.com', sla_hours: 24 },
+      { id: 'iss_003', ticket_ref: 'EQI-003', tenant_name: 'QA Dynamics', reporter_email: 'admin@qadynamics.com', title: 'Invoice PDF not downloading', description: 'Clicking download on invoice shows blank page', category: 'billing', priority: 'low', status: 'resolved', resolution: 'Fixed PDF generation endpoint', sla_hours: 48 },
+      { id: 'iss_004', ticket_ref: 'EQI-004', tenant_name: 'DevOps Hub', reporter_email: 'devops@hub.com', title: 'SSO login loop with Okta', description: 'Users get redirected in a loop after Okta authentication', category: 'sso', priority: 'critical', status: 'open', sla_hours: 4 },
+      { id: 'iss_005', ticket_ref: 'EQI-005', tenant_name: 'TestSphere', reporter_email: 'admin@testsphere.io', title: 'Request: Bulk test case import from CSV', description: 'Need ability to import 500+ test cases from CSV file', category: 'feature_request', priority: 'low', status: 'open', sla_hours: 168 },
+    ];
+    for (const i of issues) sqliteDb.prepare('INSERT OR IGNORE INTO saas_issues (id,ticket_ref,tenant_name,reporter_email,title,description,category,priority,status,assigned_to,resolution,sla_hours) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(i.id, i.ticket_ref, i.tenant_name, i.reporter_email, i.title, i.description, i.category, i.priority, i.status, (i as any).assigned_to || '', (i as any).resolution || '', i.sla_hours);
+  }
+} catch (e: any) { console.error('Super Admin v2 table init error:', e.message); }
+
+// ─── RBAC: List all roles ─────────────────────────────────────────────────────
+app.get('/api/saas/rbac/roles', requireSuperAdmin, (req: any, res: any) => {
+  const roles = sqliteDb.prepare('SELECT * FROM saas_rbac_roles ORDER BY is_system DESC, role_name ASC').all();
+  res.json(roles);
+});
+
+app.post('/api/saas/rbac/roles', requireSuperAdmin, (req: any, res: any) => {
+  const { role_name, display_name, description, permissions } = req.body;
+  if (!role_name || !display_name) return res.status(400).json({ error: 'role_name and display_name required' });
+  const id = 'role_' + Date.now().toString(36);
+  sqliteDb.prepare('INSERT INTO saas_rbac_roles (id,role_name,display_name,description,permissions,is_system) VALUES (?,?,?,?,?,0)').run(id, role_name, display_name, description || '', JSON.stringify(permissions || []));
+  res.json({ success: true, id });
+});
+
+app.put('/api/saas/rbac/roles/:id', requireSuperAdmin, (req: any, res: any) => {
+  const { display_name, description, permissions } = req.body;
+  const role = sqliteDb.prepare('SELECT * FROM saas_rbac_roles WHERE id=?').get(req.params.id) as any;
+  if (!role) return res.status(404).json({ error: 'Role not found' });
+  if (role.is_system) return res.status(403).json({ error: 'Cannot modify system roles' });
+  sqliteDb.prepare('UPDATE saas_rbac_roles SET display_name=?,description=?,permissions=? WHERE id=?').run(display_name || role.display_name, description || role.description, JSON.stringify(permissions || JSON.parse(role.permissions)), req.params.id);
+  res.json({ success: true });
+});
+
+app.delete('/api/saas/rbac/roles/:id', requireSuperAdmin, (req: any, res: any) => {
+  const role = sqliteDb.prepare('SELECT * FROM saas_rbac_roles WHERE id=?').get(req.params.id) as any;
+  if (!role) return res.status(404).json({ error: 'Role not found' });
+  if (role.is_system) return res.status(403).json({ error: 'Cannot delete system roles' });
+  sqliteDb.prepare('DELETE FROM saas_rbac_roles WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ─── RBAC: User role assignments ──────────────────────────────────────────────
+app.get('/api/saas/rbac/users', requireSuperAdmin, (req: any, res: any) => {
+  const users = sqliteDb.prepare(`
+    SELECT u.id, u.name, u.email, u.role, u.created_at, u.last_login,
+           COUNT(a.id) as assignment_count
+    FROM users u
+    LEFT JOIN saas_rbac_assignments a ON a.user_id = u.id
+    GROUP BY u.id ORDER BY u.created_at DESC
+  `).all();
+  res.json(users);
+});
+
+app.post('/api/saas/rbac/assign', requireSuperAdmin, (req: any, res: any) => {
+  const { user_id, role_name, tenant_id } = req.body;
+  if (!user_id || !role_name) return res.status(400).json({ error: 'user_id and role_name required' });
+  // Update the user's primary role
+  sqliteDb.prepare('UPDATE users SET role=? WHERE id=?').run(role_name, user_id);
+  // Record assignment
+  const id = 'asgn_' + Date.now().toString(36);
+  sqliteDb.prepare('INSERT INTO saas_rbac_assignments (id,user_id,role_id,tenant_id,assigned_by) VALUES (?,?,?,?,?)').run(id, user_id, 'role_' + role_name, tenant_id || null, (req.user as any).id);
+  logSuperAdminAudit((req.user as any).id, 'RBAC_ASSIGN', 'user', user_id, `Role → ${role_name}`, req.ip);
+  res.json({ success: true });
+});
+
+// ─── Analytics: Business dashboard stats ─────────────────────────────────────
+app.get('/api/saas/analytics/overview', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+    const totalTenants = (sqliteDb.prepare('SELECT COUNT(*) as c FROM tenants').get() as any)?.c || 0;
+    const totalUsers = (sqliteDb.prepare('SELECT COUNT(*) as c FROM users').get() as any)?.c || 0;
+    const mrr = (sqliteDb.prepare(`SELECT COALESCE(SUM(revenue_usd),0) as total FROM saas_analytics_daily WHERE date=?`).get(today) as any)?.total || 0;
+    const allTimeRevenue = (sqliteDb.prepare(`SELECT COALESCE(SUM(revenue_usd),0) as total FROM saas_analytics_daily`).get() as any)?.total || 0;
+    const apiCallsToday = (sqliteDb.prepare(`SELECT COALESCE(SUM(api_calls),0) as total FROM saas_analytics_daily WHERE date=?`).get(today) as any)?.total || 0;
+    const apiCalls30d = (sqliteDb.prepare(`SELECT COALESCE(SUM(api_calls),0) as total FROM saas_analytics_daily WHERE date>=?`).get(thirtyDaysAgo) as any)?.total || 0;
+    const activeUsers30d = (sqliteDb.prepare(`SELECT COALESCE(SUM(active_users),0) as total FROM saas_analytics_daily WHERE date>=?`).get(thirtyDaysAgo) as any)?.total || 0;
+    const testRuns30d = (sqliteDb.prepare(`SELECT COALESCE(SUM(test_runs),0) as total FROM saas_analytics_daily WHERE date>=?`).get(thirtyDaysAgo) as any)?.total || 0;
+    const openIssues = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM saas_issues WHERE status IN ('open','in_progress')`).get() as any)?.c || 0;
+    const criticalIssues = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM saas_issues WHERE priority='critical' AND status='open'`).get() as any)?.c || 0;
+    const licensesByTier = sqliteDb.prepare(`SELECT license_tier, COUNT(DISTINCT tenant_name) as count FROM saas_analytics_daily GROUP BY license_tier`).all();
+    const expiringLicenses = sqliteDb.prepare(`SELECT t.name, t.plan_tier as plan, t.status FROM tenants t WHERE t.status='active' LIMIT 5`).all();
+    res.json({ totalTenants, totalUsers, mrr, allTimeRevenue, apiCallsToday, apiCalls30d, activeUsers30d, testRuns30d, openIssues, criticalIssues, licensesByTier, expiringLicenses });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Analytics: Geo-wise breakdown ───────────────────────────────────────────
+app.get('/api/saas/analytics/geo', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date(Date.now() - Number(days) * 86400000).toISOString().split('T')[0];
+    const byGeo = sqliteDb.prepare(`SELECT geo_region, country, SUM(api_calls) as api_calls, SUM(active_users) as active_users, SUM(revenue_usd) as revenue, COUNT(DISTINCT tenant_name) as tenants FROM saas_analytics_daily WHERE date>=? GROUP BY geo_region, country ORDER BY revenue DESC`).all(since);
+    const byRegion = sqliteDb.prepare(`SELECT geo_region, SUM(api_calls) as api_calls, SUM(active_users) as active_users, SUM(revenue_usd) as revenue, COUNT(DISTINCT tenant_name) as tenants FROM saas_analytics_daily WHERE date>=? GROUP BY geo_region ORDER BY revenue DESC`).all(since);
+    res.json({ byGeo, byRegion });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Analytics: License-wise breakdown ───────────────────────────────────────
+app.get('/api/saas/analytics/licenses', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date(Date.now() - Number(days) * 86400000).toISOString().split('T')[0];
+    const byTier = sqliteDb.prepare(`SELECT license_tier, COUNT(DISTINCT tenant_name) as tenants, SUM(api_calls) as api_calls, SUM(revenue_usd) as revenue, AVG(active_users) as avg_users FROM saas_analytics_daily WHERE date>=? GROUP BY license_tier ORDER BY revenue DESC`).all(since);
+    const daily = sqliteDb.prepare(`SELECT date, license_tier, SUM(revenue_usd) as revenue, COUNT(DISTINCT tenant_name) as tenants FROM saas_analytics_daily WHERE date>=? GROUP BY date, license_tier ORDER BY date ASC`).all(since);
+    res.json({ byTier, daily });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Analytics: Customer-wise breakdown ──────────────────────────────────────
+app.get('/api/saas/analytics/customers', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { days = 30, size, tier, geo } = req.query;
+    const since = new Date(Date.now() - Number(days) * 86400000).toISOString().split('T')[0];
+    let where = 'WHERE date>=?';
+    const args: any[] = [since];
+    if (size) { where += ' AND company_size=?'; args.push(size); }
+    if (tier) { where += ' AND license_tier=?'; args.push(tier); }
+    if (geo) { where += ' AND geo_region=?'; args.push(geo); }
+    const customers = sqliteDb.prepare(`SELECT tenant_name, company_size, license_tier, geo_region, country, SUM(api_calls) as api_calls, SUM(active_users) as active_users, SUM(revenue_usd) as revenue, SUM(test_runs) as test_runs, SUM(ai_tokens) as ai_tokens FROM saas_analytics_daily ${where} GROUP BY tenant_name ORDER BY revenue DESC`).all(...args);
+    const bySize = sqliteDb.prepare(`SELECT company_size, COUNT(DISTINCT tenant_name) as tenants, SUM(revenue_usd) as revenue FROM saas_analytics_daily ${where} GROUP BY company_size ORDER BY revenue DESC`).all(...args);
+    res.json({ customers, bySize });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Analytics: Daily trend ───────────────────────────────────────────────────
+app.get('/api/saas/analytics/trends', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date(Date.now() - Number(days) * 86400000).toISOString().split('T')[0];
+    const daily = sqliteDb.prepare(`SELECT date, SUM(api_calls) as api_calls, SUM(active_users) as active_users, SUM(revenue_usd) as revenue, SUM(test_runs) as test_runs, SUM(ai_tokens) as ai_tokens FROM saas_analytics_daily WHERE date>=? GROUP BY date ORDER BY date ASC`).all(since);
+    res.json({ daily });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Tenant Config Wizard ─────────────────────────────────────────────────────
+app.get('/api/saas/tenant-configs', requireSuperAdmin, (req: any, res: any) => {
+  const configs = sqliteDb.prepare('SELECT tc.*, t.name as tenant_name, t.plan_tier as plan, t.status FROM saas_tenant_configs tc LEFT JOIN tenants t ON t.id=tc.tenant_id ORDER BY tc.updated_at DESC').all();
+  res.json(configs);
+});
+
+app.get('/api/saas/tenant-configs/:tenantId', requireSuperAdmin, (req: any, res: any) => {
+  let config = sqliteDb.prepare('SELECT tc.*, t.name as tenant_name FROM saas_tenant_configs tc LEFT JOIN tenants t ON t.id=tc.tenant_id WHERE tc.tenant_id=?').get(req.params.tenantId) as any;
+  if (!config) {
+    // Auto-create default config for tenant
+    const id = 'cfg_' + Date.now().toString(36);
+    sqliteDb.prepare('INSERT INTO saas_tenant_configs (id,tenant_id) VALUES (?,?)').run(id, req.params.tenantId);
+    config = sqliteDb.prepare('SELECT * FROM saas_tenant_configs WHERE id=?').get(id);
+  }
+  res.json(config);
+});
+
+app.put('/api/saas/tenant-configs/:tenantId', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const { feature_flags, max_users, max_projects, max_api_calls_day, max_ai_tokens_day, custom_domain, sso_enforced, data_retention_days, allowed_geo_regions, branding_logo_url, branding_primary_color, notification_email, timezone } = req.body;
+    let config = sqliteDb.prepare('SELECT * FROM saas_tenant_configs WHERE tenant_id=?').get(req.params.tenantId) as any;
+    if (!config) {
+      const id = 'cfg_' + Date.now().toString(36);
+      sqliteDb.prepare('INSERT INTO saas_tenant_configs (id,tenant_id) VALUES (?,?)').run(id, req.params.tenantId);
+      config = sqliteDb.prepare('SELECT * FROM saas_tenant_configs WHERE id=?').get(id) as any;
+    }
+    sqliteDb.prepare(`UPDATE saas_tenant_configs SET feature_flags=?,max_users=?,max_projects=?,max_api_calls_day=?,max_ai_tokens_day=?,custom_domain=?,sso_enforced=?,data_retention_days=?,allowed_geo_regions=?,branding_logo_url=?,branding_primary_color=?,notification_email=?,timezone=?,updated_at=? WHERE tenant_id=?`).run(
+      JSON.stringify(feature_flags ?? JSON.parse(config.feature_flags || '{}')),
+      max_users ?? config.max_users, max_projects ?? config.max_projects,
+      max_api_calls_day ?? config.max_api_calls_day, max_ai_tokens_day ?? config.max_ai_tokens_day,
+      custom_domain ?? config.custom_domain, sso_enforced ? 1 : 0,
+      data_retention_days ?? config.data_retention_days,
+      JSON.stringify(allowed_geo_regions ?? JSON.parse(config.allowed_geo_regions || '["ALL"]')),
+      branding_logo_url ?? config.branding_logo_url, branding_primary_color ?? config.branding_primary_color,
+      notification_email ?? config.notification_email, timezone ?? config.timezone,
+      new Date().toISOString(), req.params.tenantId
+    );
+    logSuperAdminAudit((req.user as any).id, 'TENANT_CONFIG_UPDATE', 'tenant', req.params.tenantId, 'Config updated via wizard', req.ip);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Email Triggers ───────────────────────────────────────────────────────────
+app.get('/api/saas/email-triggers', requireSuperAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare('SELECT * FROM saas_email_triggers ORDER BY event_type, trigger_name').all());
+});
+
+app.post('/api/saas/email-triggers', requireSuperAdmin, (req: any, res: any) => {
+  const { event_type, trigger_name, description, threshold_value, threshold_unit, template_subject, template_body, recipient_type } = req.body;
+  if (!event_type || !trigger_name || !template_subject || !template_body) return res.status(400).json({ error: 'Missing required fields' });
+  const id = 'trig_' + Date.now().toString(36);
+  sqliteDb.prepare('INSERT INTO saas_email_triggers (id,event_type,trigger_name,description,threshold_value,threshold_unit,template_subject,template_body,recipient_type,is_active) VALUES (?,?,?,?,?,?,?,?,?,1)').run(id, event_type, trigger_name, description || '', threshold_value || 0, threshold_unit || 'event', template_subject, template_body, recipient_type || 'tenant_admin');
+  res.json({ success: true, id });
+});
+
+app.put('/api/saas/email-triggers/:id', requireSuperAdmin, (req: any, res: any) => {
+  const { trigger_name, description, threshold_value, threshold_unit, template_subject, template_body, recipient_type, is_active } = req.body;
+  sqliteDb.prepare('UPDATE saas_email_triggers SET trigger_name=?,description=?,threshold_value=?,threshold_unit=?,template_subject=?,template_body=?,recipient_type=?,is_active=?,updated_at=? WHERE id=?').run(
+    trigger_name, description, threshold_value, threshold_unit, template_subject, template_body, recipient_type, is_active ? 1 : 0, new Date().toISOString(), req.params.id
+  );
+  res.json({ success: true });
+});
+
+app.delete('/api/saas/email-triggers/:id', requireSuperAdmin, (req: any, res: any) => {
+  sqliteDb.prepare('DELETE FROM saas_email_triggers WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+app.post('/api/saas/email-triggers/:id/test-fire', requireSuperAdmin, (req: any, res: any) => {
+  const trigger = sqliteDb.prepare('SELECT * FROM saas_email_triggers WHERE id=?').get(req.params.id) as any;
+  if (!trigger) return res.status(404).json({ error: 'Trigger not found' });
+  // Log the simulated send
+  const logId = 'elog_' + Date.now().toString(36);
+  sqliteDb.prepare('INSERT INTO saas_email_log (id,trigger_id,tenant_id,recipient_email,subject,body,status) VALUES (?,?,?,?,?,?,?)').run(logId, trigger.id, 'test', (req.user as any).email || 'superadmin@edgeqi.com', trigger.template_subject, trigger.template_body, 'simulated');
+  sqliteDb.prepare('UPDATE saas_email_triggers SET last_fired_at=?, fire_count=fire_count+1 WHERE id=?').run(new Date().toISOString(), req.params.id);
+  res.json({ success: true, message: `Test email simulated for trigger: ${trigger.trigger_name}`, logId });
+});
+
+app.get('/api/saas/email-log', requireSuperAdmin, (req: any, res: any) => {
+  res.json(sqliteDb.prepare('SELECT * FROM saas_email_log ORDER BY sent_at DESC LIMIT 100').all());
+});
+
+// ─── Issue Tracker ────────────────────────────────────────────────────────────
+app.get('/api/saas/issues', requireSuperAdmin, (req: any, res: any) => {
+  const { status, priority, category } = req.query;
+  let where = 'WHERE 1=1';
+  const args: any[] = [];
+  if (status) { where += ' AND status=?'; args.push(status); }
+  if (priority) { where += ' AND priority=?'; args.push(priority); }
+  if (category) { where += ' AND category=?'; args.push(category); }
+  const issues = sqliteDb.prepare(`SELECT * FROM saas_issues ${where} ORDER BY CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, created_at DESC`).all(...args);
+  res.json(issues);
+});
+
+app.post('/api/saas/issues', requireSuperAdmin, (req: any, res: any) => {
+  const { tenant_name, reporter_email, title, description, category, priority, sla_hours } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  const id = 'iss_' + Date.now().toString(36);
+  const count = (sqliteDb.prepare('SELECT COUNT(*) as c FROM saas_issues').get() as any).c + 1;
+  const ticket_ref = `EQI-${String(count).padStart(3, '0')}`;
+  sqliteDb.prepare('INSERT INTO saas_issues (id,ticket_ref,tenant_name,reporter_email,title,description,category,priority,status,sla_hours) VALUES (?,?,?,?,?,?,?,?,?,?)').run(id, ticket_ref, tenant_name || '', reporter_email || '', title, description || '', category || 'general', priority || 'medium', 'open', sla_hours || 24);
+  res.json({ success: true, id, ticket_ref });
+});
+
+app.put('/api/saas/issues/:id', requireSuperAdmin, (req: any, res: any) => {
+  const { status, assigned_to, resolution, priority } = req.body;
+  const issue = sqliteDb.prepare('SELECT * FROM saas_issues WHERE id=?').get(req.params.id) as any;
+  if (!issue) return res.status(404).json({ error: 'Issue not found' });
+  const resolvedAt = status === 'resolved' ? new Date().toISOString() : issue.resolved_at;
+  sqliteDb.prepare('UPDATE saas_issues SET status=?,assigned_to=?,resolution=?,priority=?,resolved_at=?,updated_at=? WHERE id=?').run(
+    status ?? issue.status, assigned_to ?? issue.assigned_to, resolution ?? issue.resolution,
+    priority ?? issue.priority, resolvedAt, new Date().toISOString(), req.params.id
+  );
+  logSuperAdminAudit((req.user as any).id, 'ISSUE_UPDATE', 'issue', req.params.id, `Status → ${status}`, req.ip);
+  res.json({ success: true });
+});
+
+// ─── User Stats ───────────────────────────────────────────────────────────────
+app.get('/api/saas/user-stats', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const total = (sqliteDb.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
+    const byRole = sqliteDb.prepare('SELECT role, COUNT(*) as count FROM users GROUP BY role ORDER BY count DESC').all();
+    const recentLogins = sqliteDb.prepare('SELECT id, name, email, role, last_login FROM users WHERE last_login IS NOT NULL ORDER BY last_login DESC LIMIT 10').all();
+    const newThisMonth = (sqliteDb.prepare(`SELECT COUNT(*) as c FROM users WHERE created_at >= date('now', 'start of month')`).get() as any).c;
+    res.json({ total, byRole, recentLogins, newThisMonth });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Payment / Invoice management ────────────────────────────────────────────
+app.get('/api/saas/payments', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const invoices = sqliteDb.prepare('SELECT * FROM invoices ORDER BY created_at DESC LIMIT 100').all();
+    res.json(invoices);
+  } catch { res.json([]); }
+});
+
+app.get('/api/saas/payments/summary', requireSuperAdmin, (req: any, res: any) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const monthStart = new Date(); monthStart.setDate(1);
+    const monthStr = monthStart.toISOString().split('T')[0];
+    const mrr = (sqliteDb.prepare(`SELECT COALESCE(SUM(revenue_usd),0) as total FROM saas_analytics_daily WHERE date=?`).get(today) as any)?.total || 0;
+    const monthRevenue = (sqliteDb.prepare(`SELECT COALESCE(SUM(revenue_usd),0) as total FROM saas_analytics_daily WHERE date>=?`).get(monthStr) as any)?.total || 0;
+    const allTime = (sqliteDb.prepare(`SELECT COALESCE(SUM(revenue_usd),0) as total FROM saas_analytics_daily`).get() as any)?.total || 0;
+    const byTier = sqliteDb.prepare(`SELECT license_tier, SUM(revenue_usd) as revenue FROM saas_analytics_daily GROUP BY license_tier ORDER BY revenue DESC`).all();
+    res.json({ mrr, monthRevenue, allTime, byTier });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 // SPA CATCH-ALL — MUST be last, after ALL API routes
 // Serves the React SPA for any non-API request in monolith mode.
 // ══════════════════════════════════════════════════════════════════════════════
