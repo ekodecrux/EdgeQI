@@ -962,84 +962,19 @@ FINAL OUTCOME: QE DASHBOARD RESULTS
 
   // ── SUPER ADMIN: Completely isolated Business Control Plane ──────────────────
   // Super admins see ONLY the business portal — no QA platform features at all.
+  // SuperAdminPortal renders its own full left-nav layout; no extra wrapper needed.
   if (authUser?.role === 'super_admin') {
     return (
-      <div className="min-h-screen flex" style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif', background: '#0B0F1A' }}>
+      <>
         {!authUser && <AuthModal onLogin={handleLogin} />}
-
-        {/* Minimal Super Admin sidebar — logo + user + logout only */}
-        <aside style={{
-          width: 220, minWidth: 220, maxWidth: 220,
-          background: 'linear-gradient(180deg, #0F172A 0%, #0B0F1A 100%)',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', flexDirection: 'column', height: '100vh', position: 'sticky', top: 0
-        }}>
-          {/* Logo */}
-          <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #5B6CFF 0%, #7C3AED 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(91,108,255,0.35)' }}>
-                <Crown className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.18em', fontFamily: 'Inter, sans-serif', lineHeight: 1 }}>EDGE<span style={{ color: '#818CF8', marginLeft: 2 }}>QI</span></p>
-                <p style={{ fontSize: 8, fontFamily: 'JetBrains Mono, monospace', color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>Super Admin</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Nav — only one item: Business Control Plane */}
-          <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
-            <div style={{ marginBottom: 4 }}>
-              <p style={{ fontSize: 9, fontFamily: 'Inter, sans-serif', color: '#475569', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '4px 8px 8px', fontWeight: 700 }}>Administration</p>
-              <button
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  background: 'linear-gradient(135deg, rgba(91,108,255,0.18) 0%, rgba(124,58,237,0.12) 100%)',
-                  color: '#A5B4FC', fontFamily: 'Inter, sans-serif', fontSize: 12, fontWeight: 600
-                }}
-              >
-                <Crown className="w-3.5 h-3.5" style={{ color: '#A5B4FC', flexShrink: 0 }} />
-                Business Control Plane
-              </button>
-            </div>
-          </div>
-
-          {/* User footer */}
-          <div style={{ padding: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(15,23,42,0.6)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #5B6CFF, #7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                {authUser?.name?.charAt(0) || 'S'}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 11, color: '#E2E8F0', fontFamily: 'Inter, sans-serif', fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{authUser?.name}</p>
-                <p style={{ fontSize: 9, color: '#94A3B8', fontFamily: 'Inter, sans-serif', margin: 0 }}>super admin</p>
-              </div>
-              <button onClick={handleLogout} title="Sign out" style={{ padding: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}>
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#64748B' }}>
-              <span>EDGE QI · v3.0</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />LIVE</span>
-            </div>
-          </div>
-        </aside>
-
-        {/* Full-screen Super Admin portal — no header bar, no QA chrome */}
-        <div style={{ flex: 1, overflowY: 'auto', background: '#0B0F1A' }}>
-          <SuperAdminPortal token={authToken} />
-        </div>
-
+        <SuperAdminPortal token={authToken} onLogout={handleLogout} authUser={authUser} />
         {/* AI Copilot still available to super admin */}
         <ChatbotSlideout
           onSendMessage={handleSendAssistantMessage}
           isOpen={chatbotOpen}
           onClose={() => setChatbotOpen(false)}
         />
-      </div>
+      </>
     );
   }
 

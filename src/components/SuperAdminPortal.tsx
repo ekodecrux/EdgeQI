@@ -711,18 +711,607 @@ function IssuesSection({ token }: { token: string }) {
   );
 }
 
-function PlaceholderSection({ title, icon }: { title: string; icon: string }) {
+// ─── Analytics & Trends ──────────────────────────────────────────────────────
+function AnalyticsSection({ token }: { token: string }) {
+  const [trends, setTrends] = useState<AnalyticsTrend[]>([]);
+  const [geo, setGeo] = useState<any[]>([]);
+  const [licenses, setLicenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/saas/analytics/trends', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/analytics/geo', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/analytics/licenses', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+    ]).then(([t,g,l]) => { setTrends(Array.isArray(t)?t:[]); setGeo(Array.isArray(g)?g:[]); setLicenses(Array.isArray(l)?l:[]); })
+    .catch(()=>{})
+    .finally(()=>setLoading(false));
+  }, [token]);
+  if (loading) return <div style={{color:'#64748b',textAlign:'center',padding:40}}>Loading…</div>;
+  const maxRev = Math.max(...trends.map(t=>t.revenue||0), 1);
+  const maxApi = Math.max(...trends.map(t=>t.api_calls||0), 1);
   return (
-    <div style={{...S.card, textAlign:'center', padding:60}}>
-      <div style={{fontSize:48}}>{icon}</div>
-      <div style={{fontSize:18,fontWeight:700,color:'#e2e8f0',marginTop:12}}>{title}</div>
-      <div style={{fontSize:13,color:'#64748b',marginTop:8}}>This section is active and connected to the backend.</div>
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+        {/* Revenue Trend */}
+        <div style={S.card}>
+          <div style={S.sectionTitle}>Revenue Trend (30 days)</div>
+          {trends.length===0 ? <div style={{color:'#475569',fontSize:13}}>No data yet</div> : (
+            <div style={{display:'flex',alignItems:'flex-end',gap:3,height:80}}>
+              {trends.slice(-30).map((t,i)=>(
+                <div key={i} title={`${t.date}: $${t.revenue}`} style={{flex:1,borderRadius:2,background:'#6366f1',opacity:.8,minWidth:4,height:`${Math.max(4,(t.revenue/maxRev)*80)}px`}} />
+              ))}
+            </div>
+          )}
+          <div style={{fontSize:11,color:'#64748b',marginTop:6}}>Total: ${trends.reduce((a,t)=>a+(t.revenue||0),0).toLocaleString()}</div>
+        </div>
+        {/* API Calls Trend */}
+        <div style={S.card}>
+          <div style={S.sectionTitle}>API Calls Trend (30 days)</div>
+          {trends.length===0 ? <div style={{color:'#475569',fontSize:13}}>No data yet</div> : (
+            <div style={{display:'flex',alignItems:'flex-end',gap:3,height:80}}>
+              {trends.slice(-30).map((t,i)=>(
+                <div key={i} title={`${t.date}: ${t.api_calls}`} style={{flex:1,borderRadius:2,background:'#22c55e',opacity:.8,minWidth:4,height:`${Math.max(4,(t.api_calls/maxApi)*80)}px`}} />
+              ))}
+            </div>
+          )}
+          <div style={{fontSize:11,color:'#64748b',marginTop:6}}>Total: {trends.reduce((a,t)=>a+(t.api_calls||0),0).toLocaleString()} calls</div>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+        {/* Geo Distribution */}
+        <div style={S.card}>
+          <div style={S.sectionTitle}>Customers by Country</div>
+          {geo.length===0 ? <div style={{color:'#475569',fontSize:13}}>No data yet</div> : (
+            <table style={S.table}><thead><tr><th style={S.th}>Country</th><th style={S.th}>Orgs</th></tr></thead>
+            <tbody>{geo.map((g:any)=>(
+              <tr key={g.country}><td style={S.td}>{g.country||'Unknown'}</td><td style={S.td}><strong style={{color:'#6366f1'}}>{g.count}</strong></td></tr>
+            ))}</tbody></table>
+          )}
+        </div>
+        {/* License Distribution */}
+        <div style={S.card}>
+          <div style={S.sectionTitle}>License Plan Distribution</div>
+          {licenses.length===0 ? <div style={{color:'#475569',fontSize:13}}>No data yet</div> : (
+            licenses.map((l:any)=>(
+              <div key={l.tier||l.pack_name} style={{marginBottom:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
+                  <span style={{color:'#94a3b8'}}>{l.tier||l.pack_name||'Unknown'}</span>
+                  <span style={{color:'#e2e8f0',fontWeight:600}}>{l.count} orgs</span>
+                </div>
+                <div style={S.bar}><div style={{...S.barFill,width:`${Math.min(100,(l.count/Math.max(...licenses.map((x:any)=>x.count),1))*100)}%`}} /></div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── RBAC & Permissions ───────────────────────────────────────────────────────
+function RBACSection({ token }: { token: string }) {
+  const [roles, setRoles] = useState<any[]>([]);
+  const [rbacUsers, setRbacUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newRole, setNewRole] = useState({ name:'', description:'', permissions:'' });
+  const [showForm, setShowForm] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch('/api/saas/rbac/roles', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/rbac/users', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+    ]).then(([r,u]) => { setRoles(Array.isArray(r)?r:[]); setRbacUsers(Array.isArray(u)?u:[]); })
+    .catch(()=>{})
+    .finally(()=>setLoading(false));
+  }, [token]);
+  useEffect(()=>{ load(); }, [load]);
+
+  const createRole = async () => {
+    if (!newRole.name) return;
+    await fetch('/api/saas/rbac/roles', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify(newRole) });
+    setMsg('Role created'); setShowForm(false); setNewRole({name:'',description:'',permissions:''}); load();
+    setTimeout(()=>setMsg(''),3000);
+  };
+  const deleteRole = async (id: string) => {
+    await fetch(`/api/saas/rbac/roles/${id}`, { method:'DELETE', headers:{'Authorization':`Bearer ${token}`} });
+    load();
+  };
+
+  const BUILT_IN_ROLES = [
+    { name:'super_admin', color:'#8b5cf6', perms:['All platform access','Billing & invoices','User management','Org management','System config'] },
+    { name:'org_admin', color:'#3b82f6', perms:['Org dashboard','User invite & manage','License requests','Usage reports','QA platform access'] },
+    { name:'qa_lead', color:'#22c55e', perms:['Test case management','Defect tracking','Reports','Team oversight','CI/CD config'] },
+    { name:'qa_engineer', color:'#f97316', perms:['Run test cases','Log defects','View reports','Script execution'] },
+    { name:'viewer', color:'#64748b', perms:['Read-only dashboard','View reports','No edit access'] },
+  ];
+
+  if (loading) return <div style={{color:'#64748b',textAlign:'center',padding:40}}>Loading…</div>;
+  return (
+    <div>
+      {msg && <div style={{background:'#16a34a22',border:'1px solid #16a34a44',borderRadius:6,padding:'8px 12px',color:'#4ade80',marginBottom:12,fontSize:13}}>{msg}</div>}
+      {/* Built-in roles */}
+      <div style={{...S.card,marginBottom:16}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div style={S.sectionTitle}>Platform Roles & Permissions</div>
+          <button style={{...S.btn,...S.btnPrimary,fontSize:11}} onClick={()=>setShowForm(v=>!v)}>+ Custom Role</button>
+        </div>
+        {showForm && (
+          <div style={{background:'#0f172a',border:'1px solid #334155',borderRadius:8,padding:14,marginBottom:14}}>
+            <div style={S.formGrid}>
+              <div><label style={S.label}>Role Name</label><input style={S.input} value={newRole.name} onChange={e=>setNewRole(r=>({...r,name:e.target.value}))} placeholder="custom_reviewer" /></div>
+              <div><label style={S.label}>Description</label><input style={S.input} value={newRole.description} onChange={e=>setNewRole(r=>({...r,description:e.target.value}))} placeholder="Read-only reviewer" /></div>
+            </div>
+            <div style={{marginTop:10}}><label style={S.label}>Permissions (comma-separated)</label><input style={S.input} value={newRole.permissions} onChange={e=>setNewRole(r=>({...r,permissions:e.target.value}))} placeholder="view_reports,view_tests" /></div>
+            <div style={{display:'flex',gap:8,marginTop:10,justifyContent:'flex-end'}}>
+              <button style={{...S.btn,...S.btnGhost}} onClick={()=>setShowForm(false)}>Cancel</button>
+              <button style={{...S.btn,...S.btnPrimary}} onClick={createRole}>Create Role</button>
+            </div>
+          </div>
+        )}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+          {BUILT_IN_ROLES.map(r=>(
+            <div key={r.name} style={{background:'#0f172a',border:`1px solid ${r.color}33`,borderRadius:8,padding:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+                <span style={{...S.badge,background:r.color+'22',color:r.color,border:`1px solid ${r.color}44`}}>{r.name}</span>
+                <span style={{fontSize:10,color:'#475569'}}>built-in</span>
+              </div>
+              {r.perms.map(p=>(
+                <div key={p} style={{fontSize:11,color:'#64748b',padding:'2px 0',display:'flex',alignItems:'center',gap:4}}>
+                  <span style={{color:'#22c55e',fontSize:9}}>✓</span> {p}
+                </div>
+              ))}
+            </div>
+          ))}
+          {roles.map(r=>(
+            <div key={r.id} style={{background:'#0f172a',border:'1px solid #6366f133',borderRadius:8,padding:12}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                <span style={{...S.badge,background:'#6366f122',color:'#818cf8',border:'1px solid #6366f144'}}>{r.name}</span>
+                <button style={{...S.btn,...S.btnRed,padding:'2px 8px',fontSize:10}} onClick={()=>deleteRole(r.id)}>✕</button>
+              </div>
+              <div style={{fontSize:11,color:'#64748b'}}>{r.description||'Custom role'}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Users with roles */}
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Users & Role Assignments ({rbacUsers.length})</div>
+        <table style={S.table}>
+          <thead><tr>{['User','Email','Current Role','Tenant'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+          <tbody>{rbacUsers.slice(0,20).map((u:any)=>(
+            <tr key={u.id}>
+              <td style={S.td}>{u.name}</td>
+              <td style={S.td}>{u.email}</td>
+              <td style={S.td}><span style={{...S.badge,background:'#6366f122',color:'#818cf8',border:'1px solid #6366f144'}}>{u.role}</span></td>
+              <td style={S.td}>{u.tenant_name||<span style={{color:'#475569'}}>—</span>}</td>
+            </tr>
+          ))}
+          {rbacUsers.length===0&&<tr><td colSpan={4} style={{...S.td,textAlign:'center',color:'#475569'}}>No users found</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Payments & Invoices ──────────────────────────────────────────────────────
+function PaymentsSection({ token }: { token: string }) {
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ tenant_id:'', amount:'', currency:'USD', description:'' });
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch('/api/saas/invoices', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/payments/summary', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/tenants', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+    ]).then(([inv,sum,ten]) => {
+      setInvoices(Array.isArray(inv)?inv:inv.invoices||[]);
+      setSummary(sum);
+      setTenants(Array.isArray(ten)?ten:ten.tenants||[]);
+    }).catch(()=>{})
+    .finally(()=>setLoading(false));
+  }, [token]);
+  useEffect(()=>{ load(); }, [load]);
+
+  const createInvoice = async () => {
+    if (!form.tenant_id||!form.amount) return;
+    await fetch('/api/saas/invoices', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({...form,amount:parseFloat(form.amount)}) });
+    setMsg('Invoice created'); setShowCreate(false); setForm({tenant_id:'',amount:'',currency:'USD',description:''}); load();
+    setTimeout(()=>setMsg(''),3000);
+  };
+  const updateStatus = async (id: string, status: string) => {
+    await fetch(`/api/saas/invoices/${id}/status`, { method:'PATCH', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({status}) });
+    load();
+  };
+
+  if (loading) return <div style={{color:'#64748b',textAlign:'center',padding:40}}>Loading…</div>;
+  return (
+    <div>
+      {msg && <div style={{background:'#16a34a22',border:'1px solid #16a34a44',borderRadius:6,padding:'8px 12px',color:'#4ade80',marginBottom:12,fontSize:13}}>{msg}</div>}
+      {/* Summary KPIs */}
+      {summary && (
+        <div style={{...S.kpiGrid,marginBottom:16}}>
+          {[
+            {label:'Total Invoiced',val:`$${(summary.total_invoiced||0).toLocaleString()}`,color:'#6366f1'},
+            {label:'Paid',val:`$${(summary.total_paid||0).toLocaleString()}`,color:'#22c55e'},
+            {label:'Overdue',val:`$${(summary.total_overdue||0).toLocaleString()}`,color:'#ef4444'},
+            {label:'Pending',val:String(summary.pending_count||0),color:'#eab308'},
+          ].map(k=>(
+            <div key={k.label} style={S.kpi}>
+              <div style={{...S.kpiVal,color:k.color}}>{k.val}</div>
+              <div style={S.kpiLbl}>{k.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Invoice table */}
+      <div style={S.card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div style={S.sectionTitle}>Invoices ({invoices.length})</div>
+          <button style={{...S.btn,...S.btnPrimary,fontSize:11}} onClick={()=>setShowCreate(v=>!v)}>+ New Invoice</button>
+        </div>
+        {showCreate && (
+          <div style={{background:'#0f172a',border:'1px solid #334155',borderRadius:8,padding:14,marginBottom:14}}>
+            <div style={S.formGrid}>
+              <div><label style={S.label}>Organisation</label>
+                <select style={S.input} value={form.tenant_id} onChange={e=>setForm(f=>({...f,tenant_id:e.target.value}))}>
+                  <option value="">Select org…</option>
+                  {tenants.map((t:any)=><option key={t.id} value={t.id}>{t.company_name||t.name}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Amount (USD)</label><input style={S.input} type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} placeholder="999" /></div>
+              <div><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Monthly license fee" /></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:10,justifyContent:'flex-end'}}>
+              <button style={{...S.btn,...S.btnGhost}} onClick={()=>setShowCreate(false)}>Cancel</button>
+              <button style={{...S.btn,...S.btnPrimary}} onClick={createInvoice}>Create Invoice</button>
+            </div>
+          </div>
+        )}
+        {invoices.length===0 ? <div style={{color:'#475569',textAlign:'center',padding:20}}>No invoices yet</div> : (
+          <table style={S.table}>
+            <thead><tr>{['Invoice #','Org','Amount','Status','Date','Actions'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{invoices.map((inv:any)=>(
+              <tr key={inv.id}>
+                <td style={S.td}><span style={{color:'#6366f1',fontWeight:600}}>{inv.invoice_number}</span></td>
+                <td style={S.td}>{inv.tenant_name||inv.company_name||'—'}</td>
+                <td style={S.td}><strong style={{color:'#22c55e'}}>${(inv.total||inv.amount||0).toLocaleString()}</strong> <span style={{fontSize:11,color:'#64748b'}}>{inv.currency||'USD'}</span></td>
+                <td style={S.td}>{statusBadge(inv.status)}</td>
+                <td style={S.td}>{fmtDate(inv.created_at)}</td>
+                <td style={S.td}>
+                  <div style={{display:'flex',gap:4}}>
+                    {inv.status!=='paid'&&<button style={{...S.btn,...S.btnGreen,padding:'4px 10px',fontSize:11}} onClick={()=>updateStatus(inv.id,'paid')}>Mark Paid</button>}
+                    {inv.status==='draft'&&<button style={{...S.btn,background:'#3b82f622',color:'#60a5fa',border:'1px solid #3b82f644',padding:'4px 10px',fontSize:11}} onClick={()=>updateStatus(inv.id,'sent')}>Send</button>}
+                  </div>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Licenses & Expiry ────────────────────────────────────────────────────────
+function LicensesSection({ token }: { token: string }) {
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [packs, setPacks] = useState<LicensePack[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch('/api/saas/tenants', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/license-packs', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+    ]).then(([t,p]) => { setTenants(Array.isArray(t)?t:t.tenants||[]); setPacks(Array.isArray(p)?p:[]); })
+    .catch(()=>{})
+    .finally(()=>setLoading(false));
+  }, [token]);
+  useEffect(()=>{ load(); }, [load]);
+
+  const today = new Date();
+  const daysUntil = (d?: string) => d ? Math.ceil((new Date(d).getTime()-today.getTime())/(86400000)) : null;
+  const expiryStatus = (d?: string) => { const n=daysUntil(d); if(n===null)return 'unknown'; if(n<0)return 'expired'; if(n<=30)return 'expiring'; return 'ok'; };
+
+  const filtered = tenants.filter(t => {
+    if (filter==='all') return true;
+    if (filter==='expiring') return ['expiring','expired'].includes(expiryStatus(t.next_billing_date));
+    if (filter==='active') return t.status==='active';
+    return t.status===filter;
+  });
+
+  if (loading) return <div style={{color:'#64748b',textAlign:'center',padding:40}}>Loading…</div>;
+  const expiring = tenants.filter(t=>expiryStatus(t.next_billing_date)==='expiring').length;
+  const expired = tenants.filter(t=>expiryStatus(t.next_billing_date)==='expired').length;
+  return (
+    <div>
+      <div style={{...S.kpiGrid,marginBottom:16}}>
+        {[
+          {label:'Total Licenses',val:String(tenants.length),color:'#6366f1'},
+          {label:'Active',val:String(tenants.filter(t=>t.status==='active').length),color:'#22c55e'},
+          {label:'Expiring (30d)',val:String(expiring),color:expiring>0?'#eab308':'#22c55e'},
+          {label:'Expired',val:String(expired),color:expired>0?'#ef4444':'#22c55e'},
+        ].map(k=>(
+          <div key={k.label} style={S.kpi}>
+            <div style={{...S.kpiVal,color:k.color}}>{k.val}</div>
+            <div style={S.kpiLbl}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={S.card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div style={S.sectionTitle}>License Status ({filtered.length})</div>
+          <select style={{...S.input,width:'auto'}} value={filter} onChange={e=>setFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="expiring">Expiring / Expired</option>
+            <option value="trial">Trial</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+        {filtered.length===0 ? <div style={{color:'#475569',textAlign:'center',padding:20}}>No tenants yet</div> : (
+          <table style={S.table}>
+            <thead><tr>{['Organisation','Plan','Users','Status','Next Billing','Days Left','Action'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{filtered.map((t:any)=>{
+              const days = daysUntil(t.next_billing_date);
+              const es = expiryStatus(t.next_billing_date);
+              const dayColor = es==='expired'?'#ef4444':es==='expiring'?'#eab308':'#22c55e';
+              return (
+                <tr key={t.id}>
+                  <td style={S.td}><strong style={{color:'#e2e8f0'}}>{t.company_name||t.name}</strong></td>
+                  <td style={S.td}>{tierBadge(t.pack_tier||t.license_tier||'')}<div style={{fontSize:11,color:'#64748b'}}>{t.pack_name||'—'}</div></td>
+                  <td style={S.td}>{t.active_users||0}/{t.max_users||5}</td>
+                  <td style={S.td}>{statusBadge(t.status)}</td>
+                  <td style={S.td}>{fmtDate(t.next_billing_date)}</td>
+                  <td style={S.td}><span style={{color:dayColor,fontWeight:600}}>{days===null?'—':days<0?`${Math.abs(days)}d overdue`:`${days}d`}</span></td>
+                  <td style={S.td}>
+                    {es==='expired'&&<button style={{...S.btn,...S.btnPrimary,padding:'4px 10px',fontSize:11}}>Renew</button>}
+                    {es==='expiring'&&<button style={{...S.btn,background:'#eab30822',color:'#eab308',border:'1px solid #eab30844',padding:'4px 10px',fontSize:11}}>Notify</button>}
+                  </td>
+                </tr>
+              );
+            })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {/* License packs */}
+      <div style={{...S.card,marginTop:16}}>
+        <div style={S.sectionTitle}>Available License Packs</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+          {packs.map(p=>(
+            <div key={p.id} style={{background:'#0f172a',border:'1px solid #334155',borderRadius:8,padding:12}}>
+              <div style={{marginBottom:6}}>{tierBadge(p.tier)}</div>
+              <div style={{fontSize:13,fontWeight:700,color:'#e2e8f0'}}>{p.name}</div>
+              <div style={{fontSize:20,fontWeight:700,color:'#6366f1',margin:'6px 0'}}>${p.price_usd}<span style={{fontSize:11,color:'#64748b'}}>/{p.billing_cycle}</span></div>
+              <div style={{fontSize:11,color:'#64748b'}}>Up to {p.max_users} users</div>
+            </div>
+          ))}
+          {packs.length===0&&<div style={{color:'#475569',fontSize:13}}>No license packs configured</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Auto-Triggers ────────────────────────────────────────────────────────────
+function TriggersSection({ token }: { token: string }) {
+  const [triggers, setTriggers] = useState<EmailTrigger[]>([]);
+  const [log, setLog] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ trigger_name:'', description:'', event_type:'license_expiry', template_subject:'', template_body:'' });
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch('/api/saas/email-triggers', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+      fetch('/api/saas/email-log', { headers:{'Authorization':`Bearer ${token}`} }).then(r=>r.json()),
+    ]).then(([t,l]) => { setTriggers(Array.isArray(t)?t:[]); setLog(Array.isArray(l)?l:[]); })
+    .catch(()=>{})
+    .finally(()=>setLoading(false));
+  }, [token]);
+  useEffect(()=>{ load(); }, [load]);
+
+  const toggle = async (id: string, is_active: number) => {
+    await fetch(`/api/saas/email-triggers/${id}`, { method:'PUT', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({is_active:is_active?0:1}) });
+    load();
+  };
+  const testFire = async (id: string) => {
+    await fetch(`/api/saas/email-triggers/${id}/test-fire`, { method:'POST', headers:{'Authorization':`Bearer ${token}`} });
+    setMsg('Test trigger fired!'); setTimeout(()=>setMsg(''),3000); load();
+  };
+  const createTrigger = async () => {
+    if (!form.trigger_name) return;
+    await fetch('/api/saas/email-triggers', { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify(form) });
+    setMsg('Trigger created'); setShowCreate(false); setForm({trigger_name:'',description:'',event_type:'license_expiry',template_subject:'',template_body:''}); load();
+    setTimeout(()=>setMsg(''),3000);
+  };
+
+  const EVENT_TYPES = ['license_expiry','payment_failed','usage_spike','new_signup','trial_ending','custom'];
+  if (loading) return <div style={{color:'#64748b',textAlign:'center',padding:40}}>Loading…</div>;
+  return (
+    <div>
+      {msg && <div style={{background:'#16a34a22',border:'1px solid #16a34a44',borderRadius:6,padding:'8px 12px',color:'#4ade80',marginBottom:12,fontSize:13}}>{msg}</div>}
+      <div style={S.card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div style={S.sectionTitle}>Email Triggers ({triggers.length})</div>
+          <button style={{...S.btn,...S.btnPrimary,fontSize:11}} onClick={()=>setShowCreate(v=>!v)}>+ New Trigger</button>
+        </div>
+        {showCreate && (
+          <div style={{background:'#0f172a',border:'1px solid #334155',borderRadius:8,padding:14,marginBottom:14}}>
+            <div style={S.formGrid}>
+              <div><label style={S.label}>Trigger Name</label><input style={S.input} value={form.trigger_name} onChange={e=>setForm(f=>({...f,trigger_name:e.target.value}))} placeholder="License Expiry Warning" /></div>
+              <div><label style={S.label}>Event Type</label>
+                <select style={S.input} value={form.event_type} onChange={e=>setForm(f=>({...f,event_type:e.target.value}))}>
+                  {EVENT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Email Subject</label><input style={S.input} value={form.template_subject} onChange={e=>setForm(f=>({...f,template_subject:e.target.value}))} placeholder="Your license expires soon" /></div>
+              <div><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Sent 7 days before expiry" /></div>
+            </div>
+            <div style={{marginTop:10}}><label style={S.label}>Email Body</label><textarea style={{...S.input,height:80,resize:'vertical'}} value={form.template_body} onChange={e=>setForm(f=>({...f,template_body:e.target.value}))} placeholder="Dear {{name}}, your license expires on {{date}}…" /></div>
+            <div style={{display:'flex',gap:8,marginTop:10,justifyContent:'flex-end'}}>
+              <button style={{...S.btn,...S.btnGhost}} onClick={()=>setShowCreate(false)}>Cancel</button>
+              <button style={{...S.btn,...S.btnPrimary}} onClick={createTrigger}>Create Trigger</button>
+            </div>
+          </div>
+        )}
+        {triggers.length===0 ? <div style={{color:'#475569',textAlign:'center',padding:20}}>No triggers configured yet</div> : (
+          <table style={S.table}>
+            <thead><tr>{['Trigger','Event','Status','Fired','Last Fired','Actions'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{triggers.map(t=>(
+              <tr key={t.id}>
+                <td style={S.td}><strong style={{color:'#e2e8f0'}}>{t.trigger_name}</strong><div style={{fontSize:11,color:'#64748b'}}>{t.description}</div></td>
+                <td style={S.td}><span style={{...S.badge,background:'#3b82f622',color:'#60a5fa',border:'1px solid #3b82f644'}}>{t.event_type}</span></td>
+                <td style={S.td}>{t.is_active ? <span style={{...S.badge,background:'#16a34a22',color:'#4ade80',border:'1px solid #16a34a44'}}>Active</span> : <span style={{...S.badge,background:'#64748b22',color:'#94a3b8',border:'1px solid #64748b44'}}>Paused</span>}</td>
+                <td style={S.td}>{t.fire_count||0}</td>
+                <td style={S.td}>{fmtDate(t.last_fired_at)}</td>
+                <td style={S.td}>
+                  <div style={{display:'flex',gap:4}}>
+                    <button style={{...S.btn,background:t.is_active?'#64748b22':'#16a34a22',color:t.is_active?'#94a3b8':'#4ade80',border:`1px solid ${t.is_active?'#64748b44':'#16a34a44'}`,padding:'4px 10px',fontSize:11}} onClick={()=>toggle(t.id,t.is_active)}>{t.is_active?'Pause':'Enable'}</button>
+                    <button style={{...S.btn,background:'#6366f122',color:'#818cf8',border:'1px solid #6366f144',padding:'4px 10px',fontSize:11}} onClick={()=>testFire(t.id)}>Test</button>
+                  </div>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
+      {/* Email log */}
+      {log.length>0 && (
+        <div style={{...S.card,marginTop:16}}>
+          <div style={S.sectionTitle}>Recent Email Log</div>
+          <table style={S.table}>
+            <thead><tr>{['Trigger','Recipient','Sent At','Status'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{log.slice(0,10).map((l:any,i:number)=>(
+              <tr key={i}>
+                <td style={S.td}>{l.trigger_name}</td>
+                <td style={S.td}>{l.recipient_email}</td>
+                <td style={S.td}>{fmtDate(l.sent_at)}</td>
+                <td style={S.td}>{statusBadge(l.status||'sent')}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Customer Config ──────────────────────────────────────────────────────────
+function CustomerConfigSection({ token }: { token: string }) {
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any>(null);
+  const [config, setConfig] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/saas/tenants', { headers:{'Authorization':`Bearer ${token}`} })
+      .then(r=>r.json()).then(d=>setTenants(Array.isArray(d)?d:d.tenants||[]))
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  }, [token]);
+
+  const loadConfig = async (tenantId: string) => {
+    const r = await fetch(`/api/saas/tenant-configs/${tenantId}`, { headers:{'Authorization':`Bearer ${token}`} });
+    const d = await r.json();
+    setConfig(d.config||{});
+  };
+
+  const selectTenant = (t: any) => { setSelected(t); loadConfig(t.id); };
+
+  const save = async () => {
+    if (!selected) return;
+    setSaving(true);
+    await fetch(`/api/saas/tenant-configs/${selected.id}`, { method:'PUT', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({config}) });
+    setMsg('Configuration saved'); setSaving(false);
+    setTimeout(()=>setMsg(''),3000);
+  };
+
+  const CONFIG_FIELDS = [
+    { key:'max_test_cases', label:'Max Test Cases', type:'number', placeholder:'1000' },
+    { key:'max_api_calls_per_day', label:'Max API Calls/Day', type:'number', placeholder:'10000' },
+    { key:'allowed_integrations', label:'Allowed Integrations', type:'text', placeholder:'jira,github,slack' },
+    { key:'sso_enabled', label:'SSO Enabled', type:'select', options:['true','false'] },
+    { key:'ai_features_enabled', label:'AI Features', type:'select', options:['true','false'] },
+    { key:'custom_domain', label:'Custom Domain', type:'text', placeholder:'qa.company.com' },
+    { key:'support_tier', label:'Support Tier', type:'select', options:['basic','standard','premium','enterprise'] },
+    { key:'data_retention_days', label:'Data Retention (days)', type:'number', placeholder:'90' },
+  ];
+
+  if (loading) return <div style={{color:'#64748b',textAlign:'center',padding:40}}>Loading…</div>;
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'260px 1fr',gap:16}}>
+      {/* Tenant list */}
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Select Organisation</div>
+        {tenants.length===0 ? <div style={{color:'#475569',fontSize:13}}>No tenants yet</div> : (
+          tenants.map((t:any)=>(
+            <div key={t.id} onClick={()=>selectTenant(t)} style={{padding:'8px 10px',borderRadius:6,cursor:'pointer',marginBottom:4,
+              background:selected?.id===t.id?'#6366f1':'transparent',
+              color:selected?.id===t.id?'#fff':'#94a3b8',
+              border:`1px solid ${selected?.id===t.id?'#6366f1':'#334155'}`
+            }}>
+              <div style={{fontSize:13,fontWeight:600}}>{t.company_name||t.name}</div>
+              <div style={{fontSize:11,opacity:.7}}>{statusBadge(t.status)}</div>
+            </div>
+          ))
+        )}
+      </div>
+      {/* Config form */}
+      <div style={S.card}>
+        {!selected ? (
+          <div style={{textAlign:'center',padding:40,color:'#475569'}}>
+            <div style={{fontSize:32,marginBottom:8}}>⚙️</div>
+            <div>Select an organisation to configure</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div style={S.sectionTitle}>Config: {selected.company_name||selected.name}</div>
+              {msg && <span style={{fontSize:12,color:'#4ade80'}}>{msg}</span>}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              {CONFIG_FIELDS.map(f=>(
+                <div key={f.key}>
+                  <label style={S.label}>{f.label}</label>
+                  {f.type==='select' ? (
+                    <select style={S.input} value={config[f.key]||''} onChange={e=>setConfig((c:any)=>({...c,[f.key]:e.target.value}))}>
+                      <option value="">—</option>
+                      {f.options?.map(o=><option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input style={S.input} type={f.type} value={config[f.key]||''} onChange={e=>setConfig((c:any)=>({...c,[f.key]:e.target.value}))} placeholder={f.placeholder} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop:16,display:'flex',justifyContent:'flex-end'}}>
+              <button style={{...S.btn,...S.btnPrimary}} onClick={save} disabled={saving}>{saving?'Saving…':'Save Configuration'}</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function SuperAdminPortal({ token }: { token: string }) {
+export default function SuperAdminPortal({ token, onLogout, authUser }: { token: string; onLogout?: () => void; authUser?: { name?: string; email?: string } | null }) {
   const [activeNav, setActiveNav] = useState('overview');
   const [packs, setPacks] = useState<LicensePack[]>([]);
 
@@ -738,9 +1327,15 @@ export default function SuperAdminPortal({ token }: { token: string }) {
     switch(activeNav) {
       case 'overview':   return <OverviewSection token={token} />;
       case 'org-admins': return <OrgAdminManagement token={token} packs={packs} />;
+      case 'analytics':  return <AnalyticsSection token={token} />;
       case 'users':      return <UsersSection token={token} />;
+      case 'rbac':       return <RBACSection token={token} />;
+      case 'payments':   return <PaymentsSection token={token} />;
+      case 'licenses':   return <LicensesSection token={token} />;
+      case 'triggers':   return <TriggersSection token={token} />;
+      case 'wizard':     return <CustomerConfigSection token={token} />;
       case 'issues':     return <IssuesSection token={token} />;
-      default:           return <PlaceholderSection title={currentNav?.label||''} icon={currentNav?.icon||'📋'} />;
+      default:           return <OverviewSection token={token} />;
     }
   };
 
@@ -752,21 +1347,46 @@ export default function SuperAdminPortal({ token }: { token: string }) {
           <div style={S.sideTitle}>Super Admin</div>
           <div style={S.sideSubt}>Business Control Plane</div>
         </div>
-        {sections.map(sec => (
-          <div key={sec}>
-            <div style={S.sideSection}>{sec}</div>
-            {NAV.filter(n=>n.section===sec).map(n => (
-              <div key={n.id} style={{...S.navItem, ...(activeNav===n.id ? S.navActive : {})}}
-                onClick={()=>setActiveNav(n.id)}
-                onMouseEnter={e=>{ if(activeNav!==n.id)(e.currentTarget as HTMLElement).style.background='#334155'; }}
-                onMouseLeave={e=>{ if(activeNav!==n.id)(e.currentTarget as HTMLElement).style.background=''; }}
-              >
-                <span style={{fontSize:15}}>{n.icon}</span>
-                <span>{n.label}</span>
-              </div>
-            ))}
+        <div style={{flex:1, overflowY:'auto'}}>
+          {sections.map(sec => (
+            <div key={sec}>
+              <div style={S.sideSection}>{sec}</div>
+              {NAV.filter(n=>n.section===sec).map(n => (
+                <div key={n.id} style={{...S.navItem, ...(activeNav===n.id ? S.navActive : {})}}
+                  onClick={()=>setActiveNav(n.id)}
+                  onMouseEnter={e=>{ if(activeNav!==n.id)(e.currentTarget as HTMLElement).style.background='#334155'; }}
+                  onMouseLeave={e=>{ if(activeNav!==n.id)(e.currentTarget as HTMLElement).style.background=''; }}
+                >
+                  <span style={{fontSize:15}}>{n.icon}</span>
+                  <span>{n.label}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {/* User footer with logout */}
+        <div style={{padding:'12px', borderTop:'1px solid #334155', background:'rgba(15,23,42,0.6)'}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div style={{width:28, height:28, borderRadius:'50%', background:'linear-gradient(135deg,#5B6CFF,#7C3AED)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0}}>
+              {authUser?.name?.charAt(0) || 'S'}
+            </div>
+            <div style={{flex:1, minWidth:0}}>
+              <p style={{fontSize:11, color:'#E2E8F0', fontWeight:600, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{authUser?.name || 'Super Admin'}</p>
+              <p style={{fontSize:9, color:'#94A3B8', margin:0}}>super admin</p>
+            </div>
+            {onLogout && (
+              <button onClick={onLogout} title="Sign out" style={{padding:4, background:'none', border:'none', cursor:'pointer', color:'#64748B'}}
+                onMouseEnter={e=>(e.currentTarget.style.color='#EF4444')}
+                onMouseLeave={e=>(e.currentTarget.style.color='#64748B')}>
+                &#x2192;
+              </button>
+            )}
           </div>
-        ))}
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:6, fontSize:9, color:'#64748B'}}>
+            <span>EDGE QI · v3.0</span>
+            <span style={{display:'flex', alignItems:'center', gap:4}}><span style={{width:6, height:6, borderRadius:'50%', background:'#10B981', display:'inline-block'}} />LIVE</span>
+          </div>
+        </div>
       </div>
 
       {/* Main content */}
