@@ -8456,7 +8456,7 @@ async function startServer() {
     app.get('*', (req, res) => {
       const apiBase = process.env.API_BASE_URL ?? '';
       const indexPath = path.join(distPath, 'index.html');
-      let html = fsM.readFileSync(indexPath, 'utf8');
+      let html = fs.readFileSync(indexPath, 'utf8');
       html = html.replace(
         '<script type="module"',
         `<script>window.__API_BASE__="${apiBase}";</script>\n    <script type="module"`
