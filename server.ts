@@ -8450,9 +8450,13 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else if (!process.env.FRONTEND_ORIGIN) {
-    // Monolith production: serve pre-built SPA from dist/, injecting API_BASE
+    // Monolith production: serve pre-built SPA from dist/ + public/, injecting API_BASE
+    // Trust Railway/Render/Fly reverse proxy so express-rate-limit can read real IPs
+    app.set('trust proxy', 1);
     const distPath = path.join(process.cwd(), 'dist');
+    const publicPath = path.join(process.cwd(), 'public');
     app.use(express.static(distPath));
+    app.use(express.static(publicPath)); // pre-built frontend assets live in public/assets/
     app.get('*', (req, res) => {
       const apiBase = process.env.API_BASE_URL ?? '';
       const indexPath = path.join(distPath, 'index.html');
