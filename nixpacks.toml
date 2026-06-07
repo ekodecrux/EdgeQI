@@ -14,8 +14,8 @@ nixPkgs = [
 
 [phases.install]
 cmds = [
-  # Install production deps (server.cjs needs: express, bcryptjs, better-sqlite3, etc.)
-  "npm ci --omit=dev",
+  # Install all deps including devDeps (vite needed for frontend build)
+  "npm ci",
   # Install artillery separately (devDep but needed at runtime for test runner)
   "npm install --no-save artillery@latest 2>/dev/null || true",
   # Python open source tools
@@ -34,9 +34,13 @@ cmds = [
 
 [phases.build]
 cmds = [
-  # Use pre-built dist/server.cjs if it exists (committed to git), otherwise rebuild
+  # 1. Build the React frontend with Vite
+  "NODE_OPTIONS='--max-old-space-size=4096' node_modules/.bin/vite build 2>&1 || true",
+  # 2. Copy the new bundle to the known stable filename so dist/index.html always works
+  "NEW_BUNDLE=$(grep -o 'index-[A-Za-z0-9]*.js' dist/index.html | head -1) && if [ -n \"$NEW_BUNDLE\" ] && [ \"$NEW_BUNDLE\" != 'index-BeC3Jw2I.js' ]; then cp dist/assets/$NEW_BUNDLE dist/assets/index-BeC3Jw2I.js && sed -i \"s/$NEW_BUNDLE/index-BeC3Jw2I.js/g\" dist/index.html && echo \"Renamed $NEW_BUNDLE to index-BeC3Jw2I.js\"; else echo \"Bundle already index-BeC3Jw2I.js\"; fi",
+  # 3. Build the server bundle
   "if [ -f dist/server.cjs ]; then echo 'Using pre-built dist/server.cjs'; else npx --yes esbuild server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --external:better-sqlite3 --external:bcrypt --external:bcryptjs --external:playwright --external:sharp --external:vite --external:@vite --external:tsx; fi",
-  "echo 'Build complete:' && ls -lh dist/server.cjs",
+  "echo 'Build complete:' && ls -lh dist/server.cjs dist/index.html",
 ]
 
 [start]
