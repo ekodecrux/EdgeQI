@@ -17,7 +17,7 @@ interface TenantInfo { id: string; name: string; status: string; plan_tier: stri
 interface Subscription { pack_name: string; tier: string; max_users: number; max_concurrent: number; price_usd: number; billing_cycle: string; features: string[]; ends_at: string; }
 
 const ROLES = ['tenant_admin', 'qa_engineer', 'manager', 'viewer'];
-const ROLE_COLORS: Record<string, string> = { tenant_admin: 'text-purple-400 bg-purple-900/30', qa_engineer: 'text-blue-400 bg-blue-900/30', manager: 'text-green-400 bg-green-900/30', viewer: 'text-gray-400 bg-gray-800' };
+const ROLE_COLORS: Record<string, string> = { tenant_admin: 'text-purple-400 bg-purple-900/30', qa_engineer: 'text-teal-600 bg-teal-100', manager: 'text-green-400 bg-green-900/30', viewer: 'text-gray-600 bg-gray-100' };
 const STATUS_COLORS: Record<string, string> = { active: 'text-green-400 bg-green-900/30', suspended: 'text-red-400 bg-red-900/30', invited: 'text-yellow-400 bg-yellow-900/30' };
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -178,13 +178,13 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
   ];
 
   if (!tenantData) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="text-center"><RefreshCw size={24} className="animate-spin text-purple-400 mx-auto mb-2" /><p className="text-gray-400 text-sm">Loading organisation data…</p></div>
+    <div className="min-h-screen bg-gray-50 bg-white flex items-center justify-center">
+      <div className="text-center"><RefreshCw size={24} className="animate-spin text-purple-400 mx-auto mb-2" /><p className="text-gray-600 text-sm">Loading organisation data…</p></div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-50 bg-white text-gray-900">
       {/* Toast */}
       {toast.msg && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
@@ -193,7 +193,7 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
       )}
 
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center gap-3">
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
           <Building2 size={16} />
         </div>
@@ -201,25 +201,25 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
           <h1 className="text-base font-bold">{tenant?.name || 'Organisation Admin'}</h1>
           <div className="flex items-center gap-2">
             <span className={`text-xs px-1.5 py-0.5 rounded-full ${tenant?.status === 'active' ? 'text-green-400 bg-green-900/30' : 'text-yellow-400 bg-yellow-900/30'}`}>{tenant?.status}</span>
-            {sub && <span className="text-xs text-gray-400">{sub.pack_name} · {sub.max_users} seats · {sub.max_concurrent} concurrent</span>}
+            {sub && <span className="text-xs text-gray-600">{sub.pack_name} · {sub.max_users} seats · {sub.max_concurrent} concurrent</span>}
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
           {/* Live indicator */}
-          <button onClick={() => setLiveRefresh(!liveRefresh)} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg border ${liveRefresh ? 'border-green-600 text-green-400 bg-green-900/20' : 'border-gray-700 text-gray-400'}`}>
+          <button onClick={() => setLiveRefresh(!liveRefresh)} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg border ${liveRefresh ? 'border-green-600 text-green-400 bg-green-900/20' : 'border-gray-200 text-gray-600'}`}>
             {liveRefresh ? <><span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />Live</> : <><WifiOff size={11} />Paused</>}
           </button>
-          <button onClick={() => { loadTenantData(); loadSessions(); }} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg"><RefreshCw size={14} /></button>
-          {onClose && <button onClick={onClose} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg"><X size={14} /></button>}
+          <button onClick={() => { loadTenantData(); loadSessions(); }} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg"><RefreshCw size={14} /></button>
+          {onClose && <button onClick={onClose} className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg"><X size={14} /></button>}
         </div>
       </div>
 
       {/* Tab nav */}
-      <div className="bg-gray-900 border-b border-gray-800 px-6 flex gap-1 overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 px-6 flex gap-1 overflow-x-auto">
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.id ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:text-white'}`}>
+          <button key={t.id} onClick={() => setTab(t.id as any)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${tab === t.id ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
             <t.icon size={13} />{t.label}
-            {t.id === 'sessions' && concurrentNow > 0 && <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">{concurrentNow}</span>}
+            {t.id === 'sessions' && concurrentNow > 0 && <span className="bg-teal-600 text-gray-900 text-xs px-1.5 py-0.5 rounded-full">{concurrentNow}</span>}
           </button>
         ))}
       </div>
@@ -237,24 +237,24 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                 { label: 'API Calls Today', value: usage[0]?.total_api_calls || 0, pct: 0, color: 'bg-purple-500', icon: Zap, sub: `Peak: ${usage[0]?.peak_concurrent || 0} concurrent` },
                 { label: 'Test Runs Today', value: usage[0]?.test_runs || 0, pct: 0, color: 'bg-orange-500', icon: CheckCircle, sub: `AI tokens: ${(usage[0]?.ai_tokens_used || 0).toLocaleString()}` },
               ].map(card => (
-                <div key={card.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <div key={card.label} className="bg-white border border-gray-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-400">{card.label}</span>
-                    <card.icon size={14} className="text-gray-500" />
+                    <span className="text-xs text-gray-600">{card.label}</span>
+                    <card.icon size={14} className="text-gray-600" />
                   </div>
                   <div className="text-xl font-bold mb-1">{card.value}</div>
-                  {card.pct > 0 && <div className="h-1.5 bg-gray-800 rounded-full mb-1"><div className={`h-1.5 ${card.color} rounded-full transition-all`} style={{ width: `${Math.min(100, card.pct)}%` }} /></div>}
-                  <div className="text-xs text-gray-500">{card.sub}</div>
+                  {card.pct > 0 && <div className="h-1.5 bg-gray-100 rounded-full mb-1"><div className={`h-1.5 ${card.color} rounded-full transition-all`} style={{ width: `${Math.min(100, card.pct)}%` }} /></div>}
+                  <div className="text-xs text-gray-600">{card.sub}</div>
                 </div>
               ))}
             </div>
 
             {/* License info */}
             {sub && (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold flex items-center gap-2"><Package size={15} className="text-purple-400" />Current License</h3>
-                  <span className="text-xs text-gray-400">Expires {fmtDate(sub.ends_at)}</span>
+                  <span className="text-xs text-gray-600">Expires {fmtDate(sub.ends_at)}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   {[
@@ -263,14 +263,14 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                     { label: 'Max Users', value: sub.max_users },
                     { label: 'Max Concurrent', value: sub.max_concurrent },
                   ].map(f => (
-                    <div key={f.label} className="bg-gray-800 rounded-lg p-3">
-                      <div className="text-xs text-gray-400 mb-1">{f.label}</div>
+                    <div key={f.label} className="bg-gray-100 rounded-lg p-3">
+                      <div className="text-xs text-gray-600 mb-1">{f.label}</div>
                       <div className="font-semibold text-sm">{f.value}</div>
                     </div>
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {(sub.features || []).map(f => <span key={f} className="text-xs bg-blue-900/30 text-blue-300 px-2 py-1 rounded-full flex items-center gap-1"><CheckCircle size={9} />{f}</span>)}
+                  {(sub.features || []).map(f => <span key={f} className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full flex items-center gap-1"><CheckCircle size={9} />{f}</span>)}
                 </div>
               </div>
             )}
@@ -292,10 +292,10 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
 
             {/* Mini usage sparkline */}
             {usageLast14.length > 0 && (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2"><TrendingUp size={14} className="text-green-400" />API Calls — Last 14 Days</h3>
-                  <button onClick={() => setTab('usage')} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">Full report <ChevronRight size={11} /></button>
+                  <button onClick={() => setTab('usage')} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1">Full report <ChevronRight size={11} /></button>
                 </div>
                 <div className="flex items-end gap-1 h-16">
                   {usageLast14.map(u => {
@@ -319,19 +319,19 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Users & Access Control</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{seatsUsed} of {seatsMax} seats used</p>
+                <p className="text-xs text-gray-600 mt-0.5">{seatsUsed} of {seatsMax} seats used</p>
               </div>
-              <button onClick={() => setShowInviteModal(true)} disabled={seatsUsed >= seatsMax} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm">
+              <button onClick={() => setShowInviteModal(true)} disabled={seatsUsed >= seatsMax} className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm">
                 <Plus size={14} />Invite User
               </button>
             </div>
 
             {/* Seat usage bar */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <div className="flex justify-between text-xs text-gray-400 mb-2">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="flex justify-between text-xs text-gray-600 mb-2">
                 <span>Seat Usage</span><span>{seatsUsed}/{seatsMax} used</span>
               </div>
-              <div className="h-2 bg-gray-800 rounded-full">
+              <div className="h-2 bg-gray-100 rounded-full">
                 <div className={`h-2 rounded-full transition-all ${seatPct > 90 ? 'bg-red-500' : seatPct > 70 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(100, seatPct)}%` }} />
               </div>
               {seatPct > 80 && <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1"><AlertTriangle size={10} />Approaching seat limit. Contact your admin to upgrade.</p>}
@@ -340,36 +340,36 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             {/* Role permissions reference */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {ROLES.map(role => (
-                <div key={role} className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+                <div key={role} className="bg-white border border-gray-200 rounded-xl p-3">
                   <div className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block mb-2 ${ROLE_COLORS[role]}`}>{role.replace('_', ' ')}</div>
                   <ul className="space-y-1">
-                    {ROLE_PERMISSIONS[role].map(p => <li key={p} className="text-xs text-gray-400 flex items-start gap-1"><CheckCircle size={9} className="text-green-400 mt-0.5 shrink-0" />{p}</li>)}
+                    {ROLE_PERMISSIONS[role].map(p => <li key={p} className="text-xs text-gray-600 flex items-start gap-1"><CheckCircle size={9} className="text-green-400 mt-0.5 shrink-0" />{p}</li>)}
                   </ul>
                 </div>
               ))}
             </div>
 
             {/* User table */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-800 text-gray-400 text-xs">
+                <thead className="bg-gray-100 text-gray-600 text-xs">
                   <tr>{['User','Role','Status','Last Active','Actions'].map(h => <th key={h} className="text-left px-4 py-3">{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
-                    <tr key={u.id} className="border-t border-gray-800 hover:bg-gray-800/50">
+                    <tr key={u.id} className="border-t border-gray-200 hover:bg-gray-100/50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-xs font-bold">{u.name.charAt(0).toUpperCase()}</div>
                           <div>
                             <div className="font-medium">{u.name}</div>
-                            <div className="text-xs text-gray-500">{u.email}</div>
+                            <div className="text-xs text-gray-600">{u.email}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${ROLE_COLORS[u.role] || 'text-gray-400 bg-gray-800'}`}>{u.role.replace('_', ' ')}</span></td>
-                      <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[u.status] || 'text-gray-400'}`}>{u.status}</span></td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{u.last_active ? fmtDate(u.last_active) : '—'}</td>
+                      <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${ROLE_COLORS[u.role] || 'text-gray-600 bg-gray-100'}`}>{u.role.replace('_', ' ')}</span></td>
+                      <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[u.status] || 'text-gray-600'}`}>{u.status}</span></td>
+                      <td className="px-4 py-3 text-xs text-gray-600">{u.last_active ? fmtDate(u.last_active) : '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           {u.status === 'active' ? (
@@ -378,14 +378,14 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                             <button onClick={() => setUserStatus(u.id, 'active')} className="p-1.5 bg-green-900/30 hover:bg-green-900/50 text-green-400 rounded text-xs" title="Activate"><Unlock size={11} /></button>
                           ) : null}
                           {u.invite_token && (
-                            <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/accept-invite?token=${u.invite_token}`); showToast('Invite link copied!'); }} className="p-1.5 bg-blue-900/30 hover:bg-blue-900/50 text-blue-400 rounded text-xs" title="Copy invite link"><Copy size={11} /></button>
+                            <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/accept-invite?token=${u.invite_token}`); showToast('Invite link copied!'); }} className="p-1.5 bg-teal-100 hover:bg-blue-900/50 text-teal-600 rounded text-xs" title="Copy invite link"><Copy size={11} /></button>
                           )}
                           <button onClick={() => removeUser(u.id)} className="p-1.5 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded text-xs" title="Remove"><Trash2 size={11} /></button>
                         </div>
                       </td>
                     </tr>
                   ))}
-                  {users.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No users yet. Invite your first team member.</td></tr>}
+                  {users.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-600">No users yet. Invite your first team member.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -398,7 +398,7 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Live Sessions</h2>
-                <p className="text-xs text-gray-400">{concurrentNow} of {concurrentMax} concurrent slots in use · Auto-refreshes every 15s</p>
+                <p className="text-xs text-gray-600">{concurrentNow} of {concurrentMax} concurrent slots in use · Auto-refreshes every 15s</p>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg ${concurrentNow >= concurrentMax ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}`}>
@@ -409,38 +409,38 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             </div>
 
             {/* Concurrent gauge */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <div className="flex justify-between text-xs text-gray-400 mb-2">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="flex justify-between text-xs text-gray-600 mb-2">
                 <span>Concurrent Usage</span><span>{concurrentNow}/{concurrentMax}</span>
               </div>
-              <div className="h-3 bg-gray-800 rounded-full">
+              <div className="h-3 bg-gray-100 rounded-full">
                 <div className={`h-3 rounded-full transition-all ${concurrentPct >= 100 ? 'bg-red-500' : concurrentPct > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(100, concurrentPct)}%` }} />
               </div>
               {concurrentPct >= 100 && <p className="text-xs text-red-400 mt-1 flex items-center gap-1"><AlertTriangle size={10} />Concurrent limit reached. New users will be blocked until a session expires.</p>}
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-800 text-gray-400 text-xs">
+                <thead className="bg-gray-100 text-gray-600 text-xs">
                   <tr>{['User','IP Address','Browser / Device','Started','Last Seen','Action'].map(h => <th key={h} className="text-left px-4 py-3">{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {sessions.map(s => (
-                    <tr key={s.id} className="border-t border-gray-800 hover:bg-gray-800/50">
+                    <tr key={s.id} className="border-t border-gray-200 hover:bg-gray-100/50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-sm">{s.name}</div>
-                        <div className="text-xs text-gray-500">{s.email}</div>
+                        <div className="text-xs text-gray-600">{s.email}</div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-mono text-gray-400">{s.ip_address || '—'}</td>
-                      <td className="px-4 py-3 text-xs text-gray-400 max-w-xs truncate">{s.user_agent ? s.user_agent.split(' ').slice(-2).join(' ') : '—'}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{fmtTime(s.started_at)}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-600">{s.ip_address || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-600 max-w-xs truncate">{s.user_agent ? s.user_agent.split(' ').slice(-2).join(' ') : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-600">{fmtTime(s.started_at)}</td>
                       <td className="px-4 py-3 text-xs text-green-400 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />{fmtTime(s.last_seen)}</td>
                       <td className="px-4 py-3">
                         <button onClick={() => killSession(s.id)} className="flex items-center gap-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 px-2 py-1 rounded text-xs"><LogOut size={10} />End</button>
                       </td>
                     </tr>
                   ))}
-                  {sessions.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No active sessions</td></tr>}
+                  {sessions.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-600">No active sessions</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -455,21 +455,21 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Total API Calls (30d)', value: usage.slice(0,30).reduce((s,u) => s+u.total_api_calls, 0).toLocaleString(), icon: Zap, color: 'text-blue-400' },
+                { label: 'Total API Calls (30d)', value: usage.slice(0,30).reduce((s,u) => s+u.total_api_calls, 0).toLocaleString(), icon: Zap, color: 'text-teal-600' },
                 { label: 'Peak Concurrent (30d)', value: Math.max(...usage.slice(0,30).map(u => u.peak_concurrent), 0), icon: Activity, color: 'text-green-400' },
                 { label: 'Test Runs (30d)', value: usage.slice(0,30).reduce((s,u) => s+u.test_runs, 0).toLocaleString(), icon: CheckCircle, color: 'text-purple-400' },
                 { label: 'AI Tokens (30d)', value: usage.slice(0,30).reduce((s,u) => s+u.ai_tokens_used, 0).toLocaleString(), icon: Star, color: 'text-yellow-400' },
               ].map(c => (
-                <div key={c.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2"><c.icon size={14} className={c.color} /><span className="text-xs text-gray-400">{c.label}</span></div>
+                <div key={c.label} className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2"><c.icon size={14} className={c.color} /><span className="text-xs text-gray-600">{c.label}</span></div>
                   <div className="text-xl font-bold">{c.value}</div>
                 </div>
               ))}
             </div>
 
             {/* API Calls chart */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><BarChart2 size={14} className="text-blue-400" />Daily API Calls (Last 30 Days)</h3>
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><BarChart2 size={14} className="text-teal-600" />Daily API Calls (Last 30 Days)</h3>
               <div className="flex items-end gap-1 h-32">
                 {usage.slice(0,30).reverse().map(u => {
                   const max = Math.max(...usage.slice(0,30).map(x => x.total_api_calls), 1);
@@ -486,7 +486,7 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             </div>
 
             {/* Concurrent chart */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><Activity size={14} className="text-green-400" />Peak Concurrent Users vs Limit</h3>
               <div className="flex items-end gap-1 h-24">
                 {usage.slice(0,30).reverse().map(u => {
@@ -507,22 +507,22 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             </div>
 
             {/* Usage table */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-800 text-gray-400 text-xs">
+                <thead className="bg-gray-100 text-gray-600 text-xs">
                   <tr>{['Date','API Calls','Peak Concurrent','Test Runs','AI Tokens'].map(h => <th key={h} className="text-left px-4 py-3">{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {usage.slice(0, 30).map(u => (
-                    <tr key={u.metric_date} className="border-t border-gray-800 hover:bg-gray-800/50 text-sm">
+                    <tr key={u.metric_date} className="border-t border-gray-200 hover:bg-gray-100/50 text-sm">
                       <td className="px-4 py-2 font-mono text-xs">{u.metric_date}</td>
                       <td className="px-4 py-2">{u.total_api_calls.toLocaleString()}</td>
                       <td className="px-4 py-2"><span className={u.peak_concurrent >= concurrentMax ? 'text-red-400' : 'text-gray-300'}>{u.peak_concurrent}</span></td>
                       <td className="px-4 py-2">{u.test_runs}</td>
-                      <td className="px-4 py-2 text-gray-400">{u.ai_tokens_used.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-gray-600">{u.ai_tokens_used.toLocaleString()}</td>
                     </tr>
                   ))}
-                  {usage.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No usage data yet</td></tr>}
+                  {usage.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-600">No usage data yet</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -535,21 +535,21 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Single Sign-On (SSO)</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Connect your organisation's identity provider for seamless login</p>
+                <p className="text-xs text-gray-600 mt-0.5">Connect your organisation's identity provider for seamless login</p>
               </div>
               <button onClick={() => setShowSsoModal(true)} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm"><Settings size={14} />{ssoConfig ? 'Edit Config' : 'Configure SSO'}</button>
             </div>
 
             {ssoConfig ? (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ssoConfig.is_active ? 'bg-green-900/30' : 'bg-gray-800'}`}>
-                      <Key size={18} className={ssoConfig.is_active ? 'text-green-400' : 'text-gray-400'} />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ssoConfig.is_active ? 'bg-green-900/30' : 'bg-gray-100'}`}>
+                      <Key size={18} className={ssoConfig.is_active ? 'text-green-400' : 'text-gray-600'} />
                     </div>
                     <div>
                       <div className="font-semibold">{ssoConfig.provider?.replace('_', ' ').toUpperCase()}</div>
-                      <div className="text-xs text-gray-400">{ssoConfig.protocol?.toUpperCase()} · {ssoConfig.is_active ? 'Active' : 'Inactive'}</div>
+                      <div className="text-xs text-gray-600">{ssoConfig.protocol?.toUpperCase()} · {ssoConfig.is_active ? 'Active' : 'Inactive'}</div>
                     </div>
                   </div>
                   <button onClick={() => toggleSso(!ssoConfig.is_active)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${ssoConfig.is_active ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50' : 'bg-green-900/30 text-green-400 hover:bg-green-900/50'}`}>
@@ -557,21 +557,21 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="bg-gray-800 rounded-lg p-3"><div className="text-xs text-gray-400 mb-1">Client ID</div><div className="font-mono text-xs truncate">{ssoConfig.client_id || '—'}</div></div>
-                  <div className="bg-gray-800 rounded-lg p-3"><div className="text-xs text-gray-400 mb-1">Issuer URL</div><div className="font-mono text-xs truncate">{ssoConfig.issuer_url || '—'}</div></div>
+                  <div className="bg-gray-100 rounded-lg p-3"><div className="text-xs text-gray-600 mb-1">Client ID</div><div className="font-mono text-xs truncate">{ssoConfig.client_id || '—'}</div></div>
+                  <div className="bg-gray-100 rounded-lg p-3"><div className="text-xs text-gray-600 mb-1">Issuer URL</div><div className="font-mono text-xs truncate">{ssoConfig.issuer_url || '—'}</div></div>
                 </div>
-                <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-3">
-                  <div className="text-xs text-blue-400 font-medium mb-1">Callback URL (configure in your IdP)</div>
+                <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+                  <div className="text-xs text-teal-600 font-medium mb-1">Callback URL (configure in your IdP)</div>
                   <div className="flex items-center gap-2">
                     <code className="text-xs font-mono text-gray-300 flex-1 truncate">{ssoConfig.callback_url}</code>
-                    <button onClick={() => { navigator.clipboard?.writeText(ssoConfig.callback_url); showToast('Copied!'); }} className="p-1 hover:bg-blue-900/30 rounded"><Copy size={12} className="text-blue-400" /></button>
+                    <button onClick={() => { navigator.clipboard?.writeText(ssoConfig.callback_url); showToast('Copied!'); }} className="p-1 hover:bg-teal-100 rounded"><Copy size={12} className="text-teal-600" /></button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-900 border border-dashed border-gray-700 rounded-xl p-8 text-center">
+              <div className="bg-white border border-dashed border-gray-200 rounded-xl p-8 text-center">
                 <Key size={32} className="mx-auto mb-3 text-gray-600" />
-                <p className="text-gray-400 text-sm mb-1">No SSO configured</p>
+                <p className="text-gray-600 text-sm mb-1">No SSO configured</p>
                 <p className="text-gray-600 text-xs">Connect Azure AD, Okta, Google Workspace, Ping Identity, or any SAML/OIDC provider</p>
               </div>
             )}
@@ -585,10 +585,10 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                 { name: 'OneLogin', logo: '🟢', protocol: 'SAML' },
                 { name: 'Custom SAML', logo: '⚙️', protocol: 'SAML' },
               ].map(p => (
-                <div key={p.name} className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
+                <div key={p.name} className="bg-white border border-gray-200 rounded-lg p-3 text-center">
                   <div className="text-2xl mb-1">{p.logo}</div>
                   <div className="text-xs font-medium">{p.name}</div>
-                  <div className="text-xs text-gray-500">{p.protocol}</div>
+                  <div className="text-xs text-gray-600">{p.protocol}</div>
                 </div>
               ))}
             </div>
@@ -601,44 +601,44 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
             <h2 className="text-lg font-semibold">Billing & Receipts</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><FileText size={14} className="text-blue-400" />Invoices</h3>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><FileText size={14} className="text-teal-600" />Invoices</h3>
                 <div className="space-y-2">
                   {(tenantData?.invoices || []).map((inv: any) => (
-                    <div key={inv.id} className="bg-gray-900 border border-gray-800 rounded-xl p-3 flex items-center justify-between">
+                    <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between">
                       <div>
-                        <div className="font-mono text-xs text-gray-400">{inv.invoice_number}</div>
+                        <div className="font-mono text-xs text-gray-600">{inv.invoice_number}</div>
                         <div className="font-semibold text-sm">{new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency }).format(inv.total)}</div>
-                        <div className="text-xs text-gray-500">{fmtDate(inv.created_at)}</div>
+                        <div className="text-xs text-gray-600">{fmtDate(inv.created_at)}</div>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${inv.status === 'paid' ? 'text-green-400 bg-green-900/30' : inv.status === 'overdue' ? 'text-red-400 bg-red-900/30' : 'text-yellow-400 bg-yellow-900/30'}`}>{inv.status}</span>
                     </div>
                   ))}
-                  {!(tenantData?.invoices?.length) && <p className="text-sm text-gray-500 text-center py-6">No invoices yet</p>}
+                  {!(tenantData?.invoices?.length) && <p className="text-sm text-gray-600 text-center py-6">No invoices yet</p>}
                 </div>
               </div>
               <div>
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Receipt size={14} className="text-green-400" />Receipts</h3>
                 <div className="space-y-2">
                   {(tenantData?.receipts || []).map((r: any) => (
-                    <div key={r.id} className="bg-gray-900 border border-gray-800 rounded-xl p-3 flex items-center justify-between">
+                    <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between">
                       <div>
-                        <div className="font-mono text-xs text-gray-400">{r.receipt_number}</div>
+                        <div className="font-mono text-xs text-gray-600">{r.receipt_number}</div>
                         <div className="font-semibold text-sm">{new Intl.NumberFormat('en-US', { style: 'currency', currency: r.currency }).format(r.amount)}</div>
-                        <div className="text-xs text-gray-500">{fmtDate(r.paid_at)} · {r.payment_method}</div>
+                        <div className="text-xs text-gray-600">{fmtDate(r.paid_at)} · {r.payment_method}</div>
                       </div>
                       <CheckCircle size={16} className="text-green-400" />
                     </div>
                   ))}
-                  {!(tenantData?.receipts?.length) && <p className="text-sm text-gray-500 text-center py-6">No receipts yet</p>}
+                  {!(tenantData?.receipts?.length) && <p className="text-sm text-gray-600 text-center py-6">No receipts yet</p>}
                 </div>
               </div>
             </div>
-            <div className="bg-blue-900/20 border border-blue-800 rounded-xl p-4 flex items-start gap-3">
-              <LifeBuoy size={18} className="text-blue-400 shrink-0 mt-0.5" />
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+              <LifeBuoy size={18} className="text-teal-600 shrink-0 mt-0.5" />
               <div>
-                <div className="text-sm font-medium text-blue-300">Billing questions?</div>
-                <p className="text-xs text-gray-400 mt-0.5">For invoice disputes, payment issues, or upgrade requests, raise a support ticket and our team will respond within 24 hours.</p>
-                <button onClick={() => setShowSupportModal(true)} className="mt-2 text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">Raise a ticket <ChevronRight size={10} /></button>
+                <div className="text-sm font-medium text-teal-700">Billing questions?</div>
+                <p className="text-xs text-gray-600 mt-0.5">For invoice disputes, payment issues, or upgrade requests, raise a support ticket and our team will respond within 24 hours.</p>
+                <button onClick={() => setShowSupportModal(true)} className="mt-2 text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1">Raise a ticket <ChevronRight size={10} /></button>
               </div>
             </div>
           </div>
@@ -651,11 +651,11 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
               <h2 className="text-lg font-semibold">Support</h2>
               <button onClick={() => setShowSupportModal(true)} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg text-sm"><Plus size={14} />New Ticket</button>
             </div>
-            <div className="bg-blue-900/20 border border-blue-800 rounded-xl p-4 flex items-start gap-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">🤖</div>
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+              <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center shrink-0">🤖</div>
               <div>
                 <div className="text-sm font-medium">AI Copilot Support</div>
-                <p className="text-xs text-gray-400 mt-0.5">When you raise a ticket, our AI copilot instantly analyses your issue and provides a suggested resolution. A human agent reviews and follows up within 24 hours.</p>
+                <p className="text-xs text-gray-600 mt-0.5">When you raise a ticket, our AI copilot instantly analyses your issue and provides a suggested resolution. A human agent reviews and follows up within 24 hours.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3">
@@ -665,9 +665,9 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                 { category: 'technical', icon: Settings, title: 'Technical Support', desc: 'Integration issues, SSO problems, API errors' },
                 { category: 'general', icon: LifeBuoy, title: 'General Enquiry', desc: 'Feature requests, onboarding help, feedback' },
               ].map(c => (
-                <button key={c.category} onClick={() => { setSupportForm(f => ({ ...f, category: c.category })); setShowSupportModal(true); }} className="bg-gray-900 border border-gray-800 hover:border-orange-500 rounded-xl p-4 text-left flex items-center gap-4 transition-colors">
-                  <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center shrink-0"><c.icon size={18} className="text-orange-400" /></div>
-                  <div><div className="font-medium text-sm">{c.title}</div><div className="text-xs text-gray-400">{c.desc}</div></div>
+                <button key={c.category} onClick={() => { setSupportForm(f => ({ ...f, category: c.category })); setShowSupportModal(true); }} className="bg-white border border-gray-200 hover:border-orange-500 rounded-xl p-4 text-left flex items-center gap-4 transition-colors">
+                  <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><c.icon size={18} className="text-orange-400" /></div>
+                  <div><div className="font-medium text-sm">{c.title}</div><div className="text-xs text-gray-600">{c.desc}</div></div>
                   <ChevronRight size={14} className="ml-auto text-gray-600" />
                 </button>
               ))}
@@ -679,8 +679,8 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
       {/* ── INVITE MODAL ── */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Invite Team Member</h2>
               <button onClick={() => { setShowInviteModal(false); setInviteLink(''); }}><X size={18} /></button>
             </div>
@@ -689,30 +689,30 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
                 <div className="bg-green-900/20 border border-green-800 rounded-xl p-4 text-center">
                   <CheckCircle size={24} className="text-green-400 mx-auto mb-2" />
                   <p className="text-sm font-medium">Invitation created!</p>
-                  <p className="text-xs text-gray-400 mt-1">Share this link with the user to complete their registration:</p>
+                  <p className="text-xs text-gray-600 mt-1">Share this link with the user to complete their registration:</p>
                 </div>
-                <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-3">
+                <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-3">
                   <code className="text-xs font-mono text-gray-300 flex-1 truncate">{window.location.origin}{inviteLink}</code>
-                  <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}${inviteLink}`); showToast('Copied!'); }} className="p-1 hover:bg-gray-700 rounded"><Copy size={12} /></button>
+                  <button onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}${inviteLink}`); showToast('Copied!'); }} className="p-1 hover:bg-gray-200 rounded"><Copy size={12} /></button>
                 </div>
-                <button onClick={() => { setShowInviteModal(false); setInviteLink(''); }} className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg text-sm">Done</button>
+                <button onClick={() => { setShowInviteModal(false); setInviteLink(''); }} className="w-full bg-teal-600 hover:bg-teal-700 py-2 rounded-lg text-sm">Done</button>
               </div>
             ) : (
               <div className="p-5 space-y-4">
-                <div><label className="text-xs text-gray-400 mb-1 block">Full Name</label><input value={inviteForm.name} onChange={e => setInviteForm({...inviteForm, name: e.target.value})} placeholder="Jane Smith" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" /></div>
-                <div><label className="text-xs text-gray-400 mb-1 block">Email Address</label><input type="email" value={inviteForm.email} onChange={e => setInviteForm({...inviteForm, email: e.target.value})} placeholder="jane@company.com" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" /></div>
+                <div><label className="text-xs text-gray-600 mb-1 block">Full Name</label><input value={inviteForm.name} onChange={e => setInviteForm({...inviteForm, name: e.target.value})} placeholder="Jane Smith" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500" /></div>
+                <div><label className="text-xs text-gray-600 mb-1 block">Email Address</label><input type="email" value={inviteForm.email} onChange={e => setInviteForm({...inviteForm, email: e.target.value})} placeholder="jane@company.com" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500" /></div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Role</label>
-                  <select value={inviteForm.role} onChange={e => setInviteForm({...inviteForm, role: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                  <label className="text-xs text-gray-600 mb-1 block">Role</label>
+                  <select value={inviteForm.role} onChange={e => setInviteForm({...inviteForm, role: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
                     {ROLES.map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
                   </select>
                   <div className="mt-2 space-y-1">
-                    {ROLE_PERMISSIONS[inviteForm.role]?.map(p => <div key={p} className="flex items-center gap-1 text-xs text-gray-400"><CheckCircle size={9} className="text-green-400" />{p}</div>)}
+                    {ROLE_PERMISSIONS[inviteForm.role]?.map(p => <div key={p} className="flex items-center gap-1 text-xs text-gray-600"><CheckCircle size={9} className="text-green-400" />{p}</div>)}
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={inviteUser} disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 py-2 rounded-lg text-sm"><Mail size={14} />{loading ? 'Creating…' : 'Create Invitation'}</button>
-                  <button onClick={() => setShowInviteModal(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm">Cancel</button>
+                  <button onClick={inviteUser} disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 py-2 rounded-lg text-sm"><Mail size={14} />{loading ? 'Creating…' : 'Create Invitation'}</button>
+                  <button onClick={() => setShowInviteModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
                 </div>
               </div>
             )}
@@ -723,39 +723,39 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
       {/* ── SSO MODAL ── */}
       {showSsoModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Configure SSO</h2>
               <button onClick={() => setShowSsoModal(false)}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs text-gray-400 mb-1 block">Protocol</label>
-                  <select value={ssoForm.protocol} onChange={e => setSsoForm({...ssoForm, protocol: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                <div><label className="text-xs text-gray-600 mb-1 block">Protocol</label>
+                  <select value={ssoForm.protocol} onChange={e => setSsoForm({...ssoForm, protocol: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
                     <option value="oidc">OIDC / OAuth2</option><option value="saml">SAML 2.0</option>
                   </select>
                 </div>
-                <div><label className="text-xs text-gray-400 mb-1 block">Provider</label>
-                  <select value={ssoForm.provider} onChange={e => setSsoForm({...ssoForm, provider: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                <div><label className="text-xs text-gray-600 mb-1 block">Provider</label>
+                  <select value={ssoForm.provider} onChange={e => setSsoForm({...ssoForm, provider: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
                     <option value="azure_ad">Azure AD</option><option value="okta">Okta</option><option value="google">Google Workspace</option><option value="ping">Ping Identity</option><option value="onelogin">OneLogin</option><option value="custom">Custom</option>
                   </select>
                 </div>
               </div>
-              <div><label className="text-xs text-gray-400 mb-1 block">Client ID / App ID</label><input value={ssoForm.client_id} onChange={e => setSsoForm({...ssoForm, client_id: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" /></div>
-              <div><label className="text-xs text-gray-400 mb-1 block">Client Secret</label>
+              <div><label className="text-xs text-gray-600 mb-1 block">Client ID / App ID</label><input value={ssoForm.client_id} onChange={e => setSsoForm({...ssoForm, client_id: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" /></div>
+              <div><label className="text-xs text-gray-600 mb-1 block">Client Secret</label>
                 <div className="relative">
-                  <input type={showSecret ? 'text' : 'password'} value={ssoForm.client_secret} onChange={e => setSsoForm({...ssoForm, client_secret: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:border-purple-500" />
-                  <button onClick={() => setShowSecret(!showSecret)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showSecret ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                  <input type={showSecret ? 'text' : 'password'} value={ssoForm.client_secret} onChange={e => setSsoForm({...ssoForm, client_secret: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:border-purple-500" />
+                  <button onClick={() => setShowSecret(!showSecret)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600">{showSecret ? <EyeOff size={14} /> : <Eye size={14} />}</button>
                 </div>
               </div>
-              {ssoForm.protocol === 'oidc' && <div><label className="text-xs text-gray-400 mb-1 block">Issuer URL / Discovery URL</label><input value={ssoForm.issuer_url} onChange={e => setSsoForm({...ssoForm, issuer_url: e.target.value})} placeholder="https://login.microsoftonline.com/{tenant-id}/v2.0" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" /></div>}
-              {ssoForm.protocol === 'saml' && <div><label className="text-xs text-gray-400 mb-1 block">SAML Metadata URL</label><input value={ssoForm.saml_metadata_url} onChange={e => setSsoForm({...ssoForm, saml_metadata_url: e.target.value})} placeholder="https://your-idp.com/metadata.xml" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" /></div>}
-              <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-3 text-xs text-blue-300">
+              {ssoForm.protocol === 'oidc' && <div><label className="text-xs text-gray-600 mb-1 block">Issuer URL / Discovery URL</label><input value={ssoForm.issuer_url} onChange={e => setSsoForm({...ssoForm, issuer_url: e.target.value})} placeholder="https://login.microsoftonline.com/{tenant-id}/v2.0" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" /></div>}
+              {ssoForm.protocol === 'saml' && <div><label className="text-xs text-gray-600 mb-1 block">SAML Metadata URL</label><input value={ssoForm.saml_metadata_url} onChange={e => setSsoForm({...ssoForm, saml_metadata_url: e.target.value})} placeholder="https://your-idp.com/metadata.xml" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" /></div>}
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-700">
                 After saving, copy the <strong>Callback URL</strong> and register it as a redirect URI in your identity provider.
               </div>
               <div className="flex gap-3">
                 <button onClick={saveSso} disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 py-2 rounded-lg text-sm"><Save size={14} />{loading ? 'Saving…' : 'Save SSO Config'}</button>
-                <button onClick={() => setShowSsoModal(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm">Cancel</button>
+                <button onClick={() => setShowSsoModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
               </div>
             </div>
           </div>
@@ -765,32 +765,32 @@ export default function TenantAdminPortal({ token, onClose }: { token: string; o
       {/* ── SUPPORT MODAL ── */}
       {showSupportModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Raise Support Ticket</h2>
               <button onClick={() => setShowSupportModal(false)}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs text-gray-400 mb-1 block">Category</label>
-                  <select value={supportForm.category} onChange={e => setSupportForm({...supportForm, category: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+                <div><label className="text-xs text-gray-600 mb-1 block">Category</label>
+                  <select value={supportForm.category} onChange={e => setSupportForm({...supportForm, category: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
                     <option value="billing">Billing</option><option value="license">License</option><option value="technical">Technical</option><option value="general">General</option>
                   </select>
                 </div>
-                <div><label className="text-xs text-gray-400 mb-1 block">Priority</label>
-                  <select value={supportForm.priority} onChange={e => setSupportForm({...supportForm, priority: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
+                <div><label className="text-xs text-gray-600 mb-1 block">Priority</label>
+                  <select value={supportForm.priority} onChange={e => setSupportForm({...supportForm, priority: e.target.value})} className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
                     <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
                   </select>
                 </div>
               </div>
-              <div><label className="text-xs text-gray-400 mb-1 block">Subject</label><input value={supportForm.subject} onChange={e => setSupportForm({...supportForm, subject: e.target.value})} placeholder="Brief summary of your issue" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500" /></div>
-              <div><label className="text-xs text-gray-400 mb-1 block">Description</label><textarea value={supportForm.description} onChange={e => setSupportForm({...supportForm, description: e.target.value})} rows={4} placeholder="Describe your issue in detail…" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500" /></div>
-              <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-3 flex items-center gap-2 text-xs text-blue-300">
+              <div><label className="text-xs text-gray-600 mb-1 block">Subject</label><input value={supportForm.subject} onChange={e => setSupportForm({...supportForm, subject: e.target.value})} placeholder="Brief summary of your issue" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500" /></div>
+              <div><label className="text-xs text-gray-600 mb-1 block">Description</label><textarea value={supportForm.description} onChange={e => setSupportForm({...supportForm, description: e.target.value})} rows={4} placeholder="Describe your issue in detail…" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500" /></div>
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center gap-2 text-xs text-teal-700">
                 🤖 <span>AI Copilot will instantly analyse your ticket and suggest a resolution when you submit.</span>
               </div>
               <div className="flex gap-3">
                 <button onClick={submitSupport} disabled={loading} className="flex-1 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 py-2 rounded-lg text-sm"><Send size={14} />{loading ? 'Submitting…' : 'Submit Ticket'}</button>
-                <button onClick={() => setShowSupportModal(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm">Cancel</button>
+                <button onClick={() => setShowSupportModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">Cancel</button>
               </div>
             </div>
           </div>

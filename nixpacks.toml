@@ -34,6 +34,8 @@ cmds = [
 
 [phases.build]
 cmds = [
+  # 0. Ensure esbuild is available in build phase
+  "npm install --no-save esbuild@latest 2>/dev/null || true",
   # 1. Build the React frontend with Vite
   "NODE_OPTIONS='--max-old-space-size=4096' node_modules/.bin/vite build 2>&1 || true",
   # 2. Copy the new bundle to the known stable filename so dist/index.html always works
